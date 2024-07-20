@@ -14,7 +14,7 @@ class BaseFirm:
         self.wage_offers = []
         self.inventory_threshold = config.INVENTORY_THRESHOLD
         self.markup_rate = config.MARKUP_RATE
-
+#this is a change 
     def update_labor_demand(self):
         if self.inventory > self.inventory_threshold:
             self.desired_workers = max(1, int(len(self.workers) * 0.95))
