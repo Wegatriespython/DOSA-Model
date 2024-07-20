@@ -1,5 +1,5 @@
 import pytest
-from Worker import Worker
+from ..Worker import Worker
 from Config import config
 
 def test_worker_initialization():
