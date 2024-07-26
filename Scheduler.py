@@ -19,9 +19,11 @@ class Scheduler:
     def update_firms(self):
         for firm in self.economy.firm1s:
             firm.innovate()  # Firm1 specific method
+            firm.calculate_expected_demand( self.economy.calculate_average_investment())
             firm.update_state()
         for firm in self.economy.firm2s:
             firm.update_state()
+            firm.calculate_expected_demand( self.economy.calculate_average_consumption())
 
     def handle_production(self):
         for firm in self.economy.firm1s + self.economy.firm2s:
