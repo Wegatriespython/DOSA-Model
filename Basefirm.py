@@ -5,13 +5,14 @@ class BaseFirm:
     def __init__(self):
         self.capital = config.INITIAL_CAPITAL
         self.productivity = config.INITIAL_PRODUCTIVITY
-        self.price = config.INITIAL_PRICE
+        self.price = 1
         self.inventory = config.INITIAL_INVENTORY
         self.workers = []
         self.demand = config.INITIAL_DEMAND
         self.production = 0
         self.sales = 0
         self.desired_workers = 1
+        self.quantity_sold = 0
         self.budget = 0
         self.profit = 0
         self.total_factor_productivity = config.TOTAL_FACTOR_PRODUCTIVITY
@@ -43,7 +44,7 @@ class BaseFirm:
 
     def adjust_price(self):
         marginal_cost = self.calculate_marginal_cost()
-        self.price = (1 + self.markup_rate) * marginal_cost
+        self.price = max(1, (1 + self.markup_rate) * marginal_cost)
 
     def calculate_marginal_cost(self):
         if self.production > 0:
@@ -73,13 +74,11 @@ class BaseFirm:
 
     def calculate_expected_demand(self, average_consumption):
         beta = 0.7  # This is a smoothing factor. Adjust as needed.
-        actual_demand = average_consumption  # Use actual sales as a proxy for realized demand
+        actual_demand = beta*self.quantity_sold +(1- beta)* average_consumption  # Use actual sales as a proxy for realized demand
         
         self.demand = max(actual_demand, config.MIN_DEMAND)  # Ensure demand doesn't fall below a minimum threshold
 
-    def update_inventory(self, sales):
-        self.inventory -= sales
-        self.inventory = max(0, self.inventory)
+
 
     def manage_wage_offers(self):
         self.wage_offers.clear()

@@ -47,6 +47,8 @@ class Scheduler:
         print(f"Total firm2 sales: {sum(firm['sales'] for firm in data['firm2_data'])}")
         print(f"Total Firm2 Budget: {sum(firm['budget'] for firm in data['firm2_data'])}")
         print(f"Average wage: {sum(worker['wage'] for worker in data['worker_data']) / len(data['worker_data']):.2f}")
+        print(f"Average consumption: {sum(worker['consumption'] for worker in data['worker_data']) / len(data['worker_data']):.2f}")
+     
         print(f"Firm1 budget: {sum(firm['budget'] for firm in data['firm1_data'])}")
 
     def run_simulation(self, num_steps):

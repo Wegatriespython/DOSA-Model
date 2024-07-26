@@ -38,9 +38,9 @@ class Worker:
             self.offers.append(WageOffer(self, firm, wage))
 
     def consume(self, firms):
-        desired_consumption = min(self.savings * config.CONSUMPTION_PROPENSITY, self.savings)
+        desired_consumption = min(self.wage * config.CONSUMPTION_PROPENSITY, self.savings)
         return desired_consumption
 
-    def update_savings_and_consumption(self, actual_consumption):
-        self.savings -= actual_consumption
+    def update_savings_and_consumption(self, actual_consumption, price):
+        self.savings -= actual_consumption * price
         self.consumption += actual_consumption

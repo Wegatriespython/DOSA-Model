@@ -68,9 +68,9 @@ class Economy:
 
     def goods_market_clearing(self):
         for firm in self.firm1s:
-            sales = min(firm.demand, firm.inventory)
-            firm.inventory -= sales
-            firm.sales += sales
+            quantity_change = min(firm.demand, firm.inventory)
+            firm.inventory -= quantity_change
+            firm.quantity_sold += quantity_change
 
     def consumption_market_clearing(self):
         total_desired_consumption = 0
@@ -84,31 +84,39 @@ class Economy:
 
         total_inventory = sum(firm.inventory for firm in self.firm2s)
         
-        for firm in self.firm2s:
-            if total_inventory > 0:
+        if total_inventory > 0:
+            print("Entering consumption market clearing")
+            for firm in self.firm2s:
                 firm_share = firm.inventory / total_inventory
+                print("Total desired consumption: ", total_desired_consumption)
+                print("Firm share: ", firm_share)
                 firm_consumption = total_desired_consumption * firm_share
                 actual_consumption = min(firm_consumption, firm.inventory)
                 firm.inventory -= actual_consumption
-                firm.sales += actual_consumption
-            else:
-                actual_consumption = 0
+                firm.quantity_sold += actual_consumption
+                print("firm price: ", firm.price)
+                firm.sales += actual_consumption * firm.price
+                if firm.sales > 0: 
+                    print("SOLD firm made sale")
 
-        remaining_consumption = total_desired_consumption
-        for worker, desired_consumption in worker_consumptions:
-            if remaining_consumption > 0:
-                actual_consumption = min(desired_consumption, remaining_consumption)
-                worker.update_savings_and_consumption(actual_consumption)
-                remaining_consumption -= actual_consumption
-                if actual_consumption >= desired_consumption:
-                    worker.satiated = True
-            else:
+                # Distribute this firm's consumption among workers
+                for worker, desired in worker_consumptions:
+                    if actual_consumption > 0 and desired > 0:
+                        worker_consumption = min(desired, actual_consumption)
+                        worker.update_savings_and_consumption(worker_consumption, firm.price)
+                        actual_consumption -= worker_consumption
+                        desired -= worker_consumption
+                        if desired == 0:
+                            worker.satiated = True
+
+        # Check if any workers are still not satiated
+        for worker, remaining_desired in worker_consumptions:
+            if remaining_desired > 0:
                 worker.satiated = False
 
-        average_consumption = total_desired_consumption / len(self.workers)
+
   
-        for firm in self.firm2s:
-            firm.calculate_expected_demand(average_consumption)
+
 
     def update_global_state(self):
         self.total_demand = sum(firm.demand for firm in self.firm1s + self.firm2s)
