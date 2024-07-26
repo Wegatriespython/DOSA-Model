@@ -1,5 +1,5 @@
 from Config import config
-from Wageoffer import WageOffer
+import random
 
 class BaseFirm:
     def __init__(self):
@@ -10,57 +10,83 @@ class BaseFirm:
         self.workers = []
         self.demand = config.INITIAL_DEMAND
         self.production = 0
-        self.desired_workers = 0
-        self.wage_offers = []
-        self.inventory_threshold = config.INVENTORY_THRESHOLD
+        self.sales = 0
+        self.desired_workers = 1
+        self.budget = 0
+        self.profit = 0
+        self.total_factor_productivity = config.TOTAL_FACTOR_PRODUCTIVITY
+        self.capital_elasticity = config.CAPITAL_ELASTICITY
         self.markup_rate = config.MARKUP_RATE
-#this is a change 
-    def update_labor_demand(self):
-        if self.inventory > self.inventory_threshold:
-            self.desired_workers = max(1, int(len(self.workers) * 0.95))
+        self.wage_offers = []
+
+    def calculate_profit(self):
+        revenue = self.sales * self.price
+        labor_cost = sum(worker.wage for worker in self.workers)
+        capital_cost = self.capital * config.CAPITAL_RENTAL_RATE
+        self.profit = revenue - labor_cost - capital_cost
+        return self.profit
+
+    def adjust_workforce(self):
+        L = max(len(self.workers), 0.1)  # Avoid division by zero
+        MPL = (1 - self.capital_elasticity) * self.total_factor_productivity * (self.capital ** self.capital_elasticity) * (L ** (-self.capital_elasticity))
+        workers_for_demand = (self.demand / self.total_factor_productivity / (self.capital ** self.capital_elasticity)) ** (1 / (1 - self.capital_elasticity))
+
+        if self.inventory > config.INVENTORY_THRESHOLD:
+            self.desired_workers = max(1, int(self.desired_workers * 0.95))
         elif self.demand > self.production:
-            self.desired_workers = min(int(len(self.workers) * 1.05), len(self.workers) + 1)
-        else:
-            self.desired_workers = len(self.workers)
-
-        workers_to_change = self.desired_workers - len(self.workers)
-        if workers_to_change < 0:
-            self.fire_workers(-workers_to_change)
-
-    def fire_workers(self, num_to_fire):
-        for _ in range(min(num_to_fire, len(self.workers))):
-            worker = self.workers.pop()
-            worker.employed = False
-            worker.employer = None
-
+            self.desired_workers = min(self.desired_workers, int(workers_for_demand))
 
     def produce(self):
-        self.production = self.capital * self.productivity * len(self.workers) * config.PRODUCTION_FACTOR
+        self.production = self.total_factor_productivity * (self.capital ** self.capital_elasticity) * (len(self.workers) ** (1 - self.capital_elasticity))
+        self.production =max(0, min(self.production, self.demand - self.inventory))
         self.inventory += self.production
 
+    def adjust_price(self):
+        marginal_cost = self.calculate_marginal_cost()
+        self.price = (1 + self.markup_rate) * marginal_cost
 
-    def set_prices(self):
-        self.price = (1 + self.markup_rate) * self.get_production_cost()
+    def calculate_marginal_cost(self):
+        if self.production > 0:
+            return (sum(worker.wage for worker in self.workers) + self.capital * config.CAPITAL_RENTAL_RATE) / self.production
+        return 0
 
-    def get_production_cost(self):
-        total_wages = sum([worker.get_wage() for worker in self.workers])
-        return total_wages / self.production if self.production > 0 else 0
-
-    def get_wage_offer(self, worker):
-        return worker.get_skills() * config.WAGE_OFFER_FACTOR
-
-    def make_wage_offers(self, worker_applications):
-        self.wage_offers = []
-        for application in worker_applications:
-            if application.firm == self:
-                wage_offer = self.get_wage_offer(application.worker)
-                offer = WageOffer(application.worker, self, wage_offer)
-                self.wage_offers.append(offer)
-                application.worker.offers.append(offer)  # Add this line
-        
+    def calculate_budget(self):
+        self.budget = self.sales + self.capital - sum(worker.wage for worker in self.workers)
+        return self.budget
 
     def update_state(self):
-        if self.workers:
-            total_wages = sum([worker.get_wage() for worker in self.workers])
-            self.inventory -= total_wages
-        self.update_labor_demand()
+        self.calculate_budget()
+        self.adjust_workforce()
+        self.produce()
+        self.adjust_price()
+        self.manage_wage_offers()
+
+    def get_wage_offer(self, worker):
+        L = len(self.workers) + 1
+        MPL = (1 - self.capital_elasticity) * self.total_factor_productivity * (self.capital ** self.capital_elasticity) * (L ** (-self.capital_elasticity))
+        
+        min_wage = config.MINIMUM_WAGE
+        max_wage = MPL * (worker.skills if worker else 1)
+        wage_offer = min_wage + (max_wage - min_wage) * random.random()
+        
+        return max(min_wage, min(wage_offer, max_wage))
+
+    def calculate_expected_demand(self, average_consumption):
+        beta = 0.7  # This is a smoothing factor. Adjust as needed.
+        actual_demand = average_consumption  # Use actual sales as a proxy for realized demand
+        
+        self.demand = max(actual_demand, config.MIN_DEMAND)  # Ensure demand doesn't fall below a minimum threshold
+
+    def update_inventory(self, sales):
+        self.inventory -= sales
+        self.inventory = max(0, self.inventory)
+
+    def manage_wage_offers(self):
+        self.wage_offers.clear()
+        for _ in range(self.desired_workers - len(self.workers)):
+            self.wage_offers.append(self.get_wage_offer(None))
+
+    def fulfill_order(self, quantity):
+        sold = min(quantity, self.inventory)
+        self.inventory -= sold
+        return sold

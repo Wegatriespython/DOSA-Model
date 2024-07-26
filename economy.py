@@ -1,63 +1,55 @@
-# economy.py
-
+from Config import config
 import random
-import math
 from Worker import Worker
 from firm1 import Firm1
 from firm2 import Firm2
 from Stats import DataCollector
-from Scheduler import Scheduler
+
 class Economy:
     def __init__(self, num_workers, num_firm1, num_firm2):
         self.workers = [Worker() for _ in range(num_workers)]
         self.firm1s = [Firm1() for _ in range(num_firm1)]
         self.firm2s = [Firm2() for _ in range(num_firm2)]
-        print(f"Initial number of workers: {len(self.workers)}")
-        print(f"Initial number of firm1s: {len(self.firm1s)}")
-        print(f"Initial number of firm2s: {len(self.firm2s)}")
         self.time = 0
         self.total_demand = 0 
         self.total_supply = 0
         self.global_productivity = 1
-        self.wage_offers = [] # List to store wage offers
-        self.worker_applications = [] # List to store worker applications
-        self.data_collector = DataCollector()  # Initialize the DataCollector
+        self.data_collector = DataCollector()
 
-    def run_simulation(self, num_steps):
-        for _ in range(num_steps):
-            self.time += 1
-            self.step()
     def labor_market_matching(self):
-        self.worker_applications = []
-        for worker in self.workers:
-            if not worker.employed:
-                for firm in self.firm1s + self.firm2s:
-                    wage = firm.get_wage_offer(worker)
-                    self.worker_applications.append(WorkerApplication(worker, firm, wage))
-        
+        all_firms = self.firm1s + self.firm2s
 
-        
-        self.wage_offers = []
-        for firm in self.firm1s + self.firm2s:
-            firm.make_wage_offers(self.worker_applications)
-        
+        for firm in all_firms:
+            firm.calculate_budget()
+            workers_to_fire = []
 
-        
-        hired_workers = 0
-        for worker in self.workers:
-            if not worker.employed:
-                best_offer = None
-                for offer in worker.offers:
-                    if not best_offer or offer.wage > best_offer.wage:
-                        best_offer = offer
-                if best_offer:
-                    worker.employed = True
-                    worker.employer = best_offer.firm
-                    worker.wage = best_offer.wage
-                    best_offer.firm.workers.append(worker)
-                    worker.offers = [] # Clear offers for next round
-                    hired_workers += 1
+            for worker in firm.workers:
+                if firm.budget >= worker.wage:
+                    firm.budget -= worker.wage
+                    worker.savings += worker.wage
+                else:
+                    workers_to_fire.append(worker)
+            
+            for worker in workers_to_fire:
+                firm.workers.remove(worker)
+                worker.employed = False
+                worker.employer = None
+                worker.wage = 0
 
+        available_workers = [w for w in self.workers if not w.employed]
+        random.shuffle(available_workers)
+
+        for worker in available_workers:
+            hiring_firms = [f for f in all_firms if f.budget > config.MINIMUM_WAGE]
+            if hiring_firms:
+                hiring_firm = random.choice(hiring_firms)
+                wage = min(hiring_firm.budget, config.INITIAL_WAGE)
+                worker.employed = True
+                worker.employer = hiring_firm
+                worker.wage = wage
+                hiring_firm.workers.append(worker)
+                hiring_firm.budget -= wage
+                hiring_firm.desired_workers -= 1
 
     def capital_goods_market(self):
         for firm2 in self.firm2s:
@@ -66,32 +58,70 @@ class Economy:
                     if firm1.inventory > 0:
                         quantity = min(firm2.investment_demand, firm1.inventory)
                         capital_sold = firm1.fulfill_order(quantity)
-                        firm2.receive_capital(capital_sold)
+                        firm2.capital += capital_sold
                         firm2.investment_demand -= capital_sold
+                        payment = capital_sold * firm1.price
+                        firm2.sales -= payment
+                        firm1.sales += payment
                     if firm2.investment_demand == 0:
-                            break
-   
+                        break
+
     def goods_market_clearing(self):
-        # Update total demand and supply for debugging
-        self.total_demand = sum([firm.demand for firm in self.firm2s])
-        self.total_supply = sum([firm.inventory for firm in self.firm1s])
+        for firm in self.firm1s:
+            sales = min(firm.demand, firm.inventory)
+            firm.inventory -= sales
+            firm.sales += sales
+
+    def consumption_market_clearing(self):
+        total_desired_consumption = 0
+        worker_consumptions = []
+
+        for worker in self.workers:
+            worker.satiated = False
+            desired_consumption = worker.consume(self.firm2s)
+            total_desired_consumption += desired_consumption
+            worker_consumptions.append((worker, desired_consumption))
+
+        total_inventory = sum(firm.inventory for firm in self.firm2s)
+        
+        for firm in self.firm2s:
+            if total_inventory > 0:
+                firm_share = firm.inventory / total_inventory
+                firm_consumption = total_desired_consumption * firm_share
+                actual_consumption = min(firm_consumption, firm.inventory)
+                firm.inventory -= actual_consumption
+                firm.sales += actual_consumption
+            else:
+                actual_consumption = 0
+
+        remaining_consumption = total_desired_consumption
+        for worker, desired_consumption in worker_consumptions:
+            if remaining_consumption > 0:
+                actual_consumption = min(desired_consumption, remaining_consumption)
+                worker.update_savings_and_consumption(actual_consumption)
+                remaining_consumption -= actual_consumption
+                if actual_consumption >= desired_consumption:
+                    worker.satiated = True
+            else:
+                worker.satiated = False
+
+        average_consumption = total_desired_consumption / len(self.workers)
+  
+        for firm in self.firm2s:
+            firm.calculate_expected_demand(average_consumption)
+
+    def update_global_state(self):
+        self.total_demand = sum(firm.demand for firm in self.firm1s + self.firm2s)
+        self.total_supply = sum(firm.inventory for firm in self.firm1s + self.firm2s)
+        self.global_productivity = self.calculate_global_productivity()
 
     def calculate_global_productivity(self):
         total_output = sum([firm.production for firm in self.firm1s + self.firm2s])
         total_labor = len([worker for worker in self.workers if worker.employed])
-        if total_labor > 0:
-            return total_output / total_labor
-        else:
-            return 1 
+        return total_output / total_labor if total_labor > 0 else 1
+
     def get_data(self):
-        """
-        Returns the collected data.
-        """
         return self.data_collector.get_data()
-    def write_data_to_csv(self, filename="V:/Python Port/simulation_results.csv"):
+
+    def write_data_to_csv(self, filename="simulation_results.csv"):
         self.data_collector.write_to_csv(filename)
-class WorkerApplication:
-    def __init__(self, worker, firm, wage):
-        self.worker = worker
-        self.firm = firm
-        self.wage = wage

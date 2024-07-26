@@ -8,17 +8,20 @@ class Firm1(BaseFirm):
         self.capital = config.FIRM1_INITIAL_CAPITAL
         self.RD_investment = config.FIRM1_INITIAL_RD_INVESTMENT
         self.inventory_threshold = config.FIRM1_INVENTORY_THRESHOLD
+        self.innovation_success_count = 0
+        self.productivity_increase_count = 0
 
     def innovate(self):
-        if random.random() < config.INNOVATION_PROBABILITY:
+        if random.random() < config.INNOVATION_ATTEMPT_PROBABILITY:
+            self.innovation_success_count += 1
             self.RD_investment = self.capital * config.FIRM1_RD_INVESTMENT_RATE
-            self.productivity *= (1 + config.PRODUCTIVITY_INCREASE)
+            
+            if random.random() < config.PRODUCTIVITY_INCREASE_PROBABILITY:
+                self.productivity_increase_count += 1
+                self.productivity *= (1 + config.PRODUCTIVITY_INCREASE)
+                
+        print(f"Firm1 {id(self)} - Innovation attempts: {self.innovation_success_count}, Productivity increases: {self.productivity_increase_count}")
 
-    def update_state(self, firm2s):
+    def update_state(self):
         super().update_state()
-        self.demand = sum([firm.investment_demand for firm in firm2s])
-
-    def fulfill_order(self, quantity):
-        sold = min(quantity, self.inventory)
-        self.inventory -= sold
-        return sold
+ 

@@ -1,6 +1,6 @@
+# firm2.py
 from Basefirm import BaseFirm
 from Config import config
-import random
 
 class Firm2(BaseFirm):
     def __init__(self):
@@ -12,15 +12,8 @@ class Firm2(BaseFirm):
         self.machine_output_per_period = config.FIRM2_MACHINE_OUTPUT_PER_PERIOD
         self.inventory_threshold = config.FIRM2_INVENTORY_THRESHOLD
 
-    def produce(self):
-        self.production = self.capital * self.productivity * len(self.workers) * config.PRODUCTION_FACTOR
-        self.inventory += self.production
-
-    def plan_production(self, workers):
-        total_worker_consumption = sum([worker.wage for worker in workers])
-        self.demand = total_worker_consumption * (0.9 + 0.2 * random.random())
-        self.desired_capital = self.demand * 1.1
-        
+    def calculate_desired_capital(self):
+        self.desired_capital = self.demand * 1.1  # Desire 10% more capital than current demand
 
     def invest(self):
         if self.capital < self.desired_capital:
@@ -34,10 +27,5 @@ class Firm2(BaseFirm):
 
     def update_state(self):
         super().update_state()
+        self.calculate_desired_capital()
         self.invest()
-        if self.demand > self.production:
-            self.desired_workers = min(
-                (len(self.workers) * 1.1) + 1, int(self.demand / (self.productivity * config.PRODUCTION_FACTOR)))
-        elif self.demand < self.production * 0.9:
-            self.desired_workers = max(1, int(self.workers * 0.9))
-        
