@@ -1,3 +1,4 @@
+# Description: This file contains the Worker class, which is a subclass of the Agent class from the mesa library. The Worker class represents a worker agent in the model. Each worker has a unique ID, a boolean employed, an employer, a wage, savings, skills, consumption, and a boolean satiated. The Worker class has a step method that updates the worker's skills and a calculate_desired_consumption method that calculates the worker's desired consumption based on their wage and savings. The Worker class is used in the model to represent workers in the labor market.
 from mesa import Agent
 from Config import Config
 

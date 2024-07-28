@@ -1,3 +1,4 @@
+# Description: This file contains the implementation of the Firm class, which is a subclass of the Agent class in the Mesa library. The Firm class represents a firm in the model. The Firm class has two subclasses, Firm1 and Firm2, which represent two different types of firms in the model. The Firm class has the following attributes: capital, productivity, price, inventory, workers, demand, production, sales, budget, RD_investment, and expected_demand. The Firm class has the following methods: step, produce, cobb_douglas_production, adjust_price, calculate_marginal_cost, and calculate_expected_demand. The Firm1 class is a subclass of the Firm class and has the following attributes: inventory. The Firm1 class has the following methods: step and innovate. The Firm2 class is a subclass of the Firm
 from mesa import Agent
 import random
 

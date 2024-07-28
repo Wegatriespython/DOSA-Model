@@ -1,3 +1,4 @@
+# Description: This file is used to run the model and visualize the results using the Mesa library.
 from mesa_economy import EconomyModel
 from mesa.visualization.ModularVisualization import ModularServer
 from mesa.visualization.modules import ChartModule

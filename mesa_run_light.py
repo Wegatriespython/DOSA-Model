@@ -1,3 +1,4 @@
+# Description: Run the EconomyModel with light analysis.
 from mesa_economy import EconomyModel
 import matplotlib.pyplot as plt
 import pandas as pd
