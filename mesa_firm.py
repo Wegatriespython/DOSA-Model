@@ -1,7 +1,7 @@
 from mesa import Agent
 import numpy as np
 import random
-
+from Simple_profit_maxxing import simple_profit_maximization
 class Firm(Agent):
     def __init__(self, unique_id, model, initial_capital, initial_rd_investment):
         super().__init__(unique_id, model)
@@ -24,58 +24,13 @@ class Firm(Agent):
         self.produce()
 
     def optimize_production(self):
-        optimal_labor, optimal_capital, optimal_price, optimal_production = self.simple_profit_maximization()
+        optimal_labor, optimal_capital, optimal_price, optimal_production =   simple_profit_maximization(
+            self.budget, self.capital, len(self.workers), self.price, self.productivity,
+            self.calculate_expected_demand(), self.model.get_average_wage(), self.model.get_average_capital_price(), self.model.config.CAPITAL_ELASTICITY)
         self.adjust_labor(optimal_labor)
         self.adjust_capital(optimal_capital)
         self.price = optimal_price
         self.production = optimal_production
-
-    def simple_profit_maximization(self):
-        max_profit = float('-inf')
-        optimal_labor = len(self.workers)
-        optimal_capital = self.capital
-        optimal_price = self.price 
-        optimal_production = 0
-
-        expected_demand = self.calculate_expected_demand()
-        current_wage_bill = sum(worker.wage for worker in self.workers)
-
-        available_budget = max(0, self.budget - current_wage_bill)
-        avg_wage = self.model.get_average_wage()
-        avg_capital_price = self.model.get_average_capital_price()
-        
-        # Define realistic ranges for optimization
-        labor_range = range(max(0, len(self.workers) - 2), min(len(self.workers) + 3, int(available_budget / avg_wage) + 1))
-        capital_range = range(
-            max(1, int(self.capital * 0.8)),  # Allow for some disinvestment
-            min(int(self.capital * 1.2), int(self.capital + available_budget // avg_capital_price) + 1)
-        )
-        price_range = np.linspace(self.price * 0.8, self.price * 1.2, 20)  # 20 price points between 80% and 120% of current price
-
-        for L in labor_range:
-            for K in capital_range:
-                for P in price_range:
-                    Q = min(self.cobb_douglas_production(L, K), expected_demand)
-                    revenue = P * Q
-                    
-                    labor_cost = L * avg_wage
-                    capital_cost = max(0, K - self.capital) * avg_capital_price
-                    total_cost = labor_cost + capital_cost
-
-                    if total_cost > available_budget:
-                        continue  # Skip if the combination is not affordable
-
-                    profit = revenue - total_cost
-
-                    if profit > max_profit:
-                        max_profit = profit
-                        optimal_labor = L
-                        optimal_capital = K
-                        optimal_price = P
-                        optimal_production = Q
-
-        # Ensure we don't return negative values
-        return max(0, optimal_labor), max(1, optimal_capital), max(0.01, optimal_price), max(0, optimal_production)
 
     def adjust_labor(self, optimal_labor):
         current_labor = len(self.workers)

@@ -104,6 +104,7 @@ class EconomyModel(Model):
         self.execute_consumption_market()
         
         self.update_agents_after_markets()
+        self.check_consistency()
         logging.info(f"Completed step {self.step_count}")
         self.log_data()  # Add this line at the end of the step method
   
@@ -200,6 +201,19 @@ class EconomyModel(Model):
                 agent.sales = 0  # Reset sales for next period
             elif isinstance(agent, Worker):
                 agent.consumption = 0  # Reset consumption for next period
+        
+    def check_consistency(self):
+        total_money = sum(agent.accounts.assets.get('cash', 0) for agent in self.schedule.agents)
+        total_goods = sum(agent.inventory for agent in self.schedule.agents if isinstance(agent, (Firm1, Firm2)))
+        total_labor = sum(1 for agent in self.schedule.agents if isinstance(agent, Worker) and agent.employed)
+
+        expected_money = self.initial_money_supply
+        expected_goods = self.initial_goods_supply
+        expected_labor = self.num_workers
+
+        assert abs(total_money - expected_money) < 1e-6, f"Money not conserved: {total_money} != {expected_money}"
+        assert total_goods == expected_goods, f"Goods not conserved: {total_goods} != {expected_goods}"
+        assert total_labor == expected_labor, f"Labor not conserved: {total_labor} != {expected_labor}"
 
     def log_data(self):
         # Log optimization data

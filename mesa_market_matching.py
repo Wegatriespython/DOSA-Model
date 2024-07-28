@@ -12,14 +12,18 @@ def market_matching(buyers, sellers):
     
     transactions = []
     
-    for buyer in buyers:
-        buyer_demand, max_price, buyer_obj = buyer
+    i = 0
+    while i < len(buyers):
+        buyer_demand, max_price, buyer_obj = buyers[i]
         if buyer_demand <= 0:
+            buyers.pop(i)
             continue
         
-        for seller in sellers:
-            seller_supply, min_price, seller_obj = seller
+        j = 0
+        while j < len(sellers):
+            seller_supply, min_price, seller_obj = sellers[j]
             if seller_supply <= 0:
+                sellers.pop(j)
                 continue
             
             if min_price <= max_price:
@@ -31,13 +35,22 @@ def market_matching(buyers, sellers):
                 buyer_demand -= quantity
                 seller_supply -= quantity
                 
-                # Update the original tuples
-                buyer = (buyer_demand, max_price, buyer_obj)
-                seller = (seller_supply, min_price, seller_obj)
+                # Update the original lists
+                buyers[i] = (buyer_demand, max_price, buyer_obj)
+                sellers[j] = (seller_supply, min_price, seller_obj)
+                
+                if seller_supply == 0:
+                    sellers.pop(j)
+                else:
+                    j += 1
                 
                 if buyer_demand == 0:
+                    buyers.pop(i)
                     break
             else:
-                break  # No more sellers with acceptable prices for this buyer
+                j += 1  # Move to next seller if price is too high
+        
+        if buyer_demand > 0:
+            i += 1  # Move to next buyer if demand not fully met
     
     return transactions
