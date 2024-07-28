@@ -10,6 +10,7 @@ class Config:
         self.INITIAL_DEMAND = 1
         self.MIN_DEMAND = 1
         self.INITIAL_SKILLS = .1
+        self.DEMAND_ADJUSTMENT_RATE = 0.5 
         self.MARKUP_RATE = 0.2
         self.INITIAL_SAVINGS = 100
         self.MIN_CONSUMPTION = 1
