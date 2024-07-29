@@ -1,4 +1,6 @@
 from mesa import Agent
+import csv
+from datetime import datetime
 
 class AccountingSystem:
     def __init__(self):
@@ -110,3 +112,39 @@ class GlobalAccountingSystem:
         self.capital_prices.clear()
         self.wages.clear()
         self.consumption_good_prices.clear()
+
+    def dump_data_to_csv(self, filename=None):
+        if filename is None:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"global_accounting_data_{timestamp}.csv"
+
+        with open(filename, 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(['Variable', 'Value'])  # Header row
+            
+            # Write all the relevant data
+            writer.writerow(['Total Labor', self.total_labor])
+            writer.writerow(['Total Capital', self.total_capital])
+            writer.writerow(['Total Goods', self.total_goods])
+            writer.writerow(['Total Money', self.total_money])
+            writer.writerow(['Average Market Demand', self.get_average_market_demand()])
+            writer.writerow(['Average Capital Price', self.get_average_capital_price()])
+            writer.writerow(['Average Wage', self.get_average_wage()])
+            writer.writerow(['Average Consumption Good Price', self.get_average_consumption_good_price()])
+            writer.writerow(['Total Demand', self.get_total_demand()])
+            writer.writerow(['Total Production', self.get_total_production()])
+
+            # Write time series data
+            writer.writerow([])  # Empty row for separation
+            writer.writerow(['Time Series Data'])
+            writer.writerow(['Step', 'Market Demand', 'Capital Price', 'Wage', 'Consumption Good Price'])
+            for step in range(max(len(self.market_demand), len(self.capital_prices), len(self.wages), len(self.consumption_good_prices))):
+                writer.writerow([
+                    step,
+                    self.market_demand[step] if step < len(self.market_demand) else '',
+                    self.capital_prices[step] if step < len(self.capital_prices) else '',
+                    self.wages[step] if step < len(self.wages) else '',
+                    self.consumption_good_prices[step] if step < len(self.consumption_good_prices) else ''
+                ])
+
+        print(f"Data has been dumped to {filename}")
