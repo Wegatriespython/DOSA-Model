@@ -9,7 +9,7 @@ class Config:
         self.INITIAL_WAGE = 1
         self.MAX_MPL = 100
         self.INITIAL_INVENTORY = 20
-        self.INITIAL_DEMAND = 1
+        self.INITIAL_DEMAND = 5
         self.MIN_DEMAND = 1
         self.INITIAL_SKILLS = .1
         self.DEMAND_ADJUSTMENT_RATE = 0.5 

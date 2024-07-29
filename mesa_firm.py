@@ -13,15 +13,22 @@ class Firm(Agent):
         self.demand = model.config.INITIAL_DEMAND
         self.production = 0
         self.sales = 0
-        self.budget = 0
+        self.inventory_value = self.inventory * self.price
+        self.budget = self.capital + self.inventory_value
         self.RD_investment = initial_rd_investment
         self.labor_demand = 0
         self.investment_demand = 0
         self.accounts = AccountingSystem()
+        print(f"Firm {unique_id} initialized:")
+        print(f"  Capital: {self.capital}")
+        print(f"  Productivity: {self.productivity}")
+        print(f"  Price: {self.price}")
+        print(f"  Inventory: {self.inventory}")
 
     def step(self):
         self.optimize_production()
         self.produce()
+        print(f"Firm {self.unique_id} decision - Labor Demand: {self.labor_demand}, Investment Demand: {self.investment_demand}, Production: {self.production}")
 
     def optimize_production(self):
         optimal_labor, optimal_capital, optimal_price, optimal_production = simple_profit_maximization(
@@ -105,6 +112,7 @@ class Firm1(Firm):
     def step(self):
         self.innovate()
         super().step()
+
 
     def innovate(self):
         if self.model.random.random() < self.model.config.INNOVATION_ATTEMPT_PROBABILITY:

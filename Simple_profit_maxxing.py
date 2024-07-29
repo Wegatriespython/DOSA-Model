@@ -25,7 +25,8 @@ def simple_profit_maximization(budget, current_capital, current_labor, current_p
                     optimal_labor = L
                     optimal_capital = K
                     optimal_production = Q
-
+    print(f"Profit Maximization Input - Budget: {budget}, Capital: {current_capital}, Labor: {current_labor}, Price: {current_price}, Productivity: {current_productivity}, Expected Demand: {expected_demand}, Avg Wage: {avg_wage}, Avg Capital Price: {avg_capital_price}")
+    print(f"Profit Maximization Output - Optimal Labor: {optimal_labor}, Optimal Capital: {optimal_capital}, Optimal Price: {optimal_price}, Optimal Production: {optimal_production}")
     return optimal_labor, optimal_capital, current_price, optimal_production
 
 def improved_gradient_descent_profit_maximization(budget, current_capital, current_labor, current_price, current_productivity,
@@ -55,6 +56,9 @@ def improved_gradient_descent_profit_maximization(budget, current_capital, curre
 
 def neoclassical_profit_maximization(budget, current_capital, current_labor, current_price, current_productivity,
                                      expected_demand, avg_wage, avg_capital_price, capital_elasticity):
+    
+    avg_wage = max(avg_wage, config.MINIMUM_WAGE)
+    avg_capital_price = max(avg_capital_price, config.INITIAL_PRICE)
     def objective(x):
         labor, capital = x
         production = min(cobb_douglas_production(current_productivity, capital, labor, capital_elasticity), expected_demand)

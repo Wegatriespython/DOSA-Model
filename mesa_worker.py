@@ -19,7 +19,7 @@ class Worker(Agent):
         if self.consumption > 0:
             self.consumption = 0
         self.update_skills()
-
+        print(f"Worker {self.unique_id} decision - Desired Consumption: {self.calculate_desired_consumption()}, Employed: {self.employed}")
     def update_skills(self):
         if self.employed:
             self.skills *= (1 + self.model.config.SKILL_GROWTH_RATE)
