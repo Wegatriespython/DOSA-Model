@@ -31,6 +31,7 @@ class EconomyModel(Model):
                 "Average Market Demand": lambda m: m.global_accounting.get_average_market_demand(),
                 "Average Capital Price": lambda m: m.global_accounting.get_average_capital_price(),
                 "Average Wage": lambda m: m.global_accounting.get_average_wage(),
+                "Average Inventory": self.calculate_average_inventory, 
                 "Average Consumption Good Price": lambda m: m.global_accounting.get_average_consumption_good_price(),
                 "Total Demand": lambda m: m.global_accounting.get_total_demand(),
                 "Total Production": lambda m: m.global_accounting.get_total_production(),
@@ -46,6 +47,7 @@ class EconomyModel(Model):
                 "Expenses": lambda a: sum(a.accounts.expenses.values()) if hasattr(a, 'accounts') else None,
                 "Profit": lambda a: a.accounts.calculate_profit() if hasattr(a, 'accounts') else None,
                 "Productivity": lambda a: a.productivity if hasattr(a, 'productivity') else None,
+                "Historic Price": lambda a: a.historic_price if isinstance(a, Worker) else None,
                 "Wage": lambda a: a.wage if hasattr(a, 'wage') else None,
                 "Skills": lambda a: a.skills if hasattr(a, 'skills') else None,
                 "Savings": lambda a: a.savings if hasattr(a, 'savings') else None,
@@ -63,6 +65,7 @@ class EconomyModel(Model):
         print(f"Initializing EconomyModel with {num_workers} workers, {num_firm1} Firm1, and {num_firm2} Firm2")
         print(f"FIRM1_INITIAL_CAPITAL: {self.config.FIRM1_INITIAL_CAPITAL}")
         print(f"FIRM2_INITIAL_CAPITAL: {self.config.FIRM2_INITIAL_CAPITAL}")
+    
     def create_agents(self):
         for i in range(self.num_workers):
             worker = Worker(i, self)
@@ -122,14 +125,23 @@ class EconomyModel(Model):
         print("Consumption Market")
         transactions = market_matching(buyers, sellers)
         self.process_consumption_transactions(transactions)
-
+        self.update_price_history() 
+        
+    def update_price_history(self):
+        current_price = self.global_accounting.get_average_consumption_good_price()
+        for agent in self.schedule.agents:
+            if isinstance(agent, Worker):
+                agent.price_history.append(current_price)
+                if len(agent.price_history) > 10:  # Keep only last 10 periods
+                    agent.price_history.pop(0)
+                agent.historic_price = sum(agent.price_history) / len(agent.price_history)
     def get_labor_buyers(self):
         return [(firm.labor_demand, firm.get_max_wage(), firm) 
                 for firm in self.schedule.agents 
                 if isinstance(firm, (Firm1, Firm2)) and firm.labor_demand > 0]
 
     def get_labor_sellers(self):
-        return [(1, self.config.MINIMUM_WAGE, worker) 
+        return [(1, worker.wage, worker) 
                 for worker in self.schedule.agents 
                 if isinstance(worker, Worker) and not worker.employed]
 
@@ -144,7 +156,7 @@ class EconomyModel(Model):
                 if isinstance(firm, Firm1) and firm.inventory > 0]
 
     def get_consumption_buyers(self):
-        return [(worker.calculate_desired_consumption(), worker.get_max_consumption_price(), worker) 
+        return [(worker.consumption, worker.get_max_consumption_price(), worker) 
                 for worker in self.schedule.agents 
                 if isinstance(worker, Worker) and worker.savings > 0]
 
@@ -158,12 +170,14 @@ class EconomyModel(Model):
             firm.hire_worker(worker, price)
             worker.get_hired(firm, price)
             self.global_accounting.record_labor_transaction(firm, worker, quantity, price)
+            self.global_accounting.update_average_wage()
 
     def process_capital_transactions(self, transactions):
         for buyer, seller, quantity, price in transactions:
             buyer.buy_capital(quantity, price)
             seller.sell_capital(quantity, price)
             self.global_accounting.record_capital_transaction(buyer, seller, quantity, price)
+            self.global_accounting.update_average_capital_price()
 
     def process_consumption_transactions(self, transactions):
         for buyer, seller, quantity, price in transactions:
@@ -183,7 +197,11 @@ class EconomyModel(Model):
 
     def get_capital_supply(self):
         return sum(firm.accounts.assets.get('inventory', 0) for firm in self.schedule.agents if isinstance(firm, Firm1))
-
+    def calculate_average_inventory(self):
+        firms = [agent for agent in self.schedule.agents if isinstance(agent, (Firm1, Firm2))]
+        if firms:
+            return sum(firm.inventory for firm in firms) / len(firms)
+        return 0
     def calculate_global_productivity(self):
         total_output = sum(firm.accounts.get_total_production() for firm in self.schedule.agents if isinstance(firm, (Firm1, Firm2)))
         total_labor = self.global_accounting.get_total_labor()

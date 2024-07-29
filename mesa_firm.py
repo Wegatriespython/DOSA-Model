@@ -1,5 +1,5 @@
 from mesa import Agent
-from Simple_profit_maxxing import simple_profit_maximization
+from Simple_profit_maxxing import neoclassical_profit_maximization
 from Accounting_System import AccountingSystem
 
 class Firm(Agent):
@@ -26,15 +26,27 @@ class Firm(Agent):
         print(f"  Inventory: {self.inventory}")
 
     def step(self):
+        self.depreciate_inventory()
         self.optimize_production()
         self.produce()
         print(f"Firm {self.unique_id} decision - Labor Demand: {self.labor_demand}, Investment Demand: {self.investment_demand}, Production: {self.production}")
 
+    def depreciate_inventory(self):
+        depreciation_amount = self.inventory * self.model.config.DEPRECIATION_RATE
+        self.inventory -= depreciation_amount
+        old_inventory_value = self.inventory_value
+        self.inventory_value = self.inventory * self.price
+        value_loss = old_inventory_value - self.inventory_value
+        self.budget -= value_loss
+        self.accounts.record_expense('inventory_depreciation', value_loss)
+        print(f"Firm {self.unique_id} depreciated inventory by {depreciation_amount:.2f} units, value loss: {value_loss:.2f}")
+        
     def optimize_production(self):
-        optimal_labor, optimal_capital, optimal_price, optimal_production = simple_profit_maximization(
+        optimal_labor, optimal_capital, optimal_price, optimal_production = neoclassical_profit_maximization(
             self.budget, self.capital, len(self.workers), self.price, self.productivity,
             self.calculate_expected_demand(), self.model.global_accounting.get_average_wage(), 
-            self.model.global_accounting.get_average_capital_price(), self.model.config.CAPITAL_ELASTICITY)
+            self.model.global_accounting.get_average_capital_price(), self.model.config.CAPITAL_ELASTICITY,
+            self.inventory, self.model.config.DEPRECIATION_RATE)
         
         self.adjust_labor(optimal_labor)
         self.adjust_capital(optimal_capital)
