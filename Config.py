@@ -10,7 +10,7 @@ class Config:
         self.MAX_MPL = 100
         self.INITIAL_INVENTORY = 4
         self.INITIAL_DEMAND = 5
-        self.DEPRECIATION_RATE = 0.6
+        self.DEPRECIATION_RATE = 0.05
         self.MIN_DEMAND = 1
         self.PRICE_ADJUSTMENT_FACTOR = 0.2
         self.EXPECTED_PERIODS = 100
