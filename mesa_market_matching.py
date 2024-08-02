@@ -14,7 +14,7 @@ class Trade(NamedTuple):
 def market_matching(buyers: List[Tuple[int, float, Any]], sellers: List[Tuple[int, float, Any]]) -> List[Tuple[Any, Any, int, float]]:
     """
     Match buyers and sellers based on their demand/supply and max/min prices.
-    
+
     :param buyers: List of tuples (quantity, price, buyer_object)
     :param sellers: List of tuples (quantity, price, seller_object)
     :return: List of successful transactions (buyer_object, seller_object, quantity, price)
@@ -47,8 +47,8 @@ def market_matching(buyers: List[Tuple[int, float, Any]], sellers: List[Tuple[in
             buyer_index += 1
         if sorted_sellers[seller_index][0] == 0:
             seller_index += 1
-    print(f"Market Matching Input - Buyers: {buyers}, Sellers: {sellers}")
-    print(f"Market Matching Output - Transactions: {transactions}")
+    #print(f"Market Matching Input - Buyers: {buyers}, Sellers: {sellers}")
+    #print(f"Market Matching Output - Transactions: {transactions}")
     return transactions
 
 # Test the function

@@ -1,7 +1,11 @@
 from mesa import Agent
 import numpy as np
 from Simple_profit_maxxing import neoclassical_profit_maximization
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import StandardScaler
+import logging
 
+logging.basicConfig(level=logging.INFO)
 class Firm(Agent):
     def __init__(self, unique_id, model, initial_capital, initial_productivity):
         super().__init__(unique_id, model)
@@ -19,6 +23,10 @@ class Firm(Agent):
         self.labor_demand = 0
         self.investment_demand = 0
         self.mode = 'decentralized'
+        self.demand_predictor = LinearRegression()
+        self.scaler = StandardScaler()
+        self.is_trained = False
+        self.prediction_history = []
 
     def step(self):
         if self.mode == 'decentralized':
@@ -39,20 +47,15 @@ class Firm(Agent):
         elif isinstance(self, Firm2):
             self.expected_demand = self.calculate_expected_demand('consumption')
         self.expected_price = self.calculate_expected_price()
-
+        #self.train_demand_predictor()
         depreciation_amount = self.inventory * self.model.config.DEPRECIATION_RATE
         self.inventory = max(0, self.inventory - depreciation_amount)
         self.budget -= depreciation_amount * self.price
 
     def calculate_expected_demand(self, market_type):
-        """
-        Calculate expected demand based on historical sales and average buyer demand.
-
-        :param market_type: String indicating the market type ('labor', 'capital', or 'consumption')
-        :return: Expected demand
-        """
-        historical_demand = np.mean(self.historic_sales[-5:])
-
+        market_demand = self.get_market_demand(market_type)
+        return max(market_demand, self.model.config.MIN_DEMAND)
+    def get_market_demand(self, market_type):
         if market_type == 'labor':
             potential_buyers = [agent for agent in self.model.schedule.agents if isinstance(agent, Firm)]
             buyer_demand = [firm.labor_demand for firm in potential_buyers]
@@ -65,14 +68,61 @@ class Firm(Agent):
         else:
             raise ValueError(f"Invalid market type: {market_type}")
 
-        average_buyer_demand = np.mean(buyer_demand) if buyer_demand else 0
+        return sum(buyer_demand)
+    def get_noisy_market_demand(self, market_type, noise_level=0.1):
+        if market_type == 'labor':
+            potential_buyers = [agent for agent in self.model.schedule.agents if isinstance(agent, Firm)]
+            buyer_demand = [firm.labor_demand for firm in potential_buyers]
+        elif market_type == 'capital':
+            potential_buyers = [agent for agent in self.model.schedule.agents if isinstance(agent, Firm)]
+            buyer_demand = [firm.investment_demand for firm in potential_buyers]
+        elif market_type == 'consumption':
+            potential_buyers = [agent for agent in self.model.schedule.agents if hasattr(agent, 'consumption')]
+            buyer_demand = [agent.consumption for agent in potential_buyers]
+        else:
+            raise ValueError(f"Invalid market type: {market_type}")
 
-        # Combine historical demand and average buyer demand with 50% bias towards historical
-        combined_demand = 0.5 * historical_demand + 0.5 * average_buyer_demand
+        total_demand = sum(buyer_demand)
+        noisy_demand = total_demand * (1 + np.random.normal(0, noise_level))
+        return max(noisy_demand, 0)  # Ensure non-negative demand
+    def predict_demand(self, noisy_market_demand):
+        if not self.is_trained:
+            return np.mean(self.historic_sales)  # Fallback to historical average if not trained
 
-        # Ensure the expected demand is not below a minimum threshold
-        return max(combined_demand, self.model.config.MIN_DEMAND)
+        features = self.prepare_features(noisy_market_demand)
+        features_scaled = self.scaler.transform(features.reshape(1, -1))
+        prediction = self.demand_predictor.predict(features_scaled)[0]
 
+        return max(prediction, 0)  # Ensure non-negative demand
+
+    def prepare_features(self, noisy_market_demand):
+        return np.array([
+            self.capital,
+            len(self.workers),
+            self.productivity,
+            self.price,
+            self.inventory,
+            self.budget,
+            np.mean(self.historic_sales),
+            np.std(self.historic_sales),
+            self.model.global_accounting.get_average_wage(),
+            self.model.global_accounting.get_average_capital_price(),
+            self.model.global_accounting.get_average_consumption_good_price(),
+            noisy_market_demand  # Include noisy market demand as a feature
+        ])
+
+    def train_demand_predictor(self):
+        if len(self.historic_sales) < 10:  # Need some history to train
+            return
+
+        X = np.array([self.prepare_features(self.get_noisy_market_demand(self.get_market_type())) for _ in range(len(self.historic_sales) - 5)])
+        y = np.array(self.historic_sales[5:])  # Predict next period's sales
+
+        X_scaled = self.scaler.fit_transform(X)
+        self.demand_predictor.fit(X_scaled, y)
+        self.is_trained = True
+
+        logging.info(f"Firm {self.unique_id} - Demand predictor trained. Coefficients: {self.demand_predictor.coef_}")
 
     def make_production_decision(self):
         # Update expected demand first
@@ -95,7 +145,7 @@ class Firm(Agent):
             5,
             self.model.config.DISCOUNT_RATE
         )
-        print(f"Optimal labor: {optimal_labor}, optimal capital: {optimal_capital}, optimal price: {optimal_price}, optimal production: {optimal_production}")
+        #print(f"Optimal labor: {optimal_labor}, optimal capital: {optimal_capital}, optimal price: {optimal_price}, optimal production: {optimal_production}")
 
         self.labor_demand = max(0, optimal_labor - len(self.workers))
         self.price = self.adjust_price(self.price, self.sales, self.expected_demand)
@@ -237,7 +287,24 @@ class Firm(Agent):
         self.produce()
     def update_after_markets(self):
         pass
+    def get_market_type(self):
+        if isinstance(self, Firm1):
+            return 'capital'
+        elif isinstance(self, Firm2):
+            return 'consumption'
+        else:
+            return 'labor'
+    def analyze_prediction_accuracy(self):
+        if len(self.prediction_history) < 2:
+            return
 
+        actual_sales = self.historic_sales[-len(self.prediction_history)+1:]
+        predictions = [p['predicted_demand'] for p in self.prediction_history[:-1]]  # Exclude the most recent prediction
+
+        mse = np.mean((np.array(actual_sales) - np.array(predictions))**2)
+        mae = np.mean(np.abs(np.array(actual_sales) - np.array(predictions)))
+
+        logging.info(f"Firm {self.unique_id} - Prediction Accuracy: MSE: {mse:.2f}, MAE: {mae:.2f}")
 class Firm1(Firm):
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model, model.config.FIRM1_INITIAL_CAPITAL, model.config.INITIAL_PRODUCTIVITY)

@@ -10,6 +10,8 @@ from mesa_worker import Worker
 from mesa_firm import Firm1, Firm2
 from mesa_market_matching import market_matching
 from Accounting_System import GlobalAccountingSystem
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import StandardScaler
 
 class EconomyModel(Model):
     def __init__(self, num_workers, num_firm1, num_firm2, mode):
@@ -24,7 +26,8 @@ class EconomyModel(Model):
         self.global_accounting = GlobalAccountingSystem()
         self.mode = mode  # New: mode parameter
         self.relative_price = 1.0  # New: relative price of capital goods to consumption goods
-
+        self.data_collection = {firm.unique_id: [] for firm in self.schedule.agents
+                                if isinstance(firm, (Firm1, Firm2))}
         self.datacollector = DataCollector(
             model_reporters={
                 "Total Labor": lambda m: m.global_accounting.total_labor,
@@ -85,19 +88,46 @@ class EconomyModel(Model):
             self.grid.place_agent(firm, (x, y))
 
     def step(self):
+        if self.step_count == 100:
+            self.train_and_save_models()
+
         if self.mode == 'decentralised':
             self.run_decentralised_step()
         elif self.mode == 'centralised':
             self.run_centralised_step()
         else:
             raise ValueError("Invalid mode")
-
+        # Analyze prediction accuracy every 10 steps
+        if self.step_count % 10 == 0:
+            self.analyze_predictions()
 
         self.update_global_accounting()
         self.datacollector.collect(self)
         self.global_accounting.reset_period_data()
         self.step_count += 1
 
+    def collect_data(self):
+        for firm in self.schedule.agents:
+            if isinstance(firm, (Firm1, Firm2)):
+                features = firm.prepare_features()
+                target = firm.sales
+                self.data_collection[firm.unique_id].append((features, target))
+    def train_and_save_models(self):
+        for firm_id, data in self.data_collection.items():
+            X = np.array([d[0] for d in data])
+            y = np.array([d[1] for d in data])
+
+            model = LinearRegression()
+            model.fit(X, y)
+
+            print(f"Firm {firm_id} - Trained model coefficients: {model.coef_}")
+            print(f"Firm {firm_id} - Trained model intercept: {model.intercept_}")
+
+            joblib.dump(model, f'demand_predictor_firm_{firm_id}.joblib')
+    def analyze_predictions(self):
+        for agent in self.schedule.agents:
+            if isinstance(agent, (Firm1, Firm2)):
+                agent.analyze_prediction_accuracy()
     def run_decentralised_step(self):
         self.update_worker_price_information()
         self.schedule.step()
@@ -119,17 +149,17 @@ class EconomyModel(Model):
             'total_money': self.global_accounting.total_money,
         }
 
-        def apply_centralized_decisions(self, decisions):
-            # New method to apply central planner's decisions
-            self.relative_price = decisions['relative_price']
+    def apply_centralized_decisions(self, decisions):
+        # New method to apply central planner's decisions
+        self.relative_price = decisions['relative_price']
 
-            for firm, labor, capital, price in zip(self.firms, decisions['labor_allocation'],
-                                                   decisions['capital_allocation'], decisions['prices']):
-                firm.apply_central_decision(labor, capital, price)
+        for firm, labor, capital, price in zip(self.firms, decisions['labor_allocation'],
+                                                decisions['capital_allocation'], decisions['prices']):
+            firm.apply_central_decision(labor, capital, price)
 
-            for worker, employment, wage, consumption in zip(self.workers, decisions['employment'],
-                                                             decisions['wages'], decisions['consumption']):
-                worker.apply_central_decision(employment, wage, consumption)
+        for worker, employment, wage, consumption in zip(self.workers, decisions['employment'],
+                                                            decisions['wages'], decisions['consumption']):
+            worker.apply_central_decision(employment, wage, consumption)
 
         @property
         def workers(self):
