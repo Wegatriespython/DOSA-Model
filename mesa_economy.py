@@ -3,6 +3,8 @@ from mesa.time import RandomActivation
 from mesa.datacollection import DataCollector
 from mesa.space import MultiGrid
 import logging
+import random
+import numpy as np
 from Config import Config
 from mesa_worker import Worker
 from mesa_firm import Firm1, Firm2
@@ -10,7 +12,7 @@ from mesa_market_matching import market_matching
 from Accounting_System import GlobalAccountingSystem
 
 class EconomyModel(Model):
-    def __init__(self, num_workers, num_firm1, num_firm2):
+    def __init__(self, num_workers, num_firm1, num_firm2, mode):
         super().__init__()
         self.num_workers = num_workers
         self.num_firm1 = num_firm1
@@ -20,7 +22,9 @@ class EconomyModel(Model):
         self.config = Config()
         self.step_count = 0
         self.global_accounting = GlobalAccountingSystem()
-        
+        self.mode = mode  # New: mode parameter
+        self.relative_price = 1.0  # New: relative price of capital goods to consumption goods
+
         self.datacollector = DataCollector(
             model_reporters={
                 "Total Labor": lambda m: m.global_accounting.total_labor,
@@ -30,11 +34,12 @@ class EconomyModel(Model):
                 "Average Market Demand": lambda m: m.global_accounting.get_average_market_demand(),
                 "Average Capital Price": lambda m: m.global_accounting.get_average_capital_price(),
                 "Average Wage": lambda m: m.global_accounting.get_average_wage(),
-                "Average Inventory": self.calculate_average_inventory, 
+                "Average Inventory": self.calculate_average_inventory,
                 "Average Consumption Good Price": lambda m: m.global_accounting.get_average_consumption_good_price(),
                 "Total Demand": lambda m: m.global_accounting.get_total_demand(),
                 "Total Production": lambda m: m.global_accounting.get_total_production(),
                 "Global Productivity": self.calculate_global_productivity,
+                "Relative Price": lambda m: m.relative_price,  # New: track relative price
             },
             agent_reporters={
                 "Type": lambda a: type(a).__name__,
@@ -80,20 +85,75 @@ class EconomyModel(Model):
             self.grid.place_agent(firm, (x, y))
 
     def step(self):
-        self.update_worker_price_information()  # Add this line
-        self.schedule.step()
-        self.execute_markets()
+        if self.mode == 'decentralised':
+            self.run_decentralised_step()
+        elif self.mode == 'centralised':
+            self.run_centralised_step()
+        else:
+            raise ValueError("Invalid mode")
+
+
         self.update_global_accounting()
         self.datacollector.collect(self)
         self.global_accounting.reset_period_data()
         self.step_count += 1
+
+    def run_decentralised_step(self):
+        self.update_worker_price_information()
+        self.schedule.step()
+        self.execute_markets()
+    def run_centralised_step(self):
+        planner_decisions = self.central_planner.optimize(self.get_current_state())
+        self.apply_centralized_decisions(planner_decisions)
+
+    def get_current_state(self):
+        # New method to provide current state to central planner
+        return {
+            'workers': self.workers,
+            'firms1': self.firm1s,
+            'firms2': self.firm2s,
+            'relative_price': self.relative_price,
+            'total_labor': self.global_accounting.total_labor,
+            'total_capital': self.global_accounting.total_capital,
+            'total_goods': self.global_accounting.total_goods,
+            'total_money': self.global_accounting.total_money,
+        }
+
+        def apply_centralized_decisions(self, decisions):
+            # New method to apply central planner's decisions
+            self.relative_price = decisions['relative_price']
+
+            for firm, labor, capital, price in zip(self.firms, decisions['labor_allocation'],
+                                                   decisions['capital_allocation'], decisions['prices']):
+                firm.apply_central_decision(labor, capital, price)
+
+            for worker, employment, wage, consumption in zip(self.workers, decisions['employment'],
+                                                             decisions['wages'], decisions['consumption']):
+                worker.apply_central_decision(employment, wage, consumption)
+
+        @property
+        def workers(self):
+            return [agent for agent in self.schedule.agents if isinstance(agent, Worker)]
+
+        @property
+        def firm1s(self):
+            return [agent for agent in self.schedule.agents if isinstance(agent, Firm1)]
+
+        @property
+        def firm2s(self):
+            return [agent for agent in self.schedule.agents if isinstance(agent, Firm2)]
+
+        @property
+        def firms(self):
+            return self.firm1s + self.firm
+
     def update_worker_price_information(self):
         consumption_firms = [firm for firm in self.schedule.agents if isinstance(firm, Firm2)]
         seller_prices = [firm.price for firm in consumption_firms]
-        
+
         for agent in self.schedule.agents:
             if isinstance(agent, Worker):
-                agent.set_seller_prices(seller_prices)  
+                agent.set_seller_prices(seller_prices)
     def execute_markets(self):
         for agent in self.schedule.agents:
             if isinstance(agent, (Firm1, Firm2)):
@@ -104,13 +164,13 @@ class EconomyModel(Model):
 
     def execute_labor_market(self):
         print("Labor Market")
-        buyers = [(firm.labor_demand, firm.get_max_wage(), firm) 
-                  for firm in self.schedule.agents 
+        buyers = [(firm.labor_demand, firm.get_max_wage(), firm)
+                  for firm in self.schedule.agents
                   if isinstance(firm, (Firm1, Firm2)) and firm.labor_demand > 0]
-        sellers = [(1, worker.wage, worker) 
-                   for worker in self.schedule.agents 
+        sellers = [(1, worker.wage, worker)
+                   for worker in self.schedule.agents
                    if isinstance(worker, Worker) and not worker.employed]
-        
+
         transactions = market_matching(buyers, sellers)
         for firm, worker, quantity, price in transactions:
             firm.hire_worker(worker, price)
@@ -119,13 +179,13 @@ class EconomyModel(Model):
 
     def execute_capital_market(self):
         print("Capital Market")
-        buyers = [(firm.investment_demand, firm.get_max_capital_price(), firm) 
-                  for firm in self.schedule.agents 
+        buyers = [(firm.investment_demand, firm.get_max_capital_price(), firm)
+                  for firm in self.schedule.agents
                   if isinstance(firm, Firm2) and firm.investment_demand > 0]
-        sellers = [(firm.inventory, firm.price, firm) 
-                   for firm in self.schedule.agents 
+        sellers = [(firm.inventory, firm.price, firm)
+                   for firm in self.schedule.agents
                    if isinstance(firm, Firm1) and firm.inventory > 0]
-        
+
         transactions = market_matching(buyers, sellers)
         for buyer, seller, quantity, price in transactions:
             buyer.buy_capital(quantity, price)
@@ -134,13 +194,13 @@ class EconomyModel(Model):
 
     def execute_consumption_market(self):
         print("Consumption Market")
-        buyers = [(worker.consumption, worker.get_max_consumption_price(), worker) 
-                  for worker in self.schedule.agents 
+        buyers = [(worker.consumption, worker.get_max_consumption_price(), worker)
+                  for worker in self.schedule.agents
                   if isinstance(worker, Worker) and worker.savings > 0]
-        sellers = [(firm.inventory, firm.price, firm) 
-                   for firm in self.schedule.agents 
+        sellers = [(firm.inventory, firm.price, firm)
+                   for firm in self.schedule.agents
                    if isinstance(firm, Firm2) and firm.inventory > 0]
-        
+
         transactions = market_matching(buyers, sellers)
         for buyer, seller, quantity, price in transactions:
             buyer.consume(quantity, price)

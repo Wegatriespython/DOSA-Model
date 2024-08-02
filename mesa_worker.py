@@ -1,6 +1,6 @@
 from mesa import Agent
 import numpy as np
-
+from Config import Config
 class Worker(Agent):
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model)
@@ -12,10 +12,21 @@ class Worker(Agent):
         self.consumption = model.config.INITIAL_CONSUMPTION
         self.price_history = [model.config.INITIAL_PRICE]
         self.wage_history = [model.config.MINIMUM_WAGE] * 5
-
+        self.mode = 'decentralized'
+        self.seller_prices = []
     def step(self):
+        if self.mode == 'decentralized':
+            self.decentralized_step()
+        elif self.mode == 'centralized':
+            self.centralized_step()
+
+    def decentralized_step(self):
         self.update_expectations()
         self.make_economic_decision()
+        self.update_skills()
+
+    def centralized_step(self):
+        # The central planner will call apply_central_decision()
         self.update_skills()
 
     def update_expectations(self):
@@ -82,7 +93,17 @@ class Worker(Agent):
     def set_seller_prices(self, prices):
         """
         Set the current prices from sellers in the consumption market.
-        
+
         :param prices: List of prices from sellers in the consumption market
         """
         self.seller_prices = prices
+
+    def apply_central_decision(self, employment, wage, consumption):
+        self.employed = employment
+        self.wage = wage
+        self.consumption = consumption
+        if self.employed:
+            self.savings += self.wage
+        self.savings -= self.consumption  # Consumption good price is 1 (numeraire)
+        if not self.employed:
+            self.employer = None
