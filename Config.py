@@ -4,7 +4,7 @@ class Config:
     def __init__(self):
         # Common parameters
         #
-        self.TIME_HORIZON = 150
+        self.TIME_HORIZON = 30
         self.INITIAL_CAPITAL = 10
         self.INITIAL_PRODUCTIVITY = 1
         self.INITIAL_PRICE = 1
@@ -13,7 +13,7 @@ class Config:
         self.MAX_MPL = 100
         self.INITIAL_INVENTORY = 4
         self.INITIAL_DEMAND = 5
-        self.DEPRECIATION_RATE = 0.00001
+        self.DEPRECIATION_RATE = 0.1
         self.MIN_DEMAND = 1
         self.PRICE_ADJUSTMENT_FACTOR = 0.2
         self.EXPECTED_PERIODS = 150
@@ -45,7 +45,8 @@ class Config:
         self.INNOVATION_ATTEMPT_PROBABILITY = 0.1  # Probability of a successful innovation attempt
         self.PRODUCTIVITY_INCREASE_PROBABILITY = 0.5  # Probability that a successful innovation increases productivity
         self.PRODUCTIVITY_INCREASE = 0.005  # Reduced from 0.1 to 0.05 for more gradual growth
-
+        self.INITIAL_RELATIVE_PRICE_CAPITAL = 3.0  # Initial price of capital goods relative to consumption goods
+        self.INITIAL_RELATIVE_PRICE_LABOR = 1.0  # Initial price of labor relative to consumption goods
         # Firm2 specific parameters
         self.FIRM2_INITIAL_CAPITAL = 5
         self.FIRM2_INITIAL_INVESTMENT = 0
@@ -55,7 +56,7 @@ class Config:
         self.FIRM2_INVENTORY_THRESHOLD = 20
 
         # Simulation parameters
-        self.INITIAL_WORKERS = 30
+        self.INITIAL_WORKERS = 10
         self.INITIAL_CAPITAL_FIRMS = 2  # This was previously INITIAL_FIRM1S
         self.INITIAL_CONSUMPTION_FIRMS = 3  # This was previously INITIAL_FIRM2S
         self.SIMULATION_STEPS = 10

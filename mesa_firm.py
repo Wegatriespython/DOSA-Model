@@ -1,6 +1,6 @@
 from mesa import Agent
 import numpy as np
-from Simple_profit_maxxing import neoclassical_profit_maximization
+from Simple_profit_maxxing import profit_maximization
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import StandardScaler
 import logging
@@ -17,7 +17,7 @@ class Firm(Agent):
         self.production = 0
         self.sales = 0
         self.budget = initial_capital
-        self.historic_sales = [model.config.INITIAL_DEMAND] * 5  # Initialize with 5 periods of initial demand
+        self.historic_sales = [model.config.INITIAL_DEMAND] * 5
         self.expected_demand = model.config.INITIAL_DEMAND
         self.expected_price = model.config.INITIAL_PRICE
         self.labor_demand = 0
@@ -27,8 +27,10 @@ class Firm(Agent):
         self.scaler = StandardScaler()
         self.is_trained = False
         self.prediction_history = []
+        self.wage = model.config.INITIAL_WAGE
 
     def step(self):
+        print("Budget", self.budget)
         if self.mode == 'decentralized':
             self.decentralized_step()
         elif self.mode == 'centralized':
@@ -37,24 +39,20 @@ class Firm(Agent):
     def decentralized_step(self):
         self.update_firm_state()
         self.make_production_decision()
-        self.produce()
         self.update_historic_sales()
     def centralized_step(self):
         pass
     def update_firm_state(self):
         if isinstance(self, Firm1):
-            self.expected_demand = self.calculate_expected_demand('capital')
+            self.expected_demand = self.get_market_demand('capital')
         elif isinstance(self, Firm2):
-            self.expected_demand = self.calculate_expected_demand('consumption')
+            self.expected_demand = self.get_market_demand('consumption')
         self.expected_price = self.calculate_expected_price()
         #self.train_demand_predictor()
         depreciation_amount = self.inventory * self.model.config.DEPRECIATION_RATE
         self.inventory = max(0, self.inventory - depreciation_amount)
         self.budget -= depreciation_amount * self.price
 
-    def calculate_expected_demand(self, market_type):
-        market_demand = self.get_market_demand(market_type)
-        return max(market_demand, self.model.config.MIN_DEMAND)
     def get_market_demand(self, market_type):
         if market_type == 'labor':
             potential_buyers = [agent for agent in self.model.schedule.agents if isinstance(agent, Firm)]
@@ -69,33 +67,18 @@ class Firm(Agent):
             raise ValueError(f"Invalid market type: {market_type}")
 
         return sum(buyer_demand)
-    def get_noisy_market_demand(self, market_type, noise_level=0.1):
-        if market_type == 'labor':
-            potential_buyers = [agent for agent in self.model.schedule.agents if isinstance(agent, Firm)]
-            buyer_demand = [firm.labor_demand for firm in potential_buyers]
-        elif market_type == 'capital':
-            potential_buyers = [agent for agent in self.model.schedule.agents if isinstance(agent, Firm)]
-            buyer_demand = [firm.investment_demand for firm in potential_buyers]
-        elif market_type == 'consumption':
-            potential_buyers = [agent for agent in self.model.schedule.agents if hasattr(agent, 'consumption')]
-            buyer_demand = [agent.consumption for agent in potential_buyers]
-        else:
-            raise ValueError(f"Invalid market type: {market_type}")
 
-        total_demand = sum(buyer_demand)
-        noisy_demand = total_demand * (1 + np.random.normal(0, noise_level))
-        return max(noisy_demand, 0)  # Ensure non-negative demand
-    def predict_demand(self, noisy_market_demand):
+    def predict_demand(self):
         if not self.is_trained:
             return np.mean(self.historic_sales)  # Fallback to historical average if not trained
 
-        features = self.prepare_features(noisy_market_demand)
+        features = self.prepare_features()
         features_scaled = self.scaler.transform(features.reshape(1, -1))
         prediction = self.demand_predictor.predict(features_scaled)[0]
 
         return max(prediction, 0)  # Ensure non-negative demand
 
-    def prepare_features(self, noisy_market_demand):
+    def prepare_features(self):
         return np.array([
             self.capital,
             len(self.workers),
@@ -105,17 +88,17 @@ class Firm(Agent):
             self.budget,
             np.mean(self.historic_sales),
             np.std(self.historic_sales),
-            self.model.global_accounting.get_average_wage(),
-            self.model.global_accounting.get_average_capital_price(),
-            self.model.global_accounting.get_average_consumption_good_price(),
-            noisy_market_demand  # Include noisy market demand as a feature
+            self.model.get_average_wage(),  # Updated
+            self.model.get_average_capital_price(),  # Updated
+            self.model.get_average_consumption_good_price(),  # Updated
+            self.get_market_demand(self.get_market_type())
         ])
 
     def train_demand_predictor(self):
         if len(self.historic_sales) < 10:  # Need some history to train
             return
 
-        X = np.array([self.prepare_features(self.get_noisy_market_demand(self.get_market_type())) for _ in range(len(self.historic_sales) - 5)])
+        X = np.array([self.prepare_features() for _ in range(len(self.historic_sales) - 5)])
         y = np.array(self.historic_sales[5:])  # Predict next period's sales
 
         X_scaled = self.scaler.fit_transform(X)
@@ -127,30 +110,64 @@ class Firm(Agent):
     def make_production_decision(self):
         # Update expected demand first
         if isinstance(self, Firm1):
-            self.expected_demand = self.calculate_expected_demand('capital')
+            self.expected_demand = self.get_market_demand('capital')
         elif isinstance(self, Firm2):
-            self.expected_demand = self.calculate_expected_demand('consumption')
+            self.expected_demand = self.get_market_demand('consumption')
 
-        optimal_labor, optimal_capital, optimal_price, optimal_production = neoclassical_profit_maximization(
+        #print("Calling profit_maximization with parameters:", {
+            #'current_capital': self.capital,
+            #'current_labor': len(self.workers),
+            #'current_price': self.price,
+            #'current_productivity': self.productivity,
+            #'expected_demand': [self.expected_demand] * self.model.config.TIME_HORIZON,
+            #'expected_price': [self.expected_price] * self.model.config.TIME_HORIZON,
+            #'capital_price': self.model.get_average_capital_price(),  # Updated
+            #'capital_elasticity': self.model.config.CAPITAL_ELASTICITY,
+            #'current_inventory': self.inventory,
+            #'depreciation_rate': self.model.config.DEPRECIATION_RATE,
+            #'expected_periods': self.model.config.TIME_HORIZON,
+            #'discount_rate': self.model.config.DISCOUNT_RATE,
+            #'budget': self.budget,
+            #'wage': self.wage
+        #})
+
+        result = profit_maximization(
             self.capital,
             len(self.workers),
             self.price,
             self.productivity,
-            [self.expected_demand] * 5,
-            [self.expected_price] * 5,
-            self.model.global_accounting.get_average_capital_price(),
+            [self.expected_demand] * self.model.config.TIME_HORIZON,
+            [self.expected_price] * self.model.config.TIME_HORIZON,
+            self.model.get_average_capital_price(),  # Updated
             self.model.config.CAPITAL_ELASTICITY,
             self.inventory,
             self.model.config.DEPRECIATION_RATE,
-            5,
-            self.model.config.DISCOUNT_RATE
+            self.model.config.TIME_HORIZON,
+            self.model.config.DISCOUNT_RATE,
+            self.budget,
+            self.wage
         )
-        #print(f"Optimal labor: {optimal_labor}, optimal capital: {optimal_capital}, optimal price: {optimal_price}, optimal production: {optimal_production}")
+
+        if result is None:
+            print("Optimization failed")
+            return
+
+
+        optimal_labor = result['optimal_labor']
+        optimal_capital = result['optimal_capital']
+        optimal_price = result['optimal_price']
+        optimal_production = result['optimal_production']
+
+        print(f"Optimal labor From the Optimisation: {optimal_labor}, optimal capital: {optimal_capital}, optimal price: {optimal_price}, optimal production: {optimal_production}")
 
         self.labor_demand = max(0, optimal_labor - len(self.workers))
         self.price = self.adjust_price(self.price, self.sales, self.expected_demand)
-        self.investment_demand = self.adjust_capital(self.capital, optimal_capital, self.budget, self.model.global_accounting.get_average_capital_price())
+        self.investment_demand = self.adjust_capital(self.capital, optimal_capital, self.budget, self.model.get_average_capital_price())  # Updated
+        print(f"Production pre-optimisation: {self.production}")
         self.production = self.adjust_production(self.production, optimal_production)
+        print(f"Production post-optimisation: {self.production}")
+        #self.inventory += self.production
+
 
     def adjust_production(self, current_production: float, optimal_production: float, max_adjustment_rate: float = 0.1) -> float:
         """
@@ -161,16 +178,19 @@ class Firm(Agent):
         :param max_adjustment_rate: Maximum rate of change in production (default 10%)
         :return: New production level
         """
+        if self.inventory - optimal_production >= 0:
+            return 0
+
         production_difference = optimal_production - current_production
         max_change = 5
 
         if abs(production_difference) <= max_change:
             # If the difference is small, move directly to optimal
-            print("Optimal production", optimal_production)
+
             return optimal_production
         elif production_difference > 0:
             # If we need to increase production
-            print("Current production", current_production + max_change)
+            #print("Current production", current_production + max_change)
             return current_production + max_change
         else:
             # If we need to decrease production
@@ -189,6 +209,7 @@ class Firm(Agent):
             proposed_price = current_price * 1.05
             return proposed_price # Increase price by 5%
         else:
+            print("Sales Shortfall", sales - expected_demand)
             proposed_price = current_price * 0.95
             return proposed_price  # Decrease price by 5%
 
@@ -217,23 +238,7 @@ class Firm(Agent):
 
         return actual_change
 
-    def produce(self):
-        if isinstance(self, Firm1):
-            self.produce_capital_goods()
-        elif isinstance(self, Firm2):
-            self.produce_consumption_goods()
 
-    def produce_capital_goods(self):
-        # Implement production function for Firm1
-        self.production = self.productivity * (self.capital ** self.model.config.CAPITAL_ELASTICITY) * (len(self.workers) ** (1 - self.model.config.CAPITAL_ELASTICITY))
-        self.inventory += self.production
-
-    def produce_consumption_goods(self):
-        # Implement production function for Firm2
-        capital_input = min(self.capital, self.inventory)  # Can't use more capital than available
-        self.production = self.productivity * (capital_input ** self.model.config.CAPITAL_ELASTICITY) * (len(self.workers) ** (1 - self.model.config.CAPITAL_ELASTICITY))
-        self.inventory += self.production
-        self.capital -= capital_input  # Consume the capital goods used in production
 
     def update_historic_sales(self):
         self.historic_sales.append(self.sales)
@@ -242,7 +247,9 @@ class Firm(Agent):
         self.sales = 0
 
     def calculate_expected_price(self):
-        return np.mean([self.price] + [self.model.global_accounting.get_average_consumption_good_price() for _ in range(4)])
+        if len(self.historic_sales) < 10:
+            return self.price
+        return np.mean([self.price] + [self.model.get_average_consumption_good_price() for _ in range(4)])
 
     def calculate_production_capacity(self):
         return self.productivity * (self.capital ** self.model.config.CAPITAL_ELASTICITY) * (len(self.workers) ** (1 - self.model.config.CAPITAL_ELASTICITY))
@@ -251,6 +258,7 @@ class Firm(Agent):
         self.workers.append(worker)
         self.budget -= wage
         self.labor_demand -= 1
+        self.wage = wage  # Update the firm's wage
 
     def fire_workers(self, num_workers):
         for _ in range(min(num_workers, len(self.workers))):
@@ -261,21 +269,20 @@ class Firm(Agent):
         if isinstance(self, Firm2):
             self.capital += quantity
             self.investment_demand -= quantity
-            self.budget -= quantity * price * self.model.relative_price  # Adjust for relative price
-
+            self.budget -= quantity * price
     def sell_goods(self, quantity, price):
         self.inventory -= quantity
         self.sales += quantity
-        if isinstance(self, Firm1):
-            self.budget += quantity * price * self.model.relative_price  # Adjust for relative price
-        else:
-            self.budget += quantity * price  # Consumption goods are the numeraire
+        self.budget += quantity * price  # Price already adjusted in execute_capital_market
+        print("Sales Made", quantity)
+        print("Budget added", quantity * price)
+
 
     def get_max_wage(self):
-        return self.budget / max(1, self.labor_demand) if self.labor_demand > 0 else 0
+        return (self.budget / max(1, self.labor_demand)) if self.labor_demand >= 0.8 else 0
 
     def get_max_capital_price(self):
-        return self.budget / max(1, self.investment_demand) if self.investment_demand > 0 else 0
+        return (self.budget / max(1, self.investment_demand)) if self.investment_demand >= 0.8 else 0
 
     def apply_central_decision(self, labor, capital, price):
         self.labor_demand = labor
@@ -311,6 +318,7 @@ class Firm1(Firm):
 
     def step(self):
         super().step()
+        self.price = self.model.config.INITIAL_PRICE * self.model.config.INITIAL_RELATIVE_PRICE_CAPITAL   # Reset price to initial value
         if self.mode == 'decentralized':
             self.innovate()
 
@@ -328,7 +336,7 @@ class Firm2(Firm):
     def buy_capital(self, quantity, price): # SUS
         self.capital_inventory += quantity
         self.investment_demand -= quantity
-        self.budget -= quantity * price * self.model.relative_price  # Adjust for relative price
+        self.budget -= quantity * price
     def produce_consumption_goods(self):
         capital_input = min(self.capital_inventory, self.model.config.MAX_CAPITAL_USAGE)
         self.production = self.productivity * (capital_input ** self.model.config.CAPITAL_ELASTICITY) * (len(self.workers) ** (1 - self.model.config.CAPITAL_ELASTICITY))

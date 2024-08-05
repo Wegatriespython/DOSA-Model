@@ -1,6 +1,7 @@
 from mesa import Agent
 import numpy as np
 from Config import Config
+
 class Worker(Agent):
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model)
@@ -14,6 +15,7 @@ class Worker(Agent):
         self.wage_history = [model.config.MINIMUM_WAGE] * 5
         self.mode = 'decentralized'
         self.seller_prices = []
+
     def step(self):
         if self.mode == 'decentralized':
             self.decentralized_step()
@@ -37,25 +39,23 @@ class Worker(Agent):
         if self.employed:
             self.wage_history.append(self.wage)
         else:
-            self.wage_history.append(0)  # Represent unemployment with 0 wage
-        self.wage_history = self.wage_history[-5:]  # Keep only the last 5 periods
+            self.wage_history.append(0)
+        self.wage_history = self.wage_history[-5:]
         self.expected_wage = max(np.mean(self.wage_history), self.model.config.MINIMUM_WAGE)
 
     def update_price_expectation(self):
         if self.seller_prices:
-            current_price = np.mean(self.seller_prices)  # Average of current seller prices
+            current_price = np.mean(self.seller_prices)
             self.price_history.append(current_price)
             if len(self.price_history) > 10:
                 self.price_history.pop(0)
             self.expected_price = np.mean(self.price_history)
         else:
-            # Fallback to global average if no seller prices are available
-            current_price = self.model.global_accounting.get_average_consumption_good_price()
+            current_price = self.model.get_average_consumption_good_price()
             self.price_history.append(current_price)
             if len(self.price_history) > 10:
                 self.price_history.pop(0)
             self.expected_price = np.mean(self.price_history)
-
     def make_economic_decision(self):
         # Simplified decision-making process
         self.consumption = min(self.savings, self.expected_wage * self.model.config.CONSUMPTION_PROPENSITY)
