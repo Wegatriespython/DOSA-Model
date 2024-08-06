@@ -5,8 +5,9 @@ from Config import Config
 class Worker(Agent):
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model)
-        self.employed = False
-        self.employer = None
+        self.employers = {}  # Dictionary to store employers and corresponding working hours
+        self.total_working_hours = 0
+        self.max_working_hours = model.config.MAX_WORKING_HOURS
         self.wage = model.config.INITIAL_WAGE
         self.savings = model.config.INITIAL_SAVINGS
         self.skills = model.config.INITIAL_SKILLS
@@ -36,7 +37,7 @@ class Worker(Agent):
         self.update_price_expectation()
 
     def update_wage_expectation(self):
-        if self.employed:
+        if self.total_working_hours > 0:
             self.wage_history.append(self.wage)
         else:
             self.wage_history.append(0)
@@ -57,25 +58,40 @@ class Worker(Agent):
                 self.price_history.pop(0)
             self.expected_price = np.mean(self.price_history)
     def make_economic_decision(self):
-        # Simplified decision-making process
-        self.consumption = min(self.savings, self.expected_wage * self.model.config.CONSUMPTION_PROPENSITY)
-        self.wage = max(self.expected_wage, self.model.config.MINIMUM_WAGE)
+        self.consumption = min(self.savings, self.expected_wage * self.total_working_hours * self.model.config.CONSUMPTION_PROPENSITY)
 
     def update_skills(self):
-        if self.employed:
+        if self.total_working_hours > 0:
             self.skills *= (1 + self.model.config.SKILL_GROWTH_RATE)
         else:
             self.skills *= (1 - self.model.config.SKILL_DECAY_RATE)
 
-    def get_hired(self, employer, wage):
-        self.employed = True
-        self.employer = employer
-        self.wage = wage
+    def get_hired(self, employer, wage, hours):
+        if employer in self.employers:
+            self.employers[employer]['hours'] += hours
+        else:
+            self.employers[employer] = {'hours': hours, 'wage': wage}
+        self.total_working_hours += hours
+        self.update_average_wage()
 
-    def get_fired(self):
-        self.employed = False
-        self.employer = None
-        self.wage = 0
+    def update_hours(self, employer, hours):
+        if employer in self.employers:
+            old_hours = self.employers[employer]['hours']
+            self.employers[employer]['hours'] = hours
+            self.total_working_hours += (hours - old_hours)
+            self.update_average_wage()
+
+    def get_fired(self, employer):
+        if employer in self.employers:
+            self.total_working_hours -= self.employers[employer]['hours']
+            del self.employers[employer]
+            self.update_average_wage()
+
+    def update_average_wage(self):
+        if self.total_working_hours > 0:
+            self.wage = sum(emp['wage'] * emp['hours'] for emp in self.employers.values()) / self.total_working_hours
+        else:
+            self.wage = 0
 
     def consume(self, quantity, price):
         total_cost = quantity * price
@@ -86,9 +102,11 @@ class Worker(Agent):
         return self.expected_price * 1.1  # Willing to pay up to 10% more than expected
 
     def update_after_markets(self):
-        if self.employed:
-            self.savings += self.wage
-        self.savings -= self.consumption * self.model.global_accounting.get_average_consumption_good_price()
+        self.savings += sum(emp['wage'] * emp['hours'] for emp in self.employers.values())
+
+
+    def available_hours(self):
+        return max(0, self.max_working_hours - self.total_working_hours)
 
     def set_seller_prices(self, prices):
         """
@@ -103,7 +121,7 @@ class Worker(Agent):
         self.wage = wage
         self.consumption = consumption
         if self.employed:
-            self.savings += self.wage
+            self.savings += self.wage*self.working_hours
         self.savings -= self.consumption  # Consumption good price is 1 (numeraire)
         if not self.employed:
             self.employer = None

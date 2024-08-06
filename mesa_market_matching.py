@@ -1,32 +1,29 @@
-import numpy as np
-
 def market_matching(buyers, sellers):
-    # Sort buyers (descending) and sellers (ascending) by price
-    buyers.sort(key=lambda x: x[1], reverse=True)
-    sellers.sort(key=lambda x: x[1])
-    if not buyers or not sellers or buyers[0][1] < sellers[0][1]:
-        return []  # No trades possible
-    clearing_price = (buyers[0][1] + sellers[0][1]) / 2
-    total_supply = sum(seller[0] for seller in sellers)
-    transactions = []
-    remaining_supply = total_supply
-    buyer_index = 0
-    while remaining_supply > 0 and buyer_index < len(buyers):
-        for seller in sellers:
-            if remaining_supply == 0 or buyer_index >= len(buyers):
-                break
+    def match_recursively(buyers, sellers, transactions):
+        if not buyers or not sellers:
+            return transactions
 
-            buyer = buyers[buyer_index]
-            trade_quantity = min(buyer[0], seller[0], remaining_supply)
+        # Sort buyers (descending) and sellers (ascending) by price
+        buyers.sort(key=lambda x: x[1], reverse=True)
+        sellers.sort(key=lambda x: x[1])
 
-            if trade_quantity > 0:
-                transactions.append((buyer[2], seller[2], trade_quantity, clearing_price))
-                remaining_supply -= trade_quantity
-                seller = (seller[0] - trade_quantity, seller[1], seller[2])
+        if buyers[0][1] < sellers[0][1]:
+            return transactions  # No more matches possible
 
-                if buyer[0] > trade_quantity:
-                    buyers[buyer_index] = (buyer[0] - trade_quantity, buyer[1], buyer[2])
-                else:
-                    buyer_index += 1
+        clearing_price = (buyers[0][1] + sellers[0][1]) / 2
+        quantity = min(buyers[0][0], sellers[0][0])
 
-    return transactions
+        transactions.append((buyers[0][2], sellers[0][2], quantity, clearing_price))
+
+        # Update quantities
+        new_buyers = [(buyers[0][0] - quantity, buyers[0][1], buyers[0][2])] + buyers[1:] if buyers[0][0] > quantity else buyers[1:]
+        new_sellers = [(sellers[0][0] - quantity, sellers[0][1], sellers[0][2])] + sellers[1:] if sellers[0][0] > quantity else sellers[1:]
+
+        # Remove any buyers or sellers with zero quantity
+        new_buyers = [b for b in new_buyers if b[0] > 0]
+        new_sellers = [s for s in new_sellers if s[0] > 0]
+
+        # Recursive call
+        return match_recursively(new_buyers, new_sellers, transactions)
+
+    return match_recursively(buyers, sellers, [])

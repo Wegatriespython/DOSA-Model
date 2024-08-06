@@ -4,16 +4,17 @@ class Config:
     def __init__(self):
         # Common parameters
         #
-        self.TIME_HORIZON = 30
+        self.MAX_WORKING_HOURS = 16
+        self.TIME_HORIZON = 6
         self.INITIAL_CAPITAL = 10
         self.INITIAL_PRODUCTIVITY = 1
         self.INITIAL_PRICE = 1
         self.MAX_CAPITAL_USAGE = 100
-        self.INITIAL_WAGE = 1
+        self.INITIAL_WAGE = 0.0625 # 1/16
         self.MAX_MPL = 100
         self.INITIAL_INVENTORY = 4
         self.INITIAL_DEMAND = 5
-        self.DEPRECIATION_RATE = 0.1
+        self.DEPRECIATION_RATE = 0.001
         self.MIN_DEMAND = 1
         self.PRICE_ADJUSTMENT_FACTOR = 0.2
         self.EXPECTED_PERIODS = 150
@@ -28,7 +29,7 @@ class Config:
         self.PRODUCTION_FACTOR = 0.1
         self.WAGE_OFFER_FACTOR = 1.1
         self.JOB_LOSS_PROBABILITY = 0.05
-        self.MINIMUM_WAGE = 1
+        self.MINIMUM_WAGE = 0.0625
         self.CONSUMPTION_PROPENSITY =1
         self.INITIAL_CONSUMPTION = 1
         self.TOTAL_FACTOR_PRODUCTIVITY = 1.0

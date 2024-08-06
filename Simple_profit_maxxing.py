@@ -6,7 +6,7 @@ def profit_maximization(
         current_capital, current_labor, current_price, current_productivity,
         expected_demand, expected_price, capital_price, capital_elasticity,
         current_inventory, depreciation_rate, expected_periods, discount_rate,
-        budget, wage, linear_solver='mumps'):
+        budget, wage, linear_solver='ma27'):
 
     model = pyo.ConcreteModel()
 
@@ -19,16 +19,16 @@ def profit_maximization(
     scale_price = max(1, current_price)
     scale_demand = max(1, max(expected_demand))
 
-    # Variables with scaling and safeguarded log transformation
-    model.labor = pyo.Var(domain=pyo.NonNegativeReals, initialize=max(1e-6, current_labor))
-    model.capital = pyo.Var(domain=pyo.NonNegativeReals, initialize=max(1e-6, current_capital))
+    # Variables with scaling and lower bounds
+    model.labor = pyo.Var(domain=pyo.NonNegativeReals, initialize=max(1e-6, current_labor), bounds=(1e-6, None))
+    model.capital = pyo.Var(domain=pyo.NonNegativeReals, initialize=max(1e-6, current_capital), bounds=(1e-6, None))
     model.production = pyo.Var(domain=pyo.NonNegativeReals, initialize=1e-6)
     model.inventory = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=max(1e-6, current_inventory))
     model.sales = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=1e-6)
 
     # Objective
     def objective_rule(model):
-        return sum(
+        obj_value = sum(
             (expected_price[t] * model.sales[t] / scale_price
              - wage * model.labor / scale_labor
              - (model.capital - current_capital) * capital_price / scale_capital * (1 if t == 0 else 0)
@@ -36,6 +36,7 @@ def profit_maximization(
             ) / ((1 + discount_rate) ** t)
             for t in model.T
         )
+        return obj_value
     model.objective = pyo.Objective(rule=objective_rule, sense=pyo.maximize)
 
     # Constraints
@@ -44,8 +45,7 @@ def profit_maximization(
     model.production_constraint = pyo.Constraint(rule=production_constraint_rule)
 
     def budget_constraint_rule(model):
-        return (wage * model.labor / scale_labor +
-                (model.capital - current_capital) * capital_price / scale_capital <= budget)
+        return (wage * model.labor + (model.capital - current_capital) * capital_price <= budget * 1.0000001) #allow 0.0001% slack
     model.budget_constraint = pyo.Constraint(rule=budget_constraint_rule)
 
     def inventory_balance_rule(model, t):
@@ -67,8 +67,14 @@ def profit_maximization(
     solver = SolverFactory('ipopt')
     solver.options['max_iter'] = 10000
     solver.options['tol'] = 1e-6
+    solver.options['halt_on_ampl_error'] = 'yes'
     solver.options['linear_solver'] = linear_solver
     results = solver.solve(model, tee=False)
+
+    if results.solver.termination_condition == pyo.TerminationCondition.optimal:
+        total_cost = pyo.value(wage * model.labor + (model.capital - current_capital) * capital_price)
+        if total_cost > budget * 1.0000001:  # Allow for 0.0001% violation due to numerical issues
+            print(f"WARNING: Budget constraint violated. Total cost: {total_cost}, Budget: {budget}")
 
     # Check if the solver found an optimal solution
     if (results.solver.status == pyo.SolverStatus.ok and
