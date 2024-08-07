@@ -10,7 +10,7 @@ def comprehensive_sensitivity_analysis():
         "current_productivity": 1,
         "expected_demand": [30] * 25,
         "expected_price": [1] * 25,
-        "capital_price": 1,
+        "capital_price": 3,
         "capital_elasticity": 0.3,
         "current_inventory": 3.6,
         "depreciation_rate": 0.1,
