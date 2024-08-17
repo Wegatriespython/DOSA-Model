@@ -53,19 +53,23 @@ class Firm(Agent):
         elif market_type == 'consumption':
             potential_buyers = [agent for agent in self.model.schedule.agents if hasattr(agent, 'consumption')]
             buyer_demand = [agent.desired_consumption for agent in potential_buyers]
-            buyer_price = [agent.price for agent in potential_buyers]
+            buyer_price = [agent.expected_price for agent in potential_buyers]
+
         else:
             raise ValueError(f"Invalid market type: {market_type}")
-
-        return sum(buyer_demand)
+        price_average = np.mean(buyer_price)
+        return sum(buyer_demand), price_average
 
 
     def make_production_decision(self):
         # Update expected demand first
         if isinstance(self, Firm1):
-            self.expected_demand = (self.get_market_demand('capital'))/2
+            self.expected_demand, self.expected_price = self.get_market_demand('capital')
+            self.expected_demand = self.expected_demand/2
+
         elif isinstance(self, Firm2):
-            self.expected_demand = (self.get_market_demand('consumption'))/3
+            self.expected_demand, self.expected_price = self.get_market_demand('consumption')
+            self.expected_demand = self.expected_demand/3
         if self.budget < 0:
             print("Budget Exceeded")
             return # Skip production if budget is negative
@@ -327,7 +331,7 @@ class Firm(Agent):
 
         if self.firm_type == 'consumption':
             labor_cost = sum([self.workers[worker]['wage'] * self.workers[worker]['hours'] for worker in self.workers])
-            capital_cost = self.investment_demand * min(self.get_max_capital_price(), self.calculate_expected_price('capital'))
+            capital_cost = self.investment_demand * min(self.get_max_capital_price(), self.model.get_average_capital_price())
             total_cost = labor_cost + capital_cost
             total_output = self.inventory
             if total_output <= 0:

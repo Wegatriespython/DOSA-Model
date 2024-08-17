@@ -187,7 +187,6 @@ class EconomyModel(Model):
         print("Data exported to economic_model_data.csv")
 
     def run_decentralised_step(self):
-        self.update_worker_price_information()
         self.schedule.step()
         self.execute_markets()
         self.employment_snapshot()
@@ -206,13 +205,6 @@ class EconomyModel(Model):
         }
 
 
-    def update_worker_price_information(self):
-        consumption_firms = [firm for firm in self.schedule.agents if isinstance(firm, Firm2)]
-        seller_prices = [firm.price for firm in consumption_firms]
-
-        for agent in self.schedule.agents:
-            if isinstance(agent, Worker):
-                agent.set_seller_prices(seller_prices)
     def execute_markets(self):
         for agent in self.schedule.agents:
             if isinstance(agent, (Firm1, Firm2)):
@@ -263,7 +255,7 @@ class EconomyModel(Model):
 
     def execute_consumption_market(self):
         print("Executing consumption market")
-        buyers = [(worker.desired_consumption, worker.get_max_consumption_price(), worker)
+        buyers = [(worker.desired_consumption, worker.expected_price, worker)
                   for worker in self.schedule.agents
                   if isinstance(worker, Worker) and worker.savings > 0]
         #print("Buyers", buyers)
