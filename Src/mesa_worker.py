@@ -11,14 +11,16 @@ class Worker(Agent):
         self.wage = 0.0625
         self.savings = 100
         self.got_paid = False
+        self.expected_price = model.config.INITIAL_PRICE
+        self.expected_wage = model.config.MINIMUM_WAGE
         self.skills = model.config.INITIAL_SKILLS
         self.consumption = 1
         self.desired_consumption = 1
+        self.price = model.config.INITIAL_PRICE
         self.price_history = [model.config.INITIAL_PRICE]
         self.MIN_CONSUMPTION = 1
         self.wage_history = [model.config.MINIMUM_WAGE] * 5
         self.mode = 'decentralized'
-        self.seller_prices = []
 
     def step(self):
         if self.mode == 'decentralized':
@@ -48,18 +50,13 @@ class Worker(Agent):
         self.expected_wage = max(np.mean(self.wage_history), self.model.config.MINIMUM_WAGE)
 
     def update_price_expectation(self):
-        if self.seller_prices:
-            current_price = np.mean(self.seller_prices)
-            self.price_history.append(current_price)
-            if len(self.price_history) > 10:
-                self.price_history.pop(0)
-            self.expected_price = np.mean(self.price_history)
+        if len(self.price_history) > 10:
+            self.price_history.pop(0)
+            self.expected_price = np.mean(self.price_history) * 1.1
         else:
             current_price = self.model.get_average_consumption_good_price()
-            self.price_history.append(current_price)
-            if len(self.price_history) > 10:
-                self.price_history.pop(0)
-            self.expected_price = np.mean(self.price_history)
+            self.expected_price = current_price * 1.1
+
     def make_economic_decision(self):
         self.desired_consumption = min(self.savings, self.expected_wage * self.total_working_hours * self.model.config.CONSUMPTION_PROPENSITY)
         self.desired_consumption = max(self.desired_consumption, self.model.config.MIN_CONSUMPTION)
@@ -100,6 +97,7 @@ class Worker(Agent):
 
     def consume(self, quantity, price):
         total_cost = quantity * price
+        self.price_history.append(price)
         self.consumption = quantity
         self.savings -= total_cost
 
@@ -113,13 +111,6 @@ class Worker(Agent):
     def available_hours(self):
         return max(0, self.max_working_hours - self.total_working_hours)
 
-    def set_seller_prices(self, prices):
-        """
-        Set the current prices from sellers in the consumption market.
-
-        :param prices: List of prices from sellers in the consumption market
-        """
-        self.seller_prices = prices
 
     def apply_central_decision(self, employment, wage, consumption):
         self.employed = employment

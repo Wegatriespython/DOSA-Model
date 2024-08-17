@@ -34,13 +34,7 @@ class Firm(Agent):
         self.update_historic_sales()
 
     def update_firm_state(self):
-        if isinstance(self, Firm1):
-            self.expected_demand = self.get_market_demand('capital')
-            self.expected_price = self.calculate_expected_price('capital')
-        elif isinstance(self, Firm2):
-            self.expected_demand = self.get_market_demand('consumption')
-            self.expected_price = self.calculate_expected_price('consumption')
-        #self.train_demand_predictor()
+       #self.train_demand_predictor()
         depreciation_amount = self.inventory * self.model.config.DEPRECIATION_RATE
         self.pay_wages()
         self.wage = self.calculate_average_wage()
@@ -51,12 +45,15 @@ class Firm(Agent):
         if market_type == 'labor':
             potential_buyers = [agent for agent in self.model.schedule.agents if isinstance(agent, Firm)]
             buyer_demand = [firm.labor_demand for firm in potential_buyers]
+            buyer_price = [firm.wage for firm in potential_buyers]
         elif market_type == 'capital':
             potential_buyers = [agent for agent in self.model.schedule.agents if isinstance(agent, Firm)]
             buyer_demand = [firm.investment_demand for firm in potential_buyers]
+            buyer_price = [firm.price for firm in potential_buyers]
         elif market_type == 'consumption':
             potential_buyers = [agent for agent in self.model.schedule.agents if hasattr(agent, 'consumption')]
             buyer_demand = [agent.desired_consumption for agent in potential_buyers]
+            buyer_price = [agent.price for agent in potential_buyers]
         else:
             raise ValueError(f"Invalid market type: {market_type}")
 
@@ -211,15 +208,6 @@ class Firm(Agent):
         if len(self.historic_sales) > 10:
             self.historic_sales.pop(0)
         self.sales = 0
-
-    def calculate_expected_price(self, market_type):
-        if len(self.historic_sales) < 10:
-            return self.price
-        if market_type == 'consumption':
-            return np.mean([self.price] + [self.model.get_average_consumption_good_price() for _ in range(4)])
-        else:
-            return np.mean([self.price] + [self.model.get_average_capital_price() for _ in range(4)])
-
 
     def calculate_production_capacity(self):
         return self.productivity * (self.capital ** self.model.config.CAPITAL_ELASTICITY) * (self.total_working_hours ** (1 - self.model.config.CAPITAL_ELASTICITY))
