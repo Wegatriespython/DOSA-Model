@@ -77,23 +77,4 @@ plot_model_variables(model_data,
                      'Production and Demand Over Time',
                      'production_demand.png')
 
-# Calculate and plot correlations including new variables
-correlation_vars = ['Total Labor', 'Total Capital', 'Total Goods', 'Total Money',
-                    'Average Market Demand', 'Average Capital Price', 'Average Wage',
-                    'Total Demand', 'Total Production', 'Global Productivity']
-
-# Add new variables to correlation matrix
-for col in time_series_data.columns:
-    model_data[col] = time_series_data[col].values
-    correlation_vars.append(col)
-
-correlation_matrix = model_data[correlation_vars].corr()
-
-plt.figure(figsize=(15, 12))
-sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', vmin=-1, vmax=1, center=0)
-plt.title('Correlation Matrix of Economic Variables')
-plt.tight_layout()
-plt.savefig('correlation_matrix.png')
-plt.close()
-
 print("Analysis complete. Plots have been saved.")

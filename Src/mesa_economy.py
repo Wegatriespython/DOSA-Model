@@ -82,7 +82,9 @@ class EconomyModel(Model):
 
     def get_average_capital_price(self):
         prices = [firm.price for firm in self.schedule.agents if isinstance(firm, Firm1)]
-        return sum(prices) / len(prices) if prices else 0
+        print(f"Prices are {prices}")
+        avg_price = np.mean(prices) if prices else 3
+        return avg_price
 
     def get_average_wage(self):
         if self.step_count == 0:
@@ -265,7 +267,7 @@ class EconomyModel(Model):
         if sellers:
             min_price = max(sellers, key=lambda x: x[1])[1]
             max_inventory = max(sellers, key=lambda x: x[0])[0]
-            print("Min price, max inventory", min_price, max_inventory)
+
         #print("Sellers", sellers)
         transactions = market_matching(buyers, sellers)
         #print("Consumption Market Transaction", transactions)

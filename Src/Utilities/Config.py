@@ -4,6 +4,7 @@ class Config:
     def __init__(self):
         # Common parameters
         #
+        self.INITIAL_SALES = 1
         self.MAX_WORKING_HOURS = 16
         self.TIME_HORIZON = 6
         self.INITIAL_CAPITAL = 10
@@ -14,7 +15,7 @@ class Config:
         self.MAX_MPL = 100
         self.INITIAL_INVENTORY = 4
         self.INITIAL_DEMAND = 5
-        self.DEPRECIATION_RATE = 0.001
+        self.DEPRECIATION_RATE = 0.1
         self.MIN_DEMAND = 1
         self.PRICE_ADJUSTMENT_FACTOR = 0.2
         self.EXPECTED_PERIODS = 150
