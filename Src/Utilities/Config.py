@@ -6,7 +6,7 @@ class Config:
         #
         self.INITIAL_SALES = 1
         self.MAX_WORKING_HOURS = 16
-        self.TIME_HORIZON = 6
+        self.TIME_HORIZON = 100
         self.INITIAL_CAPITAL = 10
         self.INITIAL_PRODUCTIVITY = 1
         self.INITIAL_PRICE = 1
@@ -18,12 +18,12 @@ class Config:
         self.DEPRECIATION_RATE = 0.1
         self.MIN_DEMAND = 1
         self.PRICE_ADJUSTMENT_FACTOR = 0.2
-        self.EXPECTED_PERIODS = 150
+        self.EXPECTED_PERIODS = 100
         self.INITIAL_SKILLS = .1
         self.DEMAND_ADJUSTMENT_RATE = 0.5
         self.DISCOUNT_FACTOR = 0.95
         self.DISCOUNT_RATE = 0.05
-        self.DECISION_HORIZON = 150
+        self.DECISION_HORIZON = 100
         self.MARKUP_RATE = 0.2
         self.INITIAL_SAVINGS = 200
         self.MIN_CONSUMPTION = 1
@@ -34,7 +34,8 @@ class Config:
         self.CONSUMPTION_PROPENSITY =1
         self.INITIAL_CONSUMPTION = 1
         self.TOTAL_FACTOR_PRODUCTIVITY = 1.0
-        self.CAPITAL_ELASTICITY = 0.3
+        self.CAPITAL_ELASTICITY_FIRM2 = 0.5
+        self.CAPITAL_ELASTICITY_FIRM1 = 0.1
         self.CAPITAL_RENTAL_RATE = 0.05
         self.SKILL_GROWTH_RATE = 0.01
         self.SKILL_DECAY_RATE = 0.005
@@ -52,7 +53,7 @@ class Config:
         # Firm2 specific parameters
         self.FIRM2_INITIAL_CAPITAL = 5
         self.FIRM2_INITIAL_INVESTMENT = 0
-        self.FIRM2_INITIAL_INVESTMENT_DEMAND = 10
+        self.FIRM2_INITIAL_INVESTMENT_DEMAND = 1
         self.FIRM2_INITIAL_DESIRED_CAPITAL = 5
         self.FIRM2_MACHINE_OUTPUT_PER_PERIOD = 10
         self.FIRM2_INVENTORY_THRESHOLD = 20
@@ -61,7 +62,7 @@ class Config:
         self.INITIAL_WORKERS = 10
         self.INITIAL_CAPITAL_FIRMS = 2  # This was previously INITIAL_FIRM1S
         self.INITIAL_CONSUMPTION_FIRMS = 3  # This was previously INITIAL_FIRM2S
-        self.SIMULATION_STEPS = 10
+        self.SIMULATION_STEPS = 100
 
 # Create a global configuration object
 config = Config()

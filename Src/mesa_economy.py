@@ -37,10 +37,14 @@ class EconomyModel(Model):
                 "Total Money": self.get_total_money,
                 "Average Market Demand": self.get_average_market_demand,
                 "Average Capital Price": self.get_average_capital_price,
+                "Average_Consumption_Demand": self.get_average_consumption_demand,
+                "Average_Consumption_Demand_Expected": self.get_average_consumption_demand_expected,
+                "Average_Consumption_expected_price": self.get_average_consumption_expected_price,
                 "Average Wage": self.get_average_wage,
                 "Average Inventory": self.calculate_average_inventory,
                 "Average Consumption Good Price": self.get_average_consumption_good_price,
                 "Total Demand": self.get_total_demand,
+                "Total Supply": self.get_total_sales,
                 "Total Production": self.get_total_production,
                 "Global Productivity": self.calculate_global_productivity
 
@@ -49,7 +53,10 @@ class EconomyModel(Model):
                 "Type": lambda a: type(a).__name__,
                 "Capital": lambda a: getattr(a, 'capital', None),
                 "Labor": lambda a: len(getattr(a, 'workers', [])),
+                "Working_Hours": lambda a: getattr(a, 'total_working_hours', None),
+                "Labor_Demand": lambda a: getattr(a, 'labor_demand', None),
                 "Production": lambda a: getattr(a, 'production', None),
+                "Investment": lambda a: getattr(a, 'investment_demand', None),
                 "Price": lambda a: getattr(a, 'price', None),
                 "Inventory": lambda a: getattr(a, 'inventory', None),
                 "Budget": lambda a: getattr(a, 'budget', None),
@@ -65,7 +72,8 @@ class EconomyModel(Model):
         self.running = True
     def get_total_labor(self):
         return sum(worker.total_working_hours for worker in self.schedule.agents if isinstance(worker, Worker))
-
+    def get_total_labor_demand(self):
+        return sum(firm.labor_demand for firm in self.schedule.agents if isinstance(firm, (Firm1,Firm2)))
     def get_total_capital(self):
         return sum(firm.capital for firm in self.schedule.agents if isinstance(firm, (Firm1, Firm2)))
 
@@ -79,12 +87,18 @@ class EconomyModel(Model):
     def get_average_market_demand(self):
         demands = [firm.expected_demand for firm in self.schedule.agents if isinstance(firm, (Firm1, Firm2))]
         return sum(demands) / len(demands) if demands else 0
-
+    def get_average_consumption_demand(self):
+        demands = [agent.desired_consumption for agent in self.schedule.agents if isinstance(agent, Worker)]
+        return sum(demands)/5  if demands else 0
+    def get_average_consumption_demand_expected(self):
+        demands = [firm.expected_demand for firm in self.schedule.agents if isinstance(firm,  Firm2)]
+        return sum(demands) / len(demands) if demands else 0
+    def average_sales(self):
+        sales = [firm.sales for firm in self.schedule.agents if isinstance(firm, (Firm2, Firm1))]
+        return sum(sales) / len(sales) if sales else 0
     def get_average_capital_price(self):
         prices = [firm.price for firm in self.schedule.agents if isinstance(firm, Firm1)]
-        print(f"Prices are {prices}")
-        avg_price = np.mean(prices) if prices else 3
-        return avg_price
+        return sum(prices) / len(prices) if prices else 3
 
     def get_average_wage(self):
         if self.step_count == 0:
@@ -93,16 +107,23 @@ class EconomyModel(Model):
         if employed_workers:
             return sum(worker.wage for worker in employed_workers) / len(employed_workers)
         return self.config.MINIMUM_WAGE
-
+    def get_average_consumption_expected_price(self):
+        prices = [firm.expected_price for firm in self.schedule.agents if isinstance(firm, Firm2)]
+        if prices:
+            return sum(prices) / len(prices)
+        return 0
     def get_average_consumption_good_price(self):
         prices = [firm.price for firm in self.schedule.agents if isinstance(firm, Firm2)]
         if prices:
             return sum(prices) / len(prices)
-        return 0.6 # Hardcoding a lower price bound, should be changed later.
+        return 0
 
     def get_total_demand(self):
-        return sum(firm.expected_demand for firm in self.schedule.agents if isinstance(firm, (Firm1, Firm2)))
-
+        capital_demand= sum(firm.investment_demand for firm in self.schedule.agents if isinstance(firm,  Firm2))
+        consumption_demand = sum(worker.desired_consumption for worker in self.schedule.agents if isinstance(worker, Worker))
+        return capital_demand + consumption_demand
+    def get_total_sales(self):
+        return sum(firm.sales for firm in self.schedule.agents if isinstance(firm, (Firm1, Firm2)))
     def get_total_production(self):
         return sum(firm.production for firm in self.schedule.agents if isinstance(firm, (Firm1, Firm2)))
     def create_agents(self):
@@ -148,7 +169,7 @@ class EconomyModel(Model):
         #if self.step_count % 10 == 0:
          #   self.analyze_predictions()
 
-        self.update_global_accounting()
+
         #self.collect_data()
         self.datacollector.collect(self)
         self.global_accounting.reset_period_data()
@@ -246,9 +267,10 @@ class EconomyModel(Model):
         sellers = [(firm.inventory, firm.price, firm)
                    for firm in self.schedule.agents
                    if isinstance(firm, Firm1) and firm.inventory > 0]
-
+        print("Capital Market Buyers", buyers)
+        print("Capital Market Sellers", sellers)
         transactions = market_matching(buyers, sellers)
-        #print("Capital Market Transaction", transactions)
+        print("Capital Market Transaction", transactions)
         for buyer, seller, quantity, price in transactions:
             buyer.buy_capital(quantity, price)
             seller.sell_goods(quantity, price)
@@ -256,7 +278,7 @@ class EconomyModel(Model):
 
 
     def execute_consumption_market(self):
-        print("Executing consumption market")
+        #print("Executing consumption market")
         buyers = [(worker.desired_consumption, worker.expected_price, worker)
                   for worker in self.schedule.agents
                   if isinstance(worker, Worker) and worker.savings > 0]
@@ -267,17 +289,13 @@ class EconomyModel(Model):
         if sellers:
             min_price = max(sellers, key=lambda x: x[1])[1]
             max_inventory = max(sellers, key=lambda x: x[0])[0]
-
+            #print("Min price, max inventory", min_price, max_inventory)
         #print("Sellers", sellers)
         transactions = market_matching(buyers, sellers)
         #print("Consumption Market Transaction", transactions)
         for buyer, seller, quantity, price in transactions:
             buyer.consume(quantity, price)
             seller.sell_goods(quantity, price)
-
-    def update_global_accounting(self):
-        total_demand = sum(firm.expected_demand for firm in self.global_accounting.firms)
-        self.global_accounting.update_market_demand(total_demand)
 
     def calculate_average_inventory(self):
         firms = [agent for agent in self.schedule.agents if isinstance(agent, (Firm1, Firm2))]
