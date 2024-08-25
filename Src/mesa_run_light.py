@@ -14,7 +14,7 @@ def run_model(steps, timeout=300):  # 5 minutes timeout
     return model
 
 # Run the model
-model = run_model(10)  # Run for 100 steps
+model = run_model(15)  # Run for 100 steps
 
 if model:
     logging.info("Model completed successfully. Starting analysis...")

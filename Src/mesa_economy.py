@@ -156,10 +156,7 @@ class EconomyModel(Model):
 
 
     def step(self):
-        if self.step_count == 100:
-            print("Model Training Starts...")
-            self.train_and_save_models()
-            self.export_data_to_csv()  # Export data after training
+
         self.schedule.step()
         for agent in self.schedule.agents:
             if isinstance(agent, (Firm1, Firm2)):

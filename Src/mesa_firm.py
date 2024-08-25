@@ -12,23 +12,13 @@ class Firm(Agent):
         super().__init__(unique_id, model)
         self.workers = {}  # Dictionary to store workers and their working hours
         self.total_working_hours = 0
-        self.capital = model.config.INITIAL_CAPITAL
-        self.productivity = model.config.INITIAL_PRODUCTIVITY
-        self.price = model.config.INITIAL_PRICE
         self.prices = []
-        self.inventory = model.config.INITIAL_INVENTORY
-        self.historic_demand = [model.config.INITIAL_DEMAND]
         self.historic_price = []
         self.optimals = []
         self.expectations = []
         self.production = 0
         self.sales = 0
         self.firm_type = ''
-        self.budget = model.config.INITIAL_CAPITAL
-        self.historic_sales = [model.config.INITIAL_SALES]
-        self.historic_inventory = [model.config.INITIAL_INVENTORY]
-        self.expected_demand = model.config.INITIAL_DEMAND
-        self.expected_price = model.config.INITIAL_PRICE
         self.labor_demand = 0
         self.investment_demand = 0
         self.mode = 'decentralized'
@@ -143,7 +133,9 @@ class Firm(Agent):
         optimal_labor = result['optimal_labor']
         optimal_capital = result['optimal_capital']
         optimal_production = result['optimal_production']
-        self.optimals = [optimal_labor, optimal_capital, optimal_production]
+        Trajectory_inventory = result['optimal_inventory']
+        optimal_inventory = Trajectory_inventory[0]
+        self.optimals = [optimal_labor, optimal_capital, optimal_production, optimal_inventory]
         print("Optimal values:", self.optimals)
         return optimal_labor, optimal_capital, optimal_production
 
@@ -166,20 +158,21 @@ class Firm(Agent):
         self.inventory += self.production
         return self.production
     def adjust_price(self) -> float:
-        if (self.inventory) > 0.1: # 1% buffer
+        if round(self.inventory,2) > round(self.optimals[3],2): # 1% buffer
 
             price_cut = np.random.uniform(0.95, 0.99)
 
-            proposed_price = self.price * price_cut
+            proposed_price = self.price * round(price_cut,2)
             proposed_price = max(proposed_price, self.get_min_sale_price())
             self.price = proposed_price
             return self.price  # Decrease price by 5%
-        else:
+        elif round(self.optimals[2]) > 1:
 
             price_hike = np.random.uniform(1.01, 1.1)
 
-            proposed_price =  self.price * price_hike
-            self.price = proposed_price
+            proposed_price =  self.price * round(price_hike,2)
+            self.price = proposed_price # Cap price at 9
+
         return self.price # Increase price by 5%
 
 
@@ -203,10 +196,19 @@ class Firm(Agent):
             self.workers[worker]['hours'] += hours
             self.total_working_hours += hours
             worker.update_hours(self, hours)
+    def wage_hikes(self):
+        if self.model.step_count % 5 == 0:
+            for worker in self.workers:
+                if worker.skills > np.mean([worker.skills for worker in self.workers]):
+                    wage = worker.expected_wage
+                    self.workers[worker]['wage'] = wage
+
+
+
 
     def pay_wages(self):
         fire_list = []
-
+        self.wage_hikes()
         for worker in self.workers:
             wage = self.workers[worker]['wage']
             hours = self.workers[worker]['hours']
@@ -305,10 +307,9 @@ class Firm(Agent):
         max_wage = avg_revenue_product * max_wage_factor
 
         # Ensure max wage doesn't exceed budget constraint
-        budget_constraint = self.budget / labor_demand if labor_demand > 0 else 0
-        max_wage = min(max_wage, budget_constraint)
+
         max_wage = max(max_wage, self.model.config.MINIMUM_WAGE)  # Allows wages up to x% above average revenue product
-        return min(max_wage, budget_constraint)
+        return (max_wage)
     def get_min_sale_price(self):
 
         if self.firm_type == 'consumption':
@@ -355,11 +356,7 @@ class Firm(Agent):
         max_price_factor = 1.2  # Allows prices up to x% above marginal revenue product
         max_capital_price = marginal_revenue_product * max_price_factor
 
-        # Ensure max capital price doesn't exceed budget constraint
-        #
 
-        budget_constraint = self.budget
-        max_capital_price = min(max_capital_price, budget_constraint)
         return max_capital_price
 
 
@@ -379,6 +376,15 @@ class Firm1(Firm):
         self.firm_type = 'capital'
         self.capital_elasticity = model.config.CAPITAL_ELASTICITY_FIRM1
         self.price = self.model.config.INITIAL_PRICE * self.model.config.INITIAL_RELATIVE_PRICE_CAPITAL
+        self.capital = model.config.FIRM1_INITIAL_CAPITAL
+        self.productivity = model.config.INITIAL_PRODUCTIVITY
+        self.inventory = model.config.FIRM1_INITIAL_INVENTORY
+        self.historic_demand = [model.config.FIRM1_INITIAL_DEMAND]
+        self.budget = self.capital
+        self.historic_sales = [model.config.INITIAL_SALES]
+        self.historic_inventory = [self.inventory]
+        self.expected_demand = model.config.FIRM1_INITIAL_DEMAND
+        self.expected_price = self.price
     def step(self):
         super().step()
   # Reset price to initial value
@@ -400,3 +406,13 @@ class Firm2(Firm):
         self.firm_type = 'consumption'
         self.capital_elasticity = model.config.CAPITAL_ELASTICITY_FIRM2
         self.investment_demand = model.config.FIRM2_INITIAL_INVESTMENT_DEMAND
+        self.capital = model.config.FIRM2_INITIAL_CAPITAL
+        self.productivity = model.config.INITIAL_PRODUCTIVITY
+        self.inventory = model.config.FIRM2_INITIAL_INVENTORY
+        self.historic_demand = [model.config.FIRM2_INITIAL_DEMAND]
+        self.budget = self.capital
+        self.historic_sales = [model.config.INITIAL_SALES]
+        self.price = self.model.config.INITIAL_PRICE
+        self.historic_inventory = [self.inventory]
+        self.expected_demand = model.config.FIRM2_INITIAL_DEMAND
+        self.expected_price = self.price

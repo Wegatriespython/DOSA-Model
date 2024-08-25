@@ -8,6 +8,7 @@ class Worker(Agent):
         self.employers = {}  # Dictionary to store employers and corresponding working hours
         self.total_working_hours = 0
         self.max_working_hours = 16
+        self.dissatistifaction = 0
         self.wage = 0.0625
         self.savings = 100
         self.got_paid = False
@@ -23,6 +24,7 @@ class Worker(Agent):
         self.mode = 'decentralized'
 
     def step(self):
+
         self.update_expectations()
         self.make_economic_decision()
         self.update_skills()
@@ -30,27 +32,26 @@ class Worker(Agent):
 
 
     def update_expectations(self):
+        self.update_average_wage()
         self.update_wage_expectation()
         self.update_price_expectation()
 
     def update_wage_expectation(self):
-        if self.total_working_hours > 0:
-            self.wage_history.append(self.wage)
-        else:
-            self.wage_history.append(0)
-        self.wage_history = self.wage_history[-5:]
-        self.expected_wage = max(np.mean(self.wage_history), self.model.config.MINIMUM_WAGE)
+        if self.total_working_hours > 12:
+            self.expected_wage = min(self.wage * (1.1), 10)# Hardcoding a wage cieling of 10
+
+        elif self.total_working_hours < 4:
+            self.expected_wage = max(self.wage * (0.9), self.model.config.MINIMUM_WAGE)
+
 
     def update_price_expectation(self):
-        if len(self.price_history) > 10:
-            self.price_history.pop(0)
-            self.expected_price = np.mean(self.price_history) * 1.1
+        if self.dissatistifaction > 0:
+            self.expected_price = self.model.get_average_consumption_good_price() * 1.1
         else:
-            current_price = self.model.get_average_consumption_good_price()
-            self.expected_price = current_price * 1.1
+            self.expected_price = self.model.get_average_consumption_good_price()
 
     def make_economic_decision(self):
-        self.desired_consumption = min(self.savings, self.expected_wage * self.total_working_hours * self.model.config.CONSUMPTION_PROPENSITY)
+        self.desired_consumption = min(self.savings, self.wage * self.total_working_hours * self.model.config.CONSUMPTION_PROPENSITY)
         self.desired_consumption = max(self.desired_consumption, self.model.config.MIN_CONSUMPTION)
         #print(f"Worker {self.unique_id} desired consumption: {self.desired_consumption}")
 
@@ -88,6 +89,7 @@ class Worker(Agent):
         total_cost = quantity * price
         self.price_history.append(price)
         self.consumption = quantity
+        self.dissatistifaction = min(0, self.desired_consumption - self.consumption)
         self.savings -= total_cost
 
     def get_max_consumption_price(self):

@@ -102,6 +102,7 @@ app.layout = html.Div([
                 id='firm-graph-type',
                 options=[
                     {'label': 'Performance Metrics', 'value': 'performance'},
+                    {'label': 'Expectations', 'value': 'expectations'},
                     {'label': 'Optimals', 'value': 'optimals'}
                 ],
                 value='performance'
@@ -168,7 +169,7 @@ def update_firm_graph(firm_type, graph_type):
             figure.add_trace(go.Scatter(x=data.index, y=data.values, mode='lines', name=variable))
         figure.update_layout(title=f'{firm_type} Performance Metrics',
                              xaxis_title='Time Step', yaxis_title='Value')
-    if graph_type =='optimals':  # optimals
+    elif graph_type == 'optimals':
         figure = go.Figure()
         optimal_data = firm_data[firm_data['Optimals'].notna()]
         for i, label in enumerate(['Optimal Labor', 'Optimal Capital', 'Optimal Production', 'Optimal Price']):
@@ -176,14 +177,17 @@ def update_firm_graph(firm_type, graph_type):
             figure.add_trace(go.Scatter(x=optimal_data['Step'], y=y, mode='lines', name=label))
         figure.update_layout(title=f'{firm_type} Optimals',
                              xaxis_title='Time Step', yaxis_title='Value')
-    else:  # expectations
+    elif graph_type == 'expectations':
         figure = go.Figure()
-        Expectations_data = firm_data[firm_data['Expectations'].notna()]
-        for i, label in enumerate(['Expectations Demand', 'Expectations Price']):
-            y = Expectations_data['Expectations'].apply(lambda opt: opt[i] if isinstance(opt, list) and len(opt) > i else None)
-            figure.add_trace(go.Scatter(x=Expectations_data['Step'], y=y, mode='lines', name=label))
+        expectations_data = firm_data[firm_data['Expectations'].notna()]
+        for i, label in enumerate(['Expected Demand', 'Expected Price']):
+            y = expectations_data['Expectations'].apply(lambda exp: exp[i] if isinstance(exp, list) and len(exp) > i else None)
+            figure.add_trace(go.Scatter(x=expectations_data['Step'], y=y, mode='lines', name=label))
         figure.update_layout(title=f'{firm_type} Expectations',
                              xaxis_title='Time Step', yaxis_title='Value')
+    else:
+        figure = go.Figure()  # Empty figure if no valid graph_type is selected
+
     return figure
 
 @app.callback(
