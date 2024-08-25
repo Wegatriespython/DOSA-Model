@@ -54,8 +54,10 @@ class EconomyModel(Model):
                 "Capital": lambda a: getattr(a, 'capital', None),
                 "Labor": lambda a: len(getattr(a, 'workers', [])),
                 "Working_Hours": lambda a: getattr(a, 'total_working_hours', None),
-                "Labor_Demand": lambda a: getattr(a, 'labor_demand', None),
+                "Labor_Demand": lambda a: getattr(a, 'total_working_hours', None),
                 "Production": lambda a: getattr(a, 'production', None),
+                "Optimals": lambda a: getattr(a, 'optimals', None),
+                "Expectations": lambda a: getattr(a, 'expectations', None),
                 "Investment": lambda a: getattr(a, 'investment_demand', None),
                 "Price": lambda a: getattr(a, 'price', None),
                 "Inventory": lambda a: getattr(a, 'inventory', None),
@@ -158,21 +160,31 @@ class EconomyModel(Model):
             print("Model Training Starts...")
             self.train_and_save_models()
             self.export_data_to_csv()  # Export data after training
-
-        if self.mode == 'decentralised':
-            self.run_decentralised_step()
-        elif self.mode == 'centralised':
-            self.run_centralised_step()
-        else:
-            raise ValueError("Invalid mode")
-        # Analyze prediction accuracy every 10 steps
-        #if self.step_count % 10 == 0:
-         #   self.analyze_predictions()
-
-
+        self.schedule.step()
+        for agent in self.schedule.agents:
+            if isinstance(agent, (Firm1, Firm2)):
+                agent.update_firm_state()
+                agent.get_expected_demand()
+                agent.make_production_decision()
+                agent.adjust_labor()
+                if isinstance(agent, Firm2):
+                    agent.adjust_investment_demand()
+        self.execute_labor_market()
+        for agent in self.schedule.agents:
+            if isinstance(agent, Firm1):
+                agent.adjust_production()
+                print(agent.unique_id, agent.production)
+                agent.adjust_price()
+                print(agent.unique_id, agent.price)
+        self.execute_capital_market()
+        for agent in self.schedule.agents:
+            if isinstance(agent, Firm2):
+                agent.adjust_production()
+                agent.adjust_price()
+        self.execute_consumption_market()
+        self.employment_snapshot()
         #self.collect_data()
         self.datacollector.collect(self)
-        self.global_accounting.reset_period_data()
         print(f"Step {self.step_count} completed")
         self.step_count += 1
 
@@ -209,10 +221,8 @@ class EconomyModel(Model):
         df.to_csv('economic_model_data.csv', index=False)
         print("Data exported to economic_model_data.csv")
 
-    def run_decentralised_step(self):
-        self.schedule.step()
-        self.execute_markets()
-        self.employment_snapshot()
+
+
 
     def get_current_state(self):
         # New method to provide current state to central planner
@@ -227,17 +237,8 @@ class EconomyModel(Model):
             'total_money': self.global_accounting.total_money,
         }
 
-
-    def execute_markets(self):
-        for agent in self.schedule.agents:
-            if isinstance(agent, (Firm1, Firm2)):
-                agent.update_firm_state()
-        self.execute_labor_market()
-        self.execute_capital_market()
-        self.execute_consumption_market()
-
     def execute_labor_market(self):
-        print("Executing labor market")
+
         buyers = [(firm.labor_demand, firm.get_max_wage(), firm)
                   for firm in self.schedule.agents
                   if isinstance(firm, (Firm1, Firm2)) and firm.labor_demand > 0]
@@ -260,17 +261,16 @@ class EconomyModel(Model):
                 firm.labor_demand = max(0, firm.labor_demand - sum(t[2] for t in transactions if t[0] == firm))
 
     def execute_capital_market(self):
-        print("Executing capital market")
+
         buyers = [(firm.investment_demand, firm.get_max_capital_price(), firm)
                   for firm in self.schedule.agents
                   if isinstance(firm, Firm2) and firm.investment_demand > 0]
         sellers = [(firm.inventory, firm.price, firm)
                    for firm in self.schedule.agents
                    if isinstance(firm, Firm1) and firm.inventory > 0]
-        print("Capital Market Buyers", buyers)
-        print("Capital Market Sellers", sellers)
+
         transactions = market_matching(buyers, sellers)
-        print("Capital Market Transaction", transactions)
+
         for buyer, seller, quantity, price in transactions:
             buyer.buy_capital(quantity, price)
             seller.sell_goods(quantity, price)

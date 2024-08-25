@@ -27,19 +27,41 @@ def load_and_preprocess_data(model_data_path, agent_data_path):
 
     # Convert agent data to appropriate types
     numeric_agent_columns = ['Capital', 'Labor', 'Production', 'Price', 'Inventory', 'Budget', 'Productivity',
-                             'Wage', 'Skills', 'Savings', 'Consumption']
+                             'Wage', 'Skills', 'Savings', 'Consumption', 'Working_Hours', 'Labor_Demand']
     for col in numeric_agent_columns:
         if col in agent_data.columns:
             agent_data[col] = pd.to_numeric(agent_data[col], errors='coerce')
 
     return model_data, agent_data
+def plot_optimals_evolution(model_data, agent_data, market_type):
+    firm_type = 'Firm1' if market_type == 'capital' else 'Firm2'
+    firm_data = agent_data[agent_data['Type'] == firm_type]
 
+    fig, axes = plt.subplots(2, 2, figsize=(15, 15))
+    fig.suptitle(f'{firm_type} Optimals Evolution for {market_type.capitalize()} Market')
+
+    optimal_labels = ['Optimal Labor', 'Optimal Capital', 'Optimal Production', 'Optimal Price']
+
+    for i, label in enumerate(optimal_labels):
+        row = i // 2
+        col = i % 2
+
+        optimals = firm_data['Optimals'].apply(lambda x: eval(x)[i] if isinstance(x, str) else (x[i] if isinstance(x, list) else None))
+        axes[row, col].plot(firm_data['Step'], optimals)
+        axes[row, col].set_title(label)
+        axes[row, col].set_xlabel('Time Step')
+        axes[row, col].set_ylabel('Value')
+
+    plt.tight_layout()
+    plt.savefig(f'{market_type}_market_optimals_evolution.png')
+    plt.close()
 def analyze_market(model_data, agent_data, market_type):
     plt.figure(figsize=(12, 6))
 
     if market_type == 'capital':
         demand = agent_data[agent_data['Type'] == 'Firm2'].groupby('Step')['Investment'].sum()
         supply = agent_data[agent_data['Type'] == 'Firm1'].groupby('Step')['Production'].sum()
+        inventory = agent_data[agent_data['Type'] == 'Firm1'].groupby('Step')['Inventory'].sum()
         price = model_data['Average Capital Price']
         firm_type = 'Firm1'
     elif market_type == 'labor':
@@ -50,6 +72,7 @@ def analyze_market(model_data, agent_data, market_type):
     elif market_type == 'consumption':
         demand = agent_data[agent_data['Type'] == 'Worker'].groupby('Step')['Consumption'].sum()
         supply = agent_data[agent_data['Type'] == 'Firm2'].groupby('Step')['Production'].sum()
+        inventory = agent_data[agent_data['Type'] == 'Firm1'].groupby('Step')['Inventory'].sum()
         price = model_data['Average Consumption Good Price']
         firm_type = 'Firm2'
 
@@ -57,12 +80,14 @@ def analyze_market(model_data, agent_data, market_type):
     common_index = model_data['Step']
     demand = demand.reindex(common_index)
     supply = supply.reindex(common_index)
+    inventory = inventory.reindex(common_index)
     price = price.reindex(common_index)
 
     # Plot supply and demand
     try:
         plt.plot(common_index, demand, label='Demand')
         plt.plot(common_index, supply, label='Supply')
+        plt.plot(common_index, inventory, label='Inventory')
         plt.title(f'{market_type.capitalize()} Market: Supply and Demand Over Time')
         plt.xlabel('Time Step')
         plt.ylabel('Quantity')
@@ -83,6 +108,7 @@ def analyze_market(model_data, agent_data, market_type):
     except Exception as e:
         print(f"Error plotting price dynamics for {market_type} market: {str(e)}")
     plt.close()
+
 
     # Firm analysis
     firm_data = agent_data[agent_data['Type'] == firm_type]
@@ -131,6 +157,7 @@ def analyze_market(model_data, agent_data, market_type):
         print(f"Average Profit Margin: {average_profit_margin:.2f}")
     except Exception as e:
         print(f"Error calculating summary statistics for {market_type} market: {str(e)}")
+    plot_optimals_evolution(model_data, agent_data, market_type)
 def main():
     try:
         logging.info("Starting data loading and preprocessing...")

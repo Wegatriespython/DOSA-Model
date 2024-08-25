@@ -23,19 +23,11 @@ class Worker(Agent):
         self.mode = 'decentralized'
 
     def step(self):
-        if self.mode == 'decentralized':
-            self.decentralized_step()
-        elif self.mode == 'centralized':
-            self.centralized_step()
-
-    def decentralized_step(self):
         self.update_expectations()
         self.make_economic_decision()
         self.update_skills()
 
-    def centralized_step(self):
-        # The central planner will call apply_central_decision()
-        self.update_skills()
+
 
     def update_expectations(self):
         self.update_wage_expectation()
@@ -69,23 +61,20 @@ class Worker(Agent):
             self.skills *= (1 - self.model.config.SKILL_DECAY_RATE)
 
     def get_hired(self, employer, wage, hours):
-        if employer in self.employers:
-            self.employers[employer]['hours'] += hours
-        else:
-            self.employers[employer] = {'hours': hours, 'wage': wage}
+        self.employers[employer] = {'hours': hours, 'wage': wage}
         self.total_working_hours += hours
         self.update_average_wage()
 
     def update_hours(self, employer, hours):
         if employer in self.employers:
-            old_hours = self.employers[employer]['hours']
             self.employers[employer]['hours'] += hours
-            self.total_working_hours += (hours - old_hours)
+            self.total_working_hours += hours
             self.update_average_wage()
 
     def get_fired(self, employer):
         if employer in self.employers:
             self.total_working_hours -= self.employers[employer]['hours']
+            self.total_working_hours = max(0, self.total_working_hours)
             del self.employers[employer]
             self.update_average_wage()
 
@@ -104,20 +93,10 @@ class Worker(Agent):
     def get_max_consumption_price(self):
         return self.expected_price * 1.1  # Willing to pay up to 10% more than expected
 
-    def update_after_markets(self):
-        self.savings += sum(emp['wage'] * emp['hours'] for emp in self.employers.values())
+    def get_paid(self, wage):
+        self.savings += wage
+
 
 
     def available_hours(self):
         return max(0, self.max_working_hours - self.total_working_hours)
-
-
-    def apply_central_decision(self, employment, wage, consumption):
-        self.employed = employment
-        self.wage = wage
-        self.consumption = consumption
-        if self.employed:
-            self.savings += self.wage*self.working_hours
-        self.savings -= self.consumption  # Consumption good price is 1 (numeraire)
-        if not self.employed:
-            self.employer = None

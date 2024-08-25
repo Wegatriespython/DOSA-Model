@@ -14,7 +14,7 @@ def run_model(steps, timeout=300):  # 5 minutes timeout
     return model
 
 # Run the model
-model = run_model(100)  # Run for 100 steps
+model = run_model(10)  # Run for 100 steps
 
 if model:
     logging.info("Model completed successfully. Starting analysis...")
@@ -23,8 +23,11 @@ if model:
     model_vars = model.datacollector.get_model_vars_dataframe()
     agent_vars = model.datacollector.get_agent_vars_dataframe()
 
+    # Reset index for model_vars and rename it to 'Step'
+    model_vars = model_vars.reset_index().rename(columns={'index': 'Step'})
+
     # Dump model-level data to CSV
-    model_vars.to_csv('Data/model_data.csv')
+    model_vars.to_csv('Data/model_data.csv', index=False)
     logging.info("Model-level data has been dumped to model_data.csv")
 
     # Dump agent-level data to CSV

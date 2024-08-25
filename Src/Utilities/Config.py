@@ -6,7 +6,7 @@ class Config:
         #
         self.INITIAL_SALES = 1
         self.MAX_WORKING_HOURS = 16
-        self.TIME_HORIZON = 100
+        self.TIME_HORIZON = 10
         self.INITIAL_CAPITAL = 10
         self.INITIAL_PRODUCTIVITY = 1
         self.INITIAL_PRICE = 1
@@ -43,7 +43,7 @@ class Config:
         # Firm1 specific parameters
         self.FIRM1_INITIAL_CAPITAL = 20
         self.FIRM1_INITIAL_RD_INVESTMENT = 0
-        self.FIRM1_RD_INVESTMENT_RATE = 0.1
+        self.FIRM1_RD_INVESTMENT_RATE = 0
         self.FIRM1_INVENTORY_THRESHOLD = 10
         self.INNOVATION_ATTEMPT_PROBABILITY = 0.1  # Probability of a successful innovation attempt
         self.PRODUCTIVITY_INCREASE_PROBABILITY = 0.5  # Probability that a successful innovation increases productivity

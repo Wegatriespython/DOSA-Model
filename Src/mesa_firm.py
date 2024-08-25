@@ -19,6 +19,8 @@ class Firm(Agent):
         self.inventory = model.config.INITIAL_INVENTORY
         self.historic_demand = [model.config.INITIAL_DEMAND]
         self.historic_price = []
+        self.optimals = []
+        self.expectations = []
         self.production = 0
         self.sales = 0
         self.firm_type = ''
@@ -33,22 +35,19 @@ class Firm(Agent):
         self.wage = model.config.INITIAL_WAGE
         self.max_working_hours = model.config.MAX_WORKING_HOURS
 
-    def step(self):
-        self.update_firm_state()
-        self.make_production_decision()
-
-
     def update_firm_state(self):
        #self.train_demand_predictor()
         depreciation_amount = self.inventory * self.model.config.DEPRECIATION_RATE
+        self.inventory = max(0, self.inventory - depreciation_amount)
+        if self.firm_type == 'consumption':
+            capital_depreciation = self.capital * self.model.config.DEPRECIATION_RATE
+            self.capital = max(0, self.capital - capital_depreciation)
         self.pay_wages()
         self.wage = self.calculate_average_wage()
         self.update_historic_sales()
         self.update_historic_prices()
-        self.inventory = max(0, self.inventory - depreciation_amount)
-        if self.firm_type == 'consumption':
-            capital_depreciation = self.capital * self.model.config.DEPRECIATION_RATE
-            self.capital = max(0, self.capital - depreciation_amount)
+
+
         print(f"firm id {self.unique_id} budget {self.budget}")
 
     def get_market_demand(self, market_type):
@@ -78,25 +77,31 @@ class Firm(Agent):
 
         return buyer_demand, buyer_price
 
-    def make_production_decision(self):
+
+    def get_expected_demand(self):
         self.production = 0
         buyer_demand, buyer_price = 0, 0
         if isinstance(self, Firm1):
             buyer_demand, buyer_price = self.get_market_demand('capital')
             self.expected_demand =expect_demand(buyer_demand,(self.model.config.TIME_HORIZON - self.model.step_count))
             self.expected_price = expect_price(self.historic_price, self.price, (self.model.config.TIME_HORIZON - self.model.step_count))
+            self.expectations=[np.mean(self.expected_demand), np.mean(self.expected_price)]
 
         elif isinstance(self, Firm2):
             buyer_demand, buyer_price = self.get_market_demand('consumption')
             self.expected_demand = expect_demand(buyer_demand,(self.model.config.TIME_HORIZON - self.model.step_count))
             self.expected_price = expect_price(self.historic_price, self.price,(self.model.config.TIME_HORIZON - self.model.step_count))
+            self.expectations=[np.mean(self.expected_demand), np.mean(self.expected_price)]
 
+        return self.expected_demand, self.expected_price
+
+    def make_production_decision(self):
         average_capital_price = self.model.get_average_capital_price()
-        print(f"average capital price {average_capital_price}")
+
         if self.budget < 0:
-            print("Budget Exceeded")
+
             return # Skip production if budget is negative
-        print("Calling profit_maximization with parameters:", {
+        """print("Calling profit_maximization with parameters:", {
             'current_capital': self.capital,
             'current_labor': self.get_total_labor_units(),
             'current_price': self.price,
@@ -111,7 +116,7 @@ class Firm(Agent):
             'discount_rate': self.model.config.DISCOUNT_RATE,
             'budget': self.budget,
             'wage': self.wage * self.max_working_hours # Per unit wage
-        })
+        })"""
 
         result = profit_maximization(
             self.capital,
@@ -137,73 +142,46 @@ class Firm(Agent):
 
         optimal_labor = result['optimal_labor']
         optimal_capital = result['optimal_capital']
-        optimal_price = result['optimal_price']
         optimal_production = result['optimal_production']
+        self.optimals = [optimal_labor, optimal_capital, optimal_production]
+        print("Optimal values:", self.optimals)
+        return optimal_labor, optimal_capital, optimal_production
 
-        print(f"Optimal labor From the Optimisation: {optimal_labor}, optimal capital: {optimal_capital}, optimal price: {optimal_price}, optimal production: {optimal_production}")
+    def adjust_labor(self):
+        optimal_labor = self.optimals[0]
 
         self.labor_demand = max(0, optimal_labor - self.get_total_labor_units()) * self.max_working_hours  # Convert to hours
 
         if optimal_labor < self.get_total_labor_units():
             self.layoff_employees(self.get_total_labor_units() - optimal_labor)
-        print(f"prices pre-optimisation: {self.price}")
-        self.price = self.adjust_price()
-        print(f"prices post-optimisation: {self.price}")
+        return self.labor_demand
+    def adjust_investment_demand(self):
+        optimal_capital = self.optimals[1]
         self.investment_demand = max(0, optimal_capital - self.capital)
+        return self.investment_demand
+    def adjust_production(self):
+        optimal_production = self.optimals[2]
         self.production =  min(optimal_production, self.calculate_production_capacity())
 
         self.inventory += self.production
-
+        return self.production
     def adjust_price(self) -> float:
-        """
-        Adjust price based on sales vs expected demand.
+        if (self.inventory) > 0.1: # 1% buffer
 
-        :param current_price: The current price of the good
-        :param sales: Actual sales in the last period
-        :param expected_demand: Expected demand for the last period
-        :return: Adjusted price
-        """
-
-
-        if (self.sales - self.inventory) >= 0: # 1% buffer
-            print("Sales Exceeded Production", self.sales - self.production)
-            price_hike = np.random.uniform(1.01, 1.1)
-            print("Price Hike", price_hike)
-            proposed_price =  self.price * price_hike
-            return proposed_price # Increase price by 5%
-        else:
-            print("Sales Shortfall", self.sales - self.production)
             price_cut = np.random.uniform(0.95, 0.99)
 
-            print("Price Cut", price_cut)
             proposed_price = self.price * price_cut
             proposed_price = max(proposed_price, self.get_min_sale_price())
-            return proposed_price  # Decrease price by 5%
-
-    def adjust_capital(self, current_capital: float,
-                    optimal_capital: float,
-                    budget: float,
-                    capital_price: float) -> float:
-        """
-        Adjust capital based on optimal capital and budget constraints.
-
-        :param current_capital: Current capital stock
-        :param optimal_capital: Optimal capital stock from profit maximization
-        :param budget: Available budget for capital adjustment
-        :param capital_price: Price of capital (in labor units)
-        :return: New capital stock
-        """
-        desired_change = optimal_capital - current_capital
-        max_affordable_change = budget / max(capital_price,1)
-
-        if desired_change > 0:
-            # Buying capital
-            actual_change = min(desired_change, max_affordable_change)
+            self.price = proposed_price
+            return self.price  # Decrease price by 5%
         else:
-            # Selling capital (assume we can sell any amount)
-            return 0
 
-        return actual_change
+            price_hike = np.random.uniform(1.01, 1.1)
+
+            proposed_price =  self.price * price_hike
+            self.price = proposed_price
+        return self.price # Increase price by 5%
+
 
 
     def calculate_production_capacity(self):
@@ -222,7 +200,6 @@ class Firm(Agent):
 
     def update_worker_hours(self, worker, hours):
         if worker in self.workers:
-            old_hours = self.workers[worker]['hours']
             self.workers[worker]['hours'] += hours
             self.total_working_hours += hours
             worker.update_hours(self, hours)
@@ -234,14 +211,14 @@ class Firm(Agent):
             wage = self.workers[worker]['wage']
             hours = self.workers[worker]['hours']
             budget_change = wage * hours
-            print(f"Budget Change Labor Cost for firm {self.unique_id}", budget_change)
+
             if self.budget >= budget_change:
                 self.budget -= budget_change
-                worker.got_paid = True
+                worker.get_paid(budget_change)
             else:
                 worker.got_paid = False
                 fire_list.append(worker)
-                print("Not enough budget to pay wages")
+
         for worker in fire_list:
             self.fire_worker(worker)
 
@@ -273,10 +250,10 @@ class Firm(Agent):
     def calculate_average_wage(self):
         if self.workers == {}:
             wage_avg = self.model.get_average_wage()
-            print("Average Wage empty start", wage_avg)
+
             return wage_avg
         wage_avg = np.mean([self.workers[worker]['wage'] for worker in self.workers])
-        print("Average Wage", wage_avg)
+
         return wage_avg
 
     def get_total_labor_units(self):
@@ -285,11 +262,11 @@ class Firm(Agent):
         if isinstance(self, Firm2):
             self.capital += quantity
             self.investment_demand -= quantity
-            print("Budget pre-purchase",self.budget)
+
             budget_change = quantity * price
-            print(f"Budget Change Capital Cost for firm{self.unique_id}", -budget_change)
+
             self.budget -= budget_change
-            print("Capital Bought", quantity)
+
     def sell_goods(self, quantity, price):
         self.inventory -= quantity
         self.sales += quantity
@@ -343,14 +320,14 @@ class Firm(Agent):
                 return 0
             return max(total_cost / total_output, 0.5) # harcoding a lower bound for now
         else:
-            labor_cost = sum([self.workers[worker]['wage'] * self.workers[worker]['hours'] for worker in self.workers])
+            labor_cost = self.total_working_hours * self.calculate_average_wage()
 
             total_output = self.inventory
             if total_output <= 0:
                 return 1.5
             if labor_cost <= 0.001:
                 return 1.5
-            return max(total_output/labor_cost, 1.5) # harcoding a lower bound for now
+            return max(labor_cost/total_output, 1.5) # harcoding a lower bound for now
 
 
 
@@ -361,9 +338,9 @@ class Firm(Agent):
             return 0
 
         # Optimal values from profit maximization
-        optimal_capital = self.capital + self.investment_demand
-        optimal_production = self.production
+        optimal_production = self.optimals[2]
         optimal_price = self.price
+        optimal_capital = self.optimals[1]
         total_revenue = 0
         # Calculate total revenue at optimal production
         for i in range(self.model.config.TIME_HORIZON):
@@ -375,9 +352,9 @@ class Firm(Agent):
         marginal_revenue_product = (total_revenue / optimal_capital) * self.capital_elasticity
 
         # Set max capital price as a fraction of marginal revenue product
-        max_price_factor = 1.0  # Allows prices up to x% above marginal revenue product
+        max_price_factor = 1.2  # Allows prices up to x% above marginal revenue product
         max_capital_price = marginal_revenue_product * max_price_factor
-        print("Max Capital Price", max_capital_price)
+
         # Ensure max capital price doesn't exceed budget constraint
         #
 
@@ -411,7 +388,7 @@ class Firm1(Firm):
     def innovate(self):
         if self.model.random.random() < self.model.config.INNOVATION_ATTEMPT_PROBABILITY:
             rd_investment = self.capital * self.model.config.FIRM1_RD_INVESTMENT_RATE
-            print(f"Budget Change RD Investment for firm {self.unique_id}", -rd_investment)
+
             self.budget -= rd_investment
             if self.model.random.random() < self.model.config.PRODUCTIVITY_INCREASE_PROBABILITY:
                 self.productivity *= (1 + self.model.config.PRODUCTIVITY_INCREASE)
