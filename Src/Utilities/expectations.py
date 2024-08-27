@@ -5,7 +5,11 @@ def expect_demand(buyer_demand, periods=6):
 
     return np.full(periods, buyer_demand)
 
-def expect_price(historic_prices, current_price, periods=6, alpha=0.3):
+def expect_price(buyer_prices, periods=6):
+
+    return np.full(periods, np.mean(buyer_prices))
+
+def expect_price_ar(historic_prices, current_price, periods=6, alpha=0.3):
     """
     Autoregressive price expectation model centered on historic mean.
 

@@ -7,6 +7,7 @@ from numpy.lib.function_base import average
 import pandas as pd
 import random
 import numpy as np
+from pandas.compat import numpy
 from Utilities.Config import Config
 from mesa_worker import Worker
 from mesa_firm import Firm1, Firm2
@@ -46,8 +47,25 @@ class EconomyModel(Model):
                 "Total Demand": self.get_total_demand,
                 "Total Supply": self.get_total_sales,
                 "Total Production": self.get_total_production,
-                "Global Productivity": self.calculate_global_productivity
-
+                "Global Productivity": self.calculate_global_productivity,
+                "labor_raw_demand": lambda m: m.pre_labor_transactions[0] if len(m.pre_labor_transactions) > 0 else 0,
+                "labor_raw_supply": lambda m: m.pre_labor_transactions[1] if len(m.pre_labor_transactions) > 1 else 0,
+                "labor_raw_buyer_price": lambda m: m.pre_labor_transactions[2] if len(m.pre_labor_transactions) > 2 else 0,
+                "labor_raw_seller_price": lambda m: m.pre_labor_transactions[3] if len(m.pre_labor_transactions) > 3 else 0,
+                "capital_raw_demand": lambda m: m.pre_capital_transactions[0] if len(m.pre_capital_transactions) > 0 else 0,
+                "capital_raw_supply": lambda m: m.pre_capital_transactions[1] if len(m.pre_capital_transactions) > 1 else 0,
+                "capital_raw_buyer_price": lambda m: m.pre_capital_transactions[2] if len(m.pre_capital_transactions) > 2 else 0,
+                "capital_raw_seller_price": lambda m: m.pre_capital_transactions[3] if len(m.pre_capital_transactions) > 3 else 0,
+                "consumption_raw_demand": lambda m: m.pre_consumption_transactions[0] if len(m.pre_consumption_transactions) > 0 else 0,
+                "consumption_raw_supply": lambda m: m.pre_consumption_transactions[1] if len(m.pre_consumption_transactions) > 1 else 0,
+                "consumption_raw_buyer_price": lambda m: m.pre_consumption_transactions[2] if len(m.pre_consumption_transactions) > 2 else 0,
+                "consumption_raw_seller_price": lambda m: m.pre_consumption_transactions[3] if len(m.pre_consumption_transactions) > 3 else 0,
+                "labor_Market_Quantity": lambda m: sum(t[2] for t in m.labor_transactions),
+                "labor_Market_Price": lambda m: np.mean([t[3] for t in m.labor_transactions]) if m.labor_transactions else 0,
+                "capital_Market_Quantity": lambda m: sum(t[2] for t in m.capital_transactions),
+                "capital_Market_Price": lambda m: np.mean([t[3] for t in m.capital_transactions]) if m.capital_transactions else 0,
+                "consumption_Market_Quantity": lambda m: sum(t[2] for t in m.consumption_transactions),
+                "consumption_Market_Price": lambda m: np.mean([t[3] for t in m.consumption_transactions]) if m.consumption_transactions else 0,
             },
             agent_reporters={
                 "Type": lambda a: type(a).__name__,
@@ -59,6 +77,8 @@ class EconomyModel(Model):
                 "Optimals": lambda a: getattr(a, 'optimals', None),
                 "Expectations": lambda a: getattr(a, 'expectations', None),
                 "Investment": lambda a: getattr(a, 'investment_demand', None),
+                "Sales": lambda a: getattr(a, 'sales', None),
+                "Wages_Firm": lambda a: getattr(a, 'wage', None),
                 "Price": lambda a: getattr(a, 'price', None),
                 "Inventory": lambda a: getattr(a, 'inventory', None),
                 "Budget": lambda a: getattr(a, 'budget', None),
@@ -69,7 +89,13 @@ class EconomyModel(Model):
                 "Consumption": lambda a: getattr(a, 'consumption', None)
             }
         )
-
+        # Initialize numpy arrays with zeros
+        self.pre_labor_transactions = np.zeros(4)
+        self.pre_capital_transactions = np.zeros(4)
+        self.pre_consumption_transactions = np.zeros(4)
+        self.labor_transactions = []
+        self.capital_transactions = []
+        self.consumption_transactions = []
         self.create_agents()
         self.running = True
     def get_total_labor(self):
@@ -156,29 +182,39 @@ class EconomyModel(Model):
 
 
     def step(self):
-
+        self.labor_transactions.clear()
+        self.capital_transactions.clear()
+        self.consumption_transactions.clear()
+        self.pre_labor_transactions.fill(0)
+        self.pre_capital_transactions.fill(0)
+        self.pre_consumption_transactions.fill(0)
         self.schedule.step()
         for agent in self.schedule.agents:
             if isinstance(agent, (Firm1, Firm2)):
                 agent.update_firm_state()
                 agent.get_expected_demand()
                 agent.make_production_decision()
+
                 agent.adjust_labor()
                 if isinstance(agent, Firm2):
                     agent.adjust_investment_demand()
         self.execute_labor_market()
+
         for agent in self.schedule.agents:
             if isinstance(agent, Firm1):
                 agent.adjust_production()
                 print(agent.unique_id, agent.production)
-                agent.adjust_price()
-                print(agent.unique_id, agent.price)
         self.execute_capital_market()
+        for agent in self.schedule.agents:
+            if isinstance(agent, Firm1):
+                agent.adjust_price()
         for agent in self.schedule.agents:
             if isinstance(agent, Firm2):
                 agent.adjust_production()
-                agent.adjust_price()
         self.execute_consumption_market()
+        for agent in self.schedule.agents:
+            if isinstance(agent, Firm2):
+                agent.adjust_price()
         self.employment_snapshot()
         #self.collect_data()
         self.datacollector.collect(self)
@@ -245,7 +281,13 @@ class EconomyModel(Model):
                    if isinstance(worker, Worker) and worker.available_hours() > 0]
         transactions = market_matching(buyers, sellers)
         #print("Labor Market Transaction", transactions)
+        buyer_demand = sum(b[0] for b in buyers) if buyers else 0
+        seller_inventory = sum(s[0] for s in sellers) if sellers else 0
+        avg_buyer_price = sum(b[1] for b in buyers) / len(buyers) if buyers else 0
+        avg_seller_price = sum(s[1] for s in sellers) / len(sellers) if sellers else 0
 
+        self.pre_labor_transactions = np.array([buyer_demand, seller_inventory, avg_buyer_price, avg_seller_price])
+        self.labor_transactions = transactions
         for firm, worker, hours, price in transactions:
             # Round hours to the nearest integer
             hours = round(hours)
@@ -265,9 +307,14 @@ class EconomyModel(Model):
         sellers = [(firm.inventory, firm.price, firm)
                    for firm in self.schedule.agents
                    if isinstance(firm, Firm1) and firm.inventory > 0]
+        buyer_demand = sum(b[0] for b in buyers)  if buyers else 0
+        seller_inventory = sum(s[0] for s in sellers)  if sellers else 0
+        avg_buyer_price = sum(b[1] for b in buyers) / len(buyers) if buyers else 0
+        avg_seller_price = sum(s[1] for s in sellers) / len(sellers) if sellers else 0
 
+        self.pre_capital_transactions = np.array([buyer_demand, seller_inventory, avg_buyer_price, avg_seller_price])
         transactions = market_matching(buyers, sellers)
-
+        self.capital_transactions = transactions
         for buyer, seller, quantity, price in transactions:
             buyer.buy_capital(quantity, price)
             seller.sell_goods(quantity, price)
@@ -288,7 +335,17 @@ class EconomyModel(Model):
             max_inventory = max(sellers, key=lambda x: x[0])[0]
             #print("Min price, max inventory", min_price, max_inventory)
         #print("Sellers", sellers)
+
+
+        buyer_demand = sum(b[0] for b in buyers) if buyers else 0
+        seller_inventory = sum(s[0] for s in sellers) if sellers else 0
+        avg_buyer_price = sum(b[1] for b in buyers) / len(buyers) if buyers else 0
+        avg_seller_price = sum(s[1] for s in sellers) / len(sellers) if sellers else 0
+
+        self.pre_consumption_transactions = np.array([buyer_demand, seller_inventory, avg_buyer_price, avg_seller_price])
         transactions = market_matching(buyers, sellers)
+
+        self.consumption_transactions = transactions
         #print("Consumption Market Transaction", transactions)
         for buyer, seller, quantity, price in transactions:
             buyer.consume(quantity, price)

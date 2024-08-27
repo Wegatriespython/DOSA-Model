@@ -35,7 +35,7 @@ def load_and_preprocess_data(model_data_path, agent_data_path):
     agent_numeric_columns = [
         'Capital', 'Labor', 'Working_Hours', 'Labor_Demand', 'Production',
         'Price', 'Inventory', 'Budget', 'Productivity', 'Wage', 'Skills',
-        'Savings', 'Consumption'
+        'Savings', 'Consumption', "Wages_Firm", "Sales"
     ]
 
     for col in agent_numeric_columns:
@@ -62,7 +62,6 @@ model_data, agent_data = load_and_preprocess_data('model_data.csv', 'agent_data.
 # Initialize the Dash app
 app = dash.Dash(__name__)
 
-# Define the layout of the dashboard
 app.layout = html.Div([
     html.H1('Economic Model Dashboard'),
 
@@ -83,7 +82,9 @@ app.layout = html.Div([
                     {'label': 'Supply', 'value': 'supply'},
                     {'label': 'Demand', 'value': 'demand'},
                     {'label': 'Inventory', 'value': 'inventory'},
-                    {'label': 'Price', 'value': 'price'}
+                    {'label': 'Price', 'value': 'price'},
+                    {'label': 'Sales', 'value': 'sales'},
+                    {'label': 'Wages', 'value': 'wage'},
                 ],
                 value=['supply', 'demand']
             ),
@@ -111,6 +112,19 @@ app.layout = html.Div([
         ]),
         dcc.Tab(label='Workers', children=[
             dcc.Graph(id='worker-graph')
+        ]),
+        dcc.Tab(label='Aggregate Transactions', children=[
+            dcc.Dropdown(
+                id='transaction-market-dropdown',
+                options=[
+                    {'label': 'Capital Market', 'value': 'capital'},
+                    {'label': 'Labor Market', 'value': 'labor'},
+                    {'label': 'Consumption Market', 'value': 'consumption'}
+                ],
+                value='capital'
+            ),
+            dcc.Graph(id='transaction-graph'),
+            dcc.Graph(id='pre-transaction-graph'),
         ])
     ])
 ])
@@ -120,22 +134,29 @@ app.layout = html.Div([
     [Input('market-dropdown', 'value'),
      Input('market-variables-checklist', 'value')]
 )
+
 def update_market_graph(selected_market, selected_variables):
     if selected_market == 'capital':
         demand = agent_data[agent_data['Type'] == 'Firm2'].groupby('Step')['Investment'].sum()
         supply = agent_data[agent_data['Type'] == 'Firm1'].groupby('Step')['Production'].sum()
         inventory = agent_data[agent_data['Type'] == 'Firm1'].groupby('Step')['Inventory'].sum()
         price = model_data['Average Capital Price']
+        sales = agent_data[agent_data['Type'] == 'Firm1'].groupby('Step')['Sales'].sum()
+        wage = agent_data[agent_data['Type'] == 'Firm1'].groupby('Step')['Wages_Firm'].mean()
     elif selected_market == 'labor':
         demand = agent_data[agent_data['Type'].isin(['Firm1', 'Firm2'])].groupby('Step')['Labor_Demand'].sum()
         supply = agent_data[agent_data['Type'] == 'Worker'].groupby('Step')['Working_Hours'].sum()
         inventory = pd.Series(0, index=demand.index)  # No inventory for labor
         price = model_data['Average Wage']
+        sales = pd.Series(0, index=demand.index)  # No sales for labor
+        wage = model_data['Average Wage']
     else:  # consumption
         demand = agent_data[agent_data['Type'] == 'Worker'].groupby('Step')['Consumption'].sum()
         supply = agent_data[agent_data['Type'] == 'Firm2'].groupby('Step')['Production'].sum()
         inventory = agent_data[agent_data['Type'] == 'Firm2'].groupby('Step')['Inventory'].sum()
         price = model_data['Average Consumption Good Price']
+        sales = agent_data[agent_data['Type'] == 'Firm2'].groupby('Step')['Sales'].sum()
+        wage = agent_data[agent_data['Type'] == 'Firm2'].groupby('Step')['Wages_Firm'].mean()
 
     common_index = model_data['Step']
     figure = go.Figure()
@@ -148,10 +169,14 @@ def update_market_graph(selected_market, selected_variables):
         figure.add_trace(go.Scatter(x=common_index, y=inventory.reindex(common_index, fill_value=0), mode='lines', name='Inventory'))
     if 'price' in selected_variables:
         figure.add_trace(go.Scatter(x=common_index, y=price.reindex(common_index, fill_value=0), mode='lines', name='Price', yaxis='y2'))
-        figure.update_layout(yaxis2=dict(title='Price', overlaying='y', side='right'))
+    if 'sales' in selected_variables:
+        figure.add_trace(go.Scatter(x=common_index, y=sales.reindex(common_index, fill_value=0), mode='lines', name='Sales'))
+    if 'wage' in selected_variables:
+        figure.add_trace(go.Scatter(x=common_index, y=wage.reindex(common_index, fill_value=0), mode='lines', name='Wage', yaxis='y2'))
 
     figure.update_layout(title=f'{selected_market.capitalize()} Market',
-                         xaxis_title='Time Step', yaxis_title='Quantity')
+                         xaxis_title='Time Step', yaxis_title='Quantity',
+                         yaxis2=dict(title='Price/Wage', overlaying='y', side='right'))
     return figure
 
 @app.callback(
@@ -164,7 +189,7 @@ def update_firm_graph(firm_type, graph_type):
 
     if graph_type == 'performance':
         figure = go.Figure()
-        for variable in ['Budget', 'Production', 'Price', 'Inventory', 'Capital']:
+        for variable in ['Budget', 'Production', 'Price', 'Inventory', 'Capital', 'Sales']:
             data = firm_data.groupby('Step')[variable].mean()
             figure.add_trace(go.Scatter(x=data.index, y=data.values, mode='lines', name=variable))
         figure.update_layout(title=f'{firm_type} Performance Metrics',
@@ -172,11 +197,25 @@ def update_firm_graph(firm_type, graph_type):
     elif graph_type == 'optimals':
         figure = go.Figure()
         optimal_data = firm_data[firm_data['Optimals'].notna()]
-        for i, label in enumerate(['Optimal Labor', 'Optimal Capital', 'Optimal Production', 'Optimal Price']):
+
+        def parse_numpy_array_string(s):
+            try:
+                # Remove brackets and split by spaces
+                values = s.strip('[]').split()
+                # Convert to float and return as a list
+                return [float(x) for x in values]
+            except:
+                return None
+
+        # Convert string representation of NumPy array to list
+        optimal_data['Optimals'] = optimal_data['Optimals'].apply(parse_numpy_array_string)
+
+        for i, label in enumerate(['Optimal Labor', 'Optimal Capital', 'Optimal Production', 'Optimal Inventory', 'Optimal Sales']):
             y = optimal_data['Optimals'].apply(lambda opt: opt[i] if isinstance(opt, list) and len(opt) > i else None)
             figure.add_trace(go.Scatter(x=optimal_data['Step'], y=y, mode='lines', name=label))
+
         figure.update_layout(title=f'{firm_type} Optimals',
-                             xaxis_title='Time Step', yaxis_title='Value')
+            xaxis_title='Time Step', yaxis_title='Value')
     elif graph_type == 'expectations':
         figure = go.Figure()
         expectations_data = firm_data[firm_data['Expectations'].notna()]
@@ -208,6 +247,39 @@ def update_worker_graph(_):
                          yaxis_title='Savings',
                          yaxis2=dict(title='Working Hours', overlaying='y', side='right'))
     return figure
+@app.callback(
+    [Output('pre-transaction-graph', 'figure'),
+        Output('transaction-graph', 'figure')],
+    [Input('transaction-market-dropdown', 'value')]
+)
+def update_transaction_graph(selected_market):
+    pre_transaction_fig = go.Figure()
+    transaction_fig = go.Figure()
 
+    # Pre-transaction data
+    pre_transaction_fig.add_trace(go.Scatter(x=model_data['Step'], y=model_data[f'{selected_market}_raw_demand'], mode='lines', name='Demand'))
+    pre_transaction_fig.add_trace(go.Scatter(x=model_data['Step'], y=model_data[f'{selected_market}_raw_supply'], mode='lines', name='Supply'))
+    pre_transaction_fig.add_trace(go.Scatter(x=model_data['Step'], y=model_data[f'{selected_market}_raw_buyer_price'], mode='lines', name='Buyer Price', yaxis='y2'))
+    pre_transaction_fig.add_trace(go.Scatter(x=model_data['Step'], y=model_data[f'{selected_market}_raw_seller_price'], mode='lines', name='Seller Price', yaxis='y2'))
+
+    pre_transaction_fig.update_layout(
+        title=f'{selected_market.capitalize()} Market - Pre-Transaction Data',
+        xaxis_title='Time Step',
+        yaxis_title='Quantity',
+        yaxis2=dict(title='Price', overlaying='y', side='right')
+    )
+
+    # Transaction data
+    transaction_fig.add_trace(go.Scatter(x=model_data['Step'], y=model_data[f'{selected_market}_Market_Quantity'], mode='lines', name='Quantity'))
+    transaction_fig.add_trace(go.Scatter(x=model_data['Step'], y=model_data[f'{selected_market}_Market_Price'], mode='lines', name='Price', yaxis='y2'))
+
+    transaction_fig.update_layout(
+        title=f'{selected_market.capitalize()} Market - Transaction Data',
+        xaxis_title='Time Step',
+        yaxis_title='Quantity',
+        yaxis2=dict(title='Price', overlaying='y', side='right')
+    )
+
+    return pre_transaction_fig, transaction_fig
 if __name__ == '__main__':
     app.run_server(debug=True)

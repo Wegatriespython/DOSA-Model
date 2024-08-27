@@ -37,18 +37,15 @@ class Worker(Agent):
         self.update_price_expectation()
 
     def update_wage_expectation(self):
-        if self.total_working_hours > 12:
-            self.expected_wage = min(self.wage * (1.1), 10)# Hardcoding a wage cieling of 10
-
-        elif self.total_working_hours < 4:
-            self.expected_wage = max(self.wage * (0.9), self.model.config.MINIMUM_WAGE)
-
+        if self.total_working_hours >= 12:
+            self.expected_wage = self.expected_wage * 1.1 # Hardcoding a wage cieling of 10
+            self.expected_wage = min(self.expected_wage, 10)
+        else :
+            self.expected_wage -= (self.expected_wage - self.model.config.MINIMUM_WAGE) * 0.1 # Hardcoding a wage floor of 10
+            self.expected_wage = max(self.expected_wage, self.model.config.MINIMUM_WAGE)
 
     def update_price_expectation(self):
-        if self.dissatistifaction > 0:
-            self.expected_price = self.model.get_average_consumption_good_price() * 1.1
-        else:
-            self.expected_price = self.model.get_average_consumption_good_price()
+        self.expected_price = self.model.get_average_consumption_good_price() * 1.1
 
     def make_economic_decision(self):
         self.desired_consumption = min(self.savings, self.wage * self.total_working_hours * self.model.config.CONSUMPTION_PROPENSITY)

@@ -22,7 +22,7 @@ def profit_maximization(
     # Scaling factors
     scale_capital = max(1, guess_capital)
     scale_labor = max(1, guess_labor)
-    scale_price = max(1, current_price)
+    scale_price = max(1, max(expected_price))
     scale_demand = max(1, max(expected_demand))
 
     # Variables with scaling and lower bounds

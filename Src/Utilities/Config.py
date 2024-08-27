@@ -6,7 +6,7 @@ class Config:
         #
 
         self.MAX_WORKING_HOURS = 16
-        self.TIME_HORIZON = 15
+        self.TIME_HORIZON = 20
         self.INITIAL_SALES = 1
 
         self.INITIAL_PRODUCTIVITY = 1
@@ -14,19 +14,14 @@ class Config:
         self.MAX_CAPITAL_USAGE = 100
         self.INITIAL_WAGE = 0.0625 # 1/16
         self.MAX_MPL = 100
-        self.DEPRECIATION_RATE = 0.1
+        self.DEPRECIATION_RATE = 0.00
         self.MIN_DEMAND = 1
-        self.PRICE_ADJUSTMENT_FACTOR = 0.2
-        self.EXPECTED_PERIODS = 100
         self.INITIAL_SKILLS = .1
-        self.DISCOUNT_FACTOR = 0.95
         self.DISCOUNT_RATE = 0.05
-        self.MARKUP_RATE = 0.2
         self.INITIAL_SAVINGS = 200
         self.MIN_CONSUMPTION = 1
         self.PRODUCTION_FACTOR = 0.1
         self.WAGE_OFFER_FACTOR = 1.1
-        self.JOB_LOSS_PROBABILITY = 0.05
         self.MINIMUM_WAGE = 0.0625
         self.CONSUMPTION_PROPENSITY =1
         self.INITIAL_CONSUMPTION = 1
@@ -53,7 +48,7 @@ class Config:
         self.FIRM2_INITIAL_INVESTMENT_DEMAND = 1
         self.FIRM2_INITIAL_DESIRED_CAPITAL = 5
         self.FIRM2_MACHINE_OUTPUT_PER_PERIOD = 10
-        self.FIRM2_INVENTORY_THRESHOLD = 20
+        self.INVENTORY_THRESHOLD = 20
 
         # Simulation parameters
         self.INITIAL_WORKERS = 10
