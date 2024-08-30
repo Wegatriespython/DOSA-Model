@@ -312,10 +312,10 @@ class Firm(Agent):
     def calculate_average_wage(self):
         if self.workers == {}:
             wage_avg = self.model.get_average_wage()
-
+            wage_avg = max(wage_avg, self.model.config.MINIMUM_WAGE)
             return wage_avg
         wage_avg = np.mean([self.workers[worker]['wage'] for worker in self.workers])
-
+        wage_avg = max(wage_avg, self.model.config.MINIMUM_WAGE)
         return wage_avg
     def get_desired_capital_price(self):
         average_capital_price = self.model.get_average_capital_price()
@@ -365,7 +365,9 @@ class Firm(Agent):
         if self.optimals[0] > self.get_total_labor_units():
             wage_hike = min_wage + (max_wage - self.wage) * 0.1
 
+        wage_hike = max(min_wage, wage_hike)
         return wage_hike
+
     def get_min_sale_price(self):
 
         if self.firm_type == 'consumption':

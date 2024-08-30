@@ -15,8 +15,8 @@ class Config:
         self.DEPRECIATION_RATE = 0.00
         self.INITIAL_SKILLS = .1
         self.DISCOUNT_RATE = 0.05
-        self.INITIAL_SAVINGS = 200
-        self.MIN_CONSUMPTION = 0
+        self.INITIAL_SAVINGS = 15
+        self.MIN_CONSUMPTION = 1
         self.PRODUCTION_FACTOR = 0.1
         self.WAGE_OFFER_FACTOR = 1.1
         self.MINIMUM_WAGE = 0.0625

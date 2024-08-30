@@ -1,7 +1,6 @@
 from mesa import Model
 from mesa.time import RandomActivationByType, SimultaneousActivation
 from mesa.datacollection import DataCollector
-from mesa.space import MultiGrid
 import logging
 from numpy.lib.function_base import average
 import pandas as pd
@@ -24,7 +23,6 @@ class EconomyModel(Model):
         self.num_firm1 = num_firm1
         self.num_firm2 = num_firm2
         self.schedule = RandomActivationByType(self)
-        self.grid = MultiGrid(10, 10, True)
         self.config = Config()
         self.step_count = 0
         self.global_accounting = GlobalAccountingSystem()  # Keep this for background data collection
@@ -159,8 +157,7 @@ class EconomyModel(Model):
         for i in range(self.num_workers):
             worker = Worker(i, self)
             self.schedule.add(worker)
-            x, y = self.random.randrange(self.grid.width), self.random.randrange(self.grid.height)
-            self.grid.place_agent(worker, (x, y))
+
 
         # Create and add Firm2 instances second
         for i in range(self.num_firm2):
@@ -168,8 +165,7 @@ class EconomyModel(Model):
             self.schedule.add(firm)
             self.global_accounting.register_firm(firm)
             self.data_collection[firm.unique_id] = []
-            x, y = self.random.randrange(self.grid.width), self.random.randrange(self.grid.height)
-            self.grid.place_agent(firm, (x, y))
+
 
         # Create and add Firm1 instances last
         for i in range(self.num_firm1):
@@ -177,8 +173,7 @@ class EconomyModel(Model):
             self.schedule.add(firm)
             self.global_accounting.register_firm(firm)
             self.data_collection[firm.unique_id] = []
-            x, y = self.random.randrange(self.grid.width), self.random.randrange(self.grid.height)
-            self.grid.place_agent(firm, (x, y))
+
 
 
     def step(self):

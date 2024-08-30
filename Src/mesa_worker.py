@@ -11,7 +11,8 @@ class Worker(Agent):
         self.max_working_hours = 16
         self.dissatistifaction = 0
         self.wage = 0.0625
-        self.savings = 100
+        self.savings = self.model.config.INITIAL_SAVINGS
+        self.optimals = []
         self.got_paid = False
         self.expected_price = model.config.INITIAL_PRICE
         self.expected_wage = model.config.MINIMUM_WAGE
@@ -30,20 +31,21 @@ class Worker(Agent):
         self.update_utilty()
         self.update_skills()
     def update_utilty(self):
-        if self.model.step_count > 10:
-            print(f"Calling maximize utility with savings: {self.savings}, wage: {self.wage}, average consumption good price: {self.model.get_average_consumption_good_price()}, price history: {self.price_history[-1]}, total working hours: {self.total_working_hours}")
+
+        print(f"Calling maximize utility with savings: {self.savings}, wage: {self.wage}, average consumption good price: {self.model.get_average_consumption_good_price()}, price history: {self.price_history[-1]}, total working hours: {self.total_working_hours}")
         wage = max(self.wage, self.model.config.MINIMUM_WAGE)
         results = maximize_utility(self.savings, wage, self.model.get_average_consumption_good_price(), self.price_history[-1], self.total_working_hours)
-        self.desired_consumption, self.total_working_hours, self.desired_savings = results
-        self.total_working_hours = round(self.total_working_hours)
+        self.desired_consumption, self.working_hours, self.desired_savings, self.future_work_hours = results
+        self.total_working_hours = round(self.working_hours)
         self.desired_consumption = round(self.desired_consumption)
         self.desired_savings = round(self.desired_savings)
-        if self.savings < self.desired_consumption:
-            self.desired_consumption = 0
-        if self.savings < self.desired_savings:
-            self.expected_wage = self.model.get_average_wage() * 1.1
-        if self.consumption < self.desired_consumption:
-            self.expected_price = self.model.get_average_consumption_good_price() * 1.1
+        self.optimals = [self.desired_consumption, self.working_hours, self.desired_savings]
+        print(f"Optimals: {self.optimals}")
+
+
+        self.expected_wage = max(self.model.get_average_wage() * 1.1, self.wage, self.model.config.MINIMUM_WAGE)
+
+        self.expected_price = self.wage * self.total_working_hours * self.model.config.CONSUMPTION_PROPENSITY
     def get_min_wage(self):
         return max(self.model.config.MINIMUM_WAGE, self.wage)
 
@@ -87,12 +89,15 @@ class Worker(Agent):
         self.savings = max(0, self.savings) #prevent negative savings
 
     def get_max_consumption_price(self):
-        return self.expected_price * 1.1  # Willing to pay up to 10% more than expected
+        return (self.savings + (self.wage * self.total_working_hours))  # Willing to pay up to 10% more than expected
 
     def get_paid(self, wage):
         self.savings += wage
 
-
-
     def available_hours(self):
-        return max(0, round(self.max_working_hours) - round(self.total_working_hours))
+        if self.total_working_hours >= self.max_working_hours:
+            return 0
+        elif self.working_hours + self.total_working_hours >= self.max_working_hours:
+            return max(0, round(self.max_working_hours) - round(self.total_working_hours))
+        else:
+            return self.working_hours
