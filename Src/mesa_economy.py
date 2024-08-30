@@ -272,11 +272,11 @@ class EconomyModel(Model):
 
     def execute_labor_market(self):
 
-        buyers = [(firm.labor_demand, firm.get_max_wage(), firm)
+        buyers = [(firm.labor_demand, firm.calculate_average_wage(), firm, firm.get_max_wage())
                   for firm in self.schedule.agents
                   if isinstance(firm, (Firm1, Firm2)) and firm.labor_demand > 0]
 
-        sellers = [(worker.available_hours(), worker.expected_wage, worker)
+        sellers = [(worker.available_hours(), worker.expected_wage, worker, worker.get_min_wage())
                    for worker in self.schedule.agents
                    if isinstance(worker, Worker) and worker.available_hours() > 0]
         transactions = market_matching(buyers, sellers)
@@ -301,12 +301,18 @@ class EconomyModel(Model):
 
     def execute_capital_market(self):
 
-        buyers = [(firm.investment_demand, firm.get_max_capital_price(), firm)
+        buyers = [(firm.investment_demand, firm.get_desired_capital_price(), firm, firm.get_max_capital_price())
                   for firm in self.schedule.agents
                   if isinstance(firm, Firm2) and firm.investment_demand > 0]
-        sellers = [(firm.inventory, firm.price, firm)
-                   for firm in self.schedule.agents
-                   if isinstance(firm, Firm1) and firm.inventory > 0]
+        print(buyers)
+
+        sellers = []
+        for firm in self.schedule.agents:
+            match firm:
+                case Firm1() if firm.inventory > 0:
+                    sellers.append((firm.inventory, firm.price, firm, firm.get_min_sale_price()))
+                case Firm2() if firm.capital_inventory > 0:
+                    sellers.append((firm.capital_inventory,firm.capital_resale_price, firm, 0.1))
         buyer_demand = sum(b[0] for b in buyers)  if buyers else 0
         seller_inventory = sum(s[0] for s in sellers)  if sellers else 0
         avg_buyer_price = sum(b[1] for b in buyers) / len(buyers) if buyers else 0
@@ -323,11 +329,11 @@ class EconomyModel(Model):
 
     def execute_consumption_market(self):
         #print("Executing consumption market")
-        buyers = [(worker.desired_consumption, worker.expected_price, worker)
+        buyers = [(worker.desired_consumption, worker.expected_price, worker, worker.get_max_consumption_price())
                   for worker in self.schedule.agents
                   if isinstance(worker, Worker) and worker.savings > 0]
         #print("Buyers", buyers)
-        sellers = [(firm.inventory, firm.price, firm)
+        sellers = [(firm.inventory, firm.price, firm, firm.get_min_sale_price())
                    for firm in self.schedule.agents
                    if isinstance(firm, Firm2) and firm.inventory > 0]
         if sellers:

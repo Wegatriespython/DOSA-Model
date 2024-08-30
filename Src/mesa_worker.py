@@ -1,6 +1,7 @@
 from mesa import Agent
 import numpy as np
 from Utilities.Config import Config
+from Utilities.utility_function import maximize_utility
 
 class Worker(Agent):
     def __init__(self, unique_id, model):
@@ -17,6 +18,7 @@ class Worker(Agent):
         self.skills = model.config.INITIAL_SKILLS
         self.consumption = 1
         self.desired_consumption = 1
+        self.desired_savings = 0
         self.price = model.config.INITIAL_PRICE
         self.price_history = [model.config.INITIAL_PRICE]
         self.MIN_CONSUMPTION = 1
@@ -25,32 +27,25 @@ class Worker(Agent):
 
     def step(self):
 
-        self.update_expectations()
-        self.make_economic_decision()
+        self.update_utilty()
         self.update_skills()
-
-
-
-    def update_expectations(self):
-        self.update_average_wage()
-        self.update_wage_expectation()
-        self.update_price_expectation()
-
-    def update_wage_expectation(self):
-        if self.total_working_hours >= 12:
-            self.expected_wage = self.expected_wage * 1.1 # Hardcoding a wage cieling of 10
-            self.expected_wage = min(self.expected_wage, 10)
-        else :
-            self.expected_wage -= (self.expected_wage - self.model.config.MINIMUM_WAGE) * 0.1 # Hardcoding a wage floor of 10
-            self.expected_wage = max(self.expected_wage, self.model.config.MINIMUM_WAGE)
-
-    def update_price_expectation(self):
-        self.expected_price = self.model.get_average_consumption_good_price() * 1.1
-
-    def make_economic_decision(self):
-        self.desired_consumption = min(self.savings, self.wage * self.total_working_hours * self.model.config.CONSUMPTION_PROPENSITY)
-        self.desired_consumption = max(self.desired_consumption, self.model.config.MIN_CONSUMPTION)
-        #print(f"Worker {self.unique_id} desired consumption: {self.desired_consumption}")
+    def update_utilty(self):
+        if self.model.step_count > 10:
+            print(f"Calling maximize utility with savings: {self.savings}, wage: {self.wage}, average consumption good price: {self.model.get_average_consumption_good_price()}, price history: {self.price_history[-1]}, total working hours: {self.total_working_hours}")
+        wage = max(self.wage, self.model.config.MINIMUM_WAGE)
+        results = maximize_utility(self.savings, wage, self.model.get_average_consumption_good_price(), self.price_history[-1], self.total_working_hours)
+        self.desired_consumption, self.total_working_hours, self.desired_savings = results
+        self.total_working_hours = round(self.total_working_hours)
+        self.desired_consumption = round(self.desired_consumption)
+        self.desired_savings = round(self.desired_savings)
+        if self.savings < self.desired_consumption:
+            self.desired_consumption = 0
+        if self.savings < self.desired_savings:
+            self.expected_wage = self.model.get_average_wage() * 1.1
+        if self.consumption < self.desired_consumption:
+            self.expected_price = self.model.get_average_consumption_good_price() * 1.1
+    def get_min_wage(self):
+        return max(self.model.config.MINIMUM_WAGE, self.wage)
 
     def update_skills(self):
         if self.total_working_hours > 0:
@@ -67,6 +62,7 @@ class Worker(Agent):
         if employer in self.employers:
             self.employers[employer]['hours'] += hours
             self.total_working_hours += hours
+            self.total_working_hours = round(self.total_working_hours)
             self.update_average_wage()
 
     def get_fired(self, employer):
@@ -88,6 +84,7 @@ class Worker(Agent):
         self.consumption = quantity
         self.dissatistifaction = min(0, self.desired_consumption - self.consumption)
         self.savings -= total_cost
+        self.savings = max(0, self.savings) #prevent negative savings
 
     def get_max_consumption_price(self):
         return self.expected_price * 1.1  # Willing to pay up to 10% more than expected
@@ -98,4 +95,4 @@ class Worker(Agent):
 
 
     def available_hours(self):
-        return max(0, self.max_working_hours - self.total_working_hours)
+        return max(0, round(self.max_working_hours) - round(self.total_working_hours))

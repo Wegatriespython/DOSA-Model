@@ -11,15 +11,12 @@ class Config:
 
         self.INITIAL_PRODUCTIVITY = 1
         self.INITIAL_PRICE = 1
-        self.MAX_CAPITAL_USAGE = 100
         self.INITIAL_WAGE = 0.0625 # 1/16
-        self.MAX_MPL = 100
         self.DEPRECIATION_RATE = 0.00
-        self.MIN_DEMAND = 1
         self.INITIAL_SKILLS = .1
         self.DISCOUNT_RATE = 0.05
         self.INITIAL_SAVINGS = 200
-        self.MIN_CONSUMPTION = 1
+        self.MIN_CONSUMPTION = 0
         self.PRODUCTION_FACTOR = 0.1
         self.WAGE_OFFER_FACTOR = 1.1
         self.MINIMUM_WAGE = 0.0625

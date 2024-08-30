@@ -1,12 +1,53 @@
 import pyomo.environ as pyo
 from pyomo.opt import SolverFactory
 import numpy as np
+from functools import lru_cache
 
-def profit_maximization(
+# Global variable to store the last solution for warm start
+last_solution = None
+
+@lru_cache(maxsize=128)
+def memoized_profit_maximization(
+    current_capital, current_labor, current_price, current_productivity,
+    expected_demand, expected_price, capital_price, capital_elasticity,
+    current_inventory, depreciation_rate, expected_periods, discount_rate,
+    budget, wage):
+    return _profit_maximization(
         current_capital, current_labor, current_price, current_productivity,
         expected_demand, expected_price, capital_price, capital_elasticity,
         current_inventory, depreciation_rate, expected_periods, discount_rate,
-        budget, wage, linear_solver='ma27'):
+        budget, wage)
+
+def profit_maximization(
+    current_capital, current_labor, current_price, current_productivity,
+    expected_demand, expected_price, capital_price, capital_elasticity,
+    current_inventory, depreciation_rate, expected_periods, discount_rate,
+    budget, wage, linear_solver='ma27'):
+
+    global last_solution
+
+    # Convert numpy arrays to tuples for hashing
+    expected_demand_tuple = tuple(expected_demand)
+    expected_price_tuple = tuple(expected_price)
+
+    result = memoized_profit_maximization(
+        current_capital, current_labor, current_price, current_productivity,
+        expected_demand_tuple, expected_price_tuple, capital_price, capital_elasticity,
+        current_inventory, depreciation_rate, expected_periods, discount_rate,
+        budget, wage)
+
+    if result is not None:
+        last_solution = (result['optimal_labor'], result['optimal_capital'])
+
+    return result
+
+def _profit_maximization(
+    current_capital, current_labor, current_price, current_productivity,
+    expected_demand, expected_price, capital_price, capital_elasticity,
+    current_inventory, depreciation_rate, expected_periods, discount_rate,
+    budget, wage, linear_solver='ma27'):
+
+    global last_solution
 
     model = pyo.ConcreteModel()
     max_labor = budget/max(1e-6,wage) + current_labor
@@ -57,6 +98,12 @@ def profit_maximization(
     solver.options['tol'] = 1e-6
     solver.options['halt_on_ampl_error'] = 'yes'
     solver.options['linear_solver'] = linear_solver
+
+    # Warm start
+    if last_solution is not None:
+        model.labor.value = last_solution[0]
+        model.capital.value = last_solution[1]
+
     results = solver.solve(model, tee=False)
 
     if results.solver.termination_condition == pyo.TerminationCondition.optimal:

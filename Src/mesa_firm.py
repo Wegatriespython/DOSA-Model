@@ -149,13 +149,13 @@ class Firm(Agent):
             return
 
 
-        optimal_labor = result['optimal_labor']
-        optimal_capital = result['optimal_capital']
-        optimal_production = result['optimal_production']
-        Trajectory_inventory = result['optimal_inventory']
-        optimal_inventory = Trajectory_inventory[0]
+        optimal_labor = round(result['optimal_labor'], 1)
+        optimal_capital = round(result['optimal_capital'], 1)
+        optimal_production = round(result['optimal_production'],1)
+        Trajectory_inventory = result['optimal_inventory'],1
+        optimal_inventory = round(round(Trajectory_inventory[0][0],1),1)
         optimal_sales = result['optimal_sales']
-        optimal_sales = np.mean(optimal_sales)
+        optimal_sales = round(np.mean(optimal_sales),1)
 
 
         self.optimals = [optimal_labor, optimal_capital, optimal_production, optimal_inventory, optimal_sales]
@@ -181,12 +181,17 @@ class Firm(Agent):
             self.layoff_employees(self.get_total_labor_units() - optimal_labor)
         return self.labor_demand
     def adjust_investment_demand(self):
-        if self.inventory > self.model.config.INVENTORY_THRESHOLD:
-            self.investment_demand = 0
+        if self.firm_type == 'consumption':
+            if self.inventory > self.model.config.INVENTORY_THRESHOLD:
+                self.investment_demand = 0
+                return self.investment_demand
+            optimal_capital = self.optimals[1]
+            self.investment_demand = max(0, optimal_capital - self.capital)
+            if optimal_capital < self.capital:
+                self.capital_inventory = self.capital - optimal_capital
+                self.capital_resale_price = self.model.get_average_capital_price()
+                self.captial_min_price = 0.1
             return self.investment_demand
-        optimal_capital = self.optimals[1]
-        self.investment_demand = max(0, optimal_capital - self.capital)
-        return self.investment_demand
     def adjust_production(self):
         if self.inventory > self.model.config.INVENTORY_THRESHOLD:
             self.production = 0
@@ -256,13 +261,14 @@ class Firm(Agent):
         fire_list = []
         wage_total = 0
         employees_total=0
+        skill_total = 0
         self.wage_hikes()
         for worker in self.workers:
             wage = self.workers[worker]['wage']
             hours = self.workers[worker]['hours']
             wage_total += wage
             employees_total += 1
-
+            skill_total += worker.skills
             budget_change = wage * hours
 
             if self.budget >= budget_change:
@@ -311,6 +317,9 @@ class Firm(Agent):
         wage_avg = np.mean([self.workers[worker]['wage'] for worker in self.workers])
 
         return wage_avg
+    def get_desired_capital_price(self):
+        average_capital_price = self.model.get_average_capital_price()
+        return average_capital_price
 
     def get_total_labor_units(self):
         return self.total_working_hours / self.max_working_hours
@@ -423,7 +432,6 @@ class Firm1(Firm):
         self.capital_elasticity = model.config.CAPITAL_ELASTICITY_FIRM1
         self.price = self.model.config.INITIAL_PRICE * self.model.config.INITIAL_RELATIVE_PRICE_CAPITAL
         self.capital = model.config.FIRM1_INITIAL_CAPITAL
-        self.productivity = model.config.INITIAL_PRODUCTIVITY
         self.inventory = model.config.FIRM1_INITIAL_INVENTORY
         self.historic_demand = [model.config.FIRM1_INITIAL_DEMAND]
         self.budget = self.capital
@@ -450,6 +458,7 @@ class Firm2(Firm):
         super().__init__(unique_id, model, model.config.FIRM2_INITIAL_CAPITAL, model.config.INITIAL_PRODUCTIVITY)
         self.capital_inventory = 0  # Separate inventory for capital goods
         self.firm_type = 'consumption'
+        self.capital_resale_price = 0
         self.capital_elasticity = model.config.CAPITAL_ELASTICITY_FIRM2
         self.investment_demand = model.config.FIRM2_INITIAL_INVESTMENT_DEMAND
         self.capital = model.config.FIRM2_INITIAL_CAPITAL
