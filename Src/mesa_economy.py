@@ -70,6 +70,8 @@ class EconomyModel(Model):
                 agent.update_firm_state()
                 agent.update_expectations()
                 agent.make_production_decision()
+                agent.get_zero_profit_conditions()
+                agent.nash_improvements()
                 agent.adjust_labor()
                 if isinstance(agent, Firm2):
                     agent.adjust_investment_demand()
@@ -83,10 +85,10 @@ class EconomyModel(Model):
         for agent in self.schedule.agents:
             if isinstance(agent, Firm1):
                 agent.adjust_production()
-                agent.adjust_price()
+                agent.nash_improvements()
             elif isinstance(agent, Firm2):
                 agent.adjust_production()
-                agent.adjust_price()
+                agent.nash_improvements()
 
         # Collect data
         self.data_collector.datacollector.collect(self)
@@ -96,13 +98,14 @@ class EconomyModel(Model):
 
     def execute_labor_market(self):
 
-        buyers = [(firm.labor_demand, firm.get_desired_wage(), firm, firm.get_max_wage())
+        buyers = [(firm.labor_demand, firm.desireds[0], firm, firm.zero_profit_conditions[0])
                   for firm in self.schedule.agents
                   if isinstance(firm, (Firm1, Firm2)) and firm.labor_demand > 0]
 
         sellers = [(worker.available_hours(), worker.expected_wage, worker, worker.get_min_wage())
                    for worker in self.schedule.agents
                    if isinstance(worker, Worker) and worker.available_hours() > 0]
+        print("Labor Market Buyers", buyers, "Labor Market Sellers", sellers)
         transactions = market_matching(buyers, sellers)
         #print("Labor Market Transaction", transactions)
         buyer_demand = sum(b[0] for b in buyers) if buyers else 0
@@ -112,6 +115,8 @@ class EconomyModel(Model):
 
         self.pre_labor_transactions = np.array([buyer_demand, seller_inventory, avg_buyer_price, avg_seller_price])
         self.labor_transactions = transactions
+        labor_transactions_history = np.array([len(transactions), sum(t[2] for t in transactions), sum(t[3] for t in transactions)])
+        self.labor_transactions_history.append(labor_transactions_history)
         for firm, worker, hours, price in transactions:
             # Round hours to the nearest integer
             hours = round(hours)
@@ -125,7 +130,7 @@ class EconomyModel(Model):
 
     def execute_capital_market(self):
 
-        buyers = [(firm.investment_demand, firm.get_desired_capital_price(), firm, firm.get_max_capital_price())
+        buyers = [(firm.investment_demand, firm.desireds[2], firm, firm.zero_profit_conditions[2])
                   for firm in self.schedule.agents
                   if isinstance(firm, Firm2) and firm.investment_demand > 0]
         print(buyers)
@@ -134,7 +139,7 @@ class EconomyModel(Model):
         for firm in self.schedule.agents:
             match firm:
                 case Firm1() if firm.inventory > 0:
-                    sellers.append((firm.inventory, firm.price, firm, firm.get_min_sale_price()))
+                    sellers.append((firm.inventory, firm.desireds[1], firm, firm.zero_profit_conditions[1]))
                 case Firm2() if firm.capital_inventory > 0:
                     sellers.append((firm.capital_inventory,firm.capital_resale_price, firm, 0.1))
         buyer_demand = sum(b[0] for b in buyers)  if buyers else 0
@@ -147,7 +152,8 @@ class EconomyModel(Model):
 
         transactions = market_matching(buyers, sellers)
         self.capital_transactions = transactions
-        self.captial_transactions_history = np.array([len(transactions), sum(t[2] for t in transactions), sum(t[3] for t in transactions)])
+        captial_transactions_history = np.array([len(transactions), sum(t[2] for t in transactions), sum(t[3] for t in transactions)])
+        self.capital_transactions_history.append(captial_transactions_history)
         for buyer, seller, quantity, price in transactions:
             buyer.buy_capital(quantity, price)
             seller.sell_goods(quantity, price)
@@ -160,7 +166,7 @@ class EconomyModel(Model):
                   for worker in self.schedule.agents
                   if isinstance(worker, Worker) and worker.savings > 0]
         #print("Buyers", buyers)
-        sellers = [(firm.inventory, firm.price, firm, firm.get_min_sale_price())
+        sellers = [(firm.inventory, firm.desireds[1], firm, firm.zero_profit_conditions[1])
                    for firm in self.schedule.agents
                    if isinstance(firm, Firm2) and firm.inventory > 0]
         if sellers:
@@ -180,7 +186,8 @@ class EconomyModel(Model):
         transactions = market_matching(buyers, sellers)
 
         self.consumption_transactions = transactions
-        self.consumption_transactions_history = np.array([len(transactions), sum(t[2] for t in transactions), sum(t[3] for t in transactions)])
+        consumption_transactions_history = np.array([len(transactions), sum(t[2] for t in transactions), sum(t[3] for t in transactions)])
+        self.consumption_transactions_history.append(consumption_transactions_history)
         for buyer, seller, quantity, price in transactions:
             buyer.consume(quantity, price)
             seller.sell_goods(quantity, price)

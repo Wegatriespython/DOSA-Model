@@ -3,23 +3,43 @@ import numpy as np
 
 def get_market_demand(self, market_type):
   # Rewrite to use transaction data
+  #
+  if self.model.step_count < 1:
+    return 0
   if market_type == 'capital':
-    all_demand = (t[2] for t in self.model.capital_transactions)
-    demand = sum(total_demand)/len(self.model.capital_transactions) if len(self.model.capital_transactions) > 0 else 0
-    all_prices = (t[3] for t in self.model.capital_transactions)
-    price = sum(all_prices)/len(self.model.capital_transactions) if len(self.model.capital_transactions) > 0 else 0
+    all_demand = self.model.capital_transactions_history[0][1]
+    all_prices = self.model.capital_transactions_history[0][2]
+    transactions = self.model.capital_transactions_history[0][0]
+    price = all_prices / transactions if transactions > 0 else 0
+    demand = all_demand / 2
     return demand, price
   elif market_type == 'consumption':
-    all_demand = self.model.consumption_transactions_history[1]
-    print(all_demand)
-    all_prices = self.model.consumption_transactions_history[2]
-    print(all_prices)
-    transactions = self.model.consumption_transactions_history[0]
-    print(transactions)
-    price = all_prices / transactions if transactions > 0 else 0
-    demand = all_demand / transactions if transactions > 0 else 0
+    print(f"{self.model.consumption_transactions_history}")
 
+    all_demand = self.model.consumption_transactions_history[0][1]
+    all_prices = self.model.consumption_transactions_history[0][2]
+    transactions = self.model.consumption_transactions_history[0][0]
+    price = all_prices / transactions if transactions > 0 else 0
+    demand = all_demand / 5
     return demand, price
+  else :
+    all_demand = self.model.labor_transactions_history[0][1]
+    all_prices = self.model.labor_transactions_history[0][2]
+    transactions = self.model.labor_transactions_history[0][0]
+    price = all_prices / transactions if transactions > 0 else 0
+    demand = all_demand / 30
+    return demand, price
+
+def get_supply(self, market_type):
+  all_supply = 0
+  if market_type == 'labor':
+    all_supply = self.model.pre_labor_transactions[1]
+  if market_type == 'capital':
+
+    all_supply = self.model.pre_capital_transactions[1]
+  if market_type == 'consumption':
+    all_supply = self.model.pre_consumption_transactions[1]
+  return all_supply
 
 
 

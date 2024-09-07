@@ -58,7 +58,9 @@ class Worker(Agent):
 
 
     def get_min_wage(self):
-        return max(self.model.config.MINIMUM_WAGE, self.wage)
+        check_wage = max(self.model.config.MINIMUM_WAGE, self.wage)
+        min_wage = min(check_wage, self.expected_wage)
+        return min_wage
 
     def update_skills(self):
         if self.total_working_hours > 0:
