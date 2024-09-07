@@ -1,13 +1,46 @@
 from math import nan
 import numpy as np
 
-def expect_demand(buyer_demand, periods=6):
+def get_market_demand(self, market_type):
+  # Rewrite to use transaction data
+  if market_type == 'capital':
+    all_demand = (t[2] for t in self.model.capital_transactions)
+    demand = sum(total_demand)/len(self.model.capital_transactions) if len(self.model.capital_transactions) > 0 else 0
+    all_prices = (t[3] for t in self.model.capital_transactions)
+    price = sum(all_prices)/len(self.model.capital_transactions) if len(self.model.capital_transactions) > 0 else 0
+    return demand, price
+  elif market_type == 'consumption':
+    all_demand = self.model.consumption_transactions_history[1]
+    print(all_demand)
+    all_prices = self.model.consumption_transactions_history[2]
+    print(all_prices)
+    transactions = self.model.consumption_transactions_history[0]
+    print(transactions)
+    price = all_prices / transactions if transactions > 0 else 0
+    demand = all_demand / transactions if transactions > 0 else 0
 
-    return np.full(periods, buyer_demand)
+    return demand, price
 
-def expect_price(buyer_prices, periods=6):
 
-    return np.full(periods, np.mean(buyer_prices))
+
+
+def get_expectations(self ,demand, price, periods):
+   expected_demand = expect_demand(demand, periods)
+   expected_price = expect_price(price, periods)
+   return expected_demand, expected_price
+
+
+def expect_demand(demand, periods=6):
+  if len(demand) >= 5:
+      return np.full(periods, np.mean(demand[-5:]))
+  else:
+    return np.full(periods, np.mean(demand))
+
+def expect_price(price, periods=6):
+  if  len(price) >= 5:
+      return np.full(periods, np.mean(price[-5:]))
+  else:
+    return np.full(periods, np.mean(price))
 
 def expect_price_ar(historic_prices, current_price, periods=6, alpha=0.3):
     """

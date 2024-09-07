@@ -151,12 +151,12 @@ def update_market_graph(selected_market, selected_variables):
         sales = pd.Series(0, index=demand.index)  # No sales for labor
         wage = model_data['Average Wage']
     else:  # consumption
-        demand = agent_data[agent_data['Type'] == 'Worker'].groupby('Step')['Consumption'].sum()
+        demand = agent_data[agent_data['Type'] == 'Worker'].groupby('Step')['desired_consumption'].sum()
         supply = agent_data[agent_data['Type'] == 'Firm2'].groupby('Step')['Production'].sum()
         inventory = agent_data[agent_data['Type'] == 'Firm2'].groupby('Step')['Inventory'].sum()
         price = model_data['Average Consumption Good Price']
         sales = agent_data[agent_data['Type'] == 'Firm2'].groupby('Step')['Sales'].sum()
-        wage = agent_data[agent_data['Type'] == 'Firm2'].groupby('Step')['Wages_Firm'].mean()
+        wage = agent_data[agent_data['Type'] == 'Firm2'].groupby('Step')['Per_Worker_Income'].mean()
 
     common_index = model_data['Step']
     figure = go.Figure()
@@ -261,6 +261,9 @@ def update_transaction_graph(selected_market):
     pre_transaction_fig.add_trace(go.Scatter(x=model_data['Step'], y=model_data[f'{selected_market}_raw_supply'], mode='lines', name='Supply'))
     pre_transaction_fig.add_trace(go.Scatter(x=model_data['Step'], y=model_data[f'{selected_market}_raw_buyer_price'], mode='lines', name='Buyer Price', yaxis='y2'))
     pre_transaction_fig.add_trace(go.Scatter(x=model_data['Step'], y=model_data[f'{selected_market}_raw_seller_price'], mode='lines', name='Seller Price', yaxis='y2'))
+    pre_transaction_fig.add_trace(go.Scatter(x=model_data['Step'], y = model_data[f'consumption_raw_buyer_max'], mode ='lines', name ='Buyer_Max', yaxis ='y2'))
+    pre_transaction_fig.add_trace(go.Scatter(x=model_data['Step'], y = model_data[f'consumption_raw_seller_min'], mode = 'lines', name ='Seller_Min', yaxis ='y2'))
+
 
     pre_transaction_fig.update_layout(
         title=f'{selected_market.capitalize()} Market - Pre-Transaction Data',

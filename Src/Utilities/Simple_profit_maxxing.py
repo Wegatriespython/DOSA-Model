@@ -26,11 +26,11 @@ def profit_maximization(
     scale_demand = max(1, max(expected_demand))
 
     # Variables with scaling and lower bounds
-    model.labor = pyo.Var(domain=pyo.NonNegativeReals, initialize=max(1e-6, guess_labor), bounds=(1e-6, None))
-    model.capital = pyo.Var(domain=pyo.NonNegativeReals, initialize=max(1e-6, guess_capital), bounds=(1e-6, None))
-    model.production = pyo.Var(domain=pyo.NonNegativeReals, initialize=1e-6)
-    model.inventory = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=max(1e-6, current_inventory))
-    model.sales = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=1e-6)
+    model.labor = pyo.Var(domain=pyo.NonNegativeIntegers, initialize=max(1e-6, guess_labor), bounds=(1e-6, None))
+    model.capital = pyo.Var(domain=pyo.NonNegativeIntegers, initialize=max(1e-6, guess_capital), bounds=(1e-6, None))
+    model.production = pyo.Var(domain=pyo.NonNegativeIntegers, initialize=1e-6)
+    model.inventory = pyo.Var(model.T, domain=pyo.NonNegativeIntegers, initialize=max(1e-6, current_inventory))
+    model.sales = pyo.Var(model.T, domain=pyo.NonNegativeIntegers, initialize=1e-6)
 
     # Objective
     def objective_rule(model):
@@ -85,7 +85,7 @@ def profit_maximization(
     # Check if the solver found an optimal solution
     if (results.solver.status == pyo.SolverStatus.ok and
         results.solver.termination_condition == pyo.TerminationCondition.optimal):
-        return {
+        unrounded_results = {
             'optimal_labor': pyo.value(model.labor),
             'optimal_capital': pyo.value(model.capital),
             'optimal_production': pyo.value(model.production),
@@ -93,7 +93,16 @@ def profit_maximization(
             'optimal_sales': [pyo.value(model.sales[t]) for t in model.T],
             'optimal_inventory': [pyo.value(model.inventory[t]) for t in model.T]
         }
+        return round_results(unrounded_results)
     else:
         print(f"Solver status: {results.solver.status}")
         print(f"Termination condition: {results.solver.termination_condition}")
         return None
+def round_results(results):
+    rounded = {}
+    for key, value in results.items():
+        if isinstance(value, list):
+            rounded[key] = [round(v) for v in value]
+        else:
+            rounded[key] = round(value)
+    return rounded
