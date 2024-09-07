@@ -54,8 +54,8 @@ def _profit_maximization(
     # Sets
     model.T = pyo.RangeSet(0, expected_periods - 1)
 
-    max_labor = budget/max(1e-6,wage) + current_labor
-    max_capital = budget/max(1e-6,capital_price) + current_capital
+    max_labor = 30
+    max_capital = current_capital
 
     guess_capital = (current_capital + max_capital)/2
     guess_labor = (current_labor + max_labor)/2

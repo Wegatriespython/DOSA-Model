@@ -66,8 +66,6 @@ def get_desired_wage(self, labor_supply, labor_demand):
   historical_labor_demand = self.optimals_cache[0]
   # If labor supply is greater than labor demand, reduce wage
   #
-  print (f"Supply: {labor_supply}, Demand: {labor_demand}")
-
   if labor_supply > labor_demand:
       wage = min_wage + (wage - min_wage) * 0.2
 
@@ -76,13 +74,12 @@ def get_desired_wage(self, labor_supply, labor_demand):
   else:
       wage = max(min_wage, wage * 0.95)
 
-  print(f"Desired wage: {wage}")
-  return wage
-def get_desired_price(self, supply, demand, price, min_price):
-    if supply > demand:
-        price = price - (price - min_price) * 0.2
-        return price
-    else:
-        price = price * 1.05
 
+  return wage
+def get_desired_price(self, supply, demand, price, min_price, real_price):
+    if (supply < demand * 5):
+       price = price * 1.05
+       return price
+    else:
+        price = price - (price - min_price) * 0.2
         return price

@@ -7,27 +7,19 @@ def get_market_demand(self, market_type):
   if self.model.step_count < 1:
     return 0
   if market_type == 'capital':
-    all_demand = self.model.capital_transactions_history[0][1]
-    all_prices = self.model.capital_transactions_history[0][2]
-    transactions = self.model.capital_transactions_history[0][0]
-    price = all_prices / transactions if transactions > 0 else 0
-    demand = all_demand / 2
+    demand = self.model.pre_capital_transactions[0]
+    price = (self.model.pre_capital_transactions[4]+self.model.pre_capital_transactions[5])/2
+    demand = demand / 2
     return demand, price
   elif market_type == 'consumption':
-    print(f"{self.model.consumption_transactions_history}")
-
-    all_demand = self.model.consumption_transactions_history[0][1]
-    all_prices = self.model.consumption_transactions_history[0][2]
-    transactions = self.model.consumption_transactions_history[0][0]
-    price = all_prices / transactions if transactions > 0 else 0
-    demand = all_demand / 5
+    demand = self.model.pre_consumption_transactions[0]
+    price = (self.model.pre_consumption_transactions[4] + self.model.pre_consumption_transactions[5]) / 2
+    demand = demand / 5
     return demand, price
   else :
-    all_demand = self.model.labor_transactions_history[0][1]
-    all_prices = self.model.labor_transactions_history[0][2]
-    transactions = self.model.labor_transactions_history[0][0]
-    price = all_prices / transactions if transactions > 0 else 0
-    demand = all_demand / 30
+    demand = self.model.pre_labor_transactions[0]
+    price = (self.model.pre_labor_transactions[2] + self.model.pre_labor_transactions[3]) / 2
+    demand = demand / 30
     return demand, price
 
 def get_supply(self, market_type):

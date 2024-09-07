@@ -2,6 +2,7 @@ from mesa import Agent
 import numpy as np
 from Utilities.Config import Config
 from Utilities.utility_function import maximize_utility
+from Utilities.expectations import get_market_demand
 
 class Worker(Agent):
     def __init__(self, unique_id, model):
@@ -15,6 +16,8 @@ class Worker(Agent):
         self.savings = self.model.config.INITIAL_SAVINGS
         self.optimals = []
         self.got_paid = False
+        self.working_hours = 0
+        self.leisure = 16
         self.expected_price = model.config.INITIAL_PRICE
         self.expected_wage = model.config.MINIMUM_WAGE
         self.skills = model.config.INITIAL_SKILLS
@@ -30,31 +33,37 @@ class Worker(Agent):
     def step(self):
 
         self.update_utilty()
+        self.update_expectations()
         self.update_skills()
     def update_utilty(self):
         self.consumption = 0
-        print(f"Calling maximize utility with savings: {self.savings}, wage: {self.wage}, average consumption good price: {self.model.data_collector.get_average_consumption_good_price(self.model)}")
 
+        if self.model.step_count > 0:
 
+          quantity, extra= get_market_demand(self, 'labor')
+          demand, prices = get_market_demand(self, 'consumption')
+          wage = self.wage
+          wage = np.full(self.model.config.TIME_HORIZON, wage)
+          prices = np.full(self.model.config.TIME_HORIZON, prices)
+          results = maximize_utility(self.savings, wage, prices)
+          self.desired_consumption, self.working_hours, self.leisure, self.desired_savings = [arr[0] for arr in results]
 
-        wage = [max(self.wage, self.model.config.MINIMUM_WAGE)]* self.model.config.TIME_HORIZON
-        prices = [self.model.data_collector.get_average_consumption_good_price(self.model)]* self.model.config.TIME_HORIZON
-        results = maximize_utility(self.savings, wage, prices)
-        self.desired_consumption, self.working_hours, self.leisure, self.desired_savings = [arr[0] for arr in results]
+          self.optimals = [self.desired_consumption, self.working_hours, self.desired_savings]
 
-        self.optimals = [self.desired_consumption, self.working_hours, self.desired_savings]
+          print(f"{self.optimals}")
 
-        print(f"Optimals: {self.optimals}")
+    def update_expectations(self):
 
+      if self.model.step_count > 0:
         wage_non_zero = list(filter(lambda x: x != 0, self.wage_history)) if any(self.wage_history) else []
         wage_avg = sum(wage_non_zero) / len(wage_non_zero) if wage_non_zero else 0
-
+        demand, prices = get_market_demand(self, 'consumption')
         if self.desired_consumption != 0:
 
-          self.expected_wage = self.optimals[0] * self.model.data_collector.get_average_consumption_good_price(self.model) / self.optimals[1] if self.optimals[1]  else  self.optimals[0] * self.model.data_collector.get_average_consumption_good_price(self.model)
-        else : self.expected_wage =   self.model.data_collector.get_average_consumption_good_price(self.model)
+          self.expected_wage = self.optimals[0] * prices / self.optimals[1] if self.optimals[1]  else  self.optimals[0] * prices
+        else : self.expected_wage =   prices
 
-        self.expected_price = (wage[0] * self.optimals[1])/self.optimals[0] if self.optimals[0] else wage[0]*self.optimals[1]
+        self.expected_price = prices
 
 
     def get_min_wage(self):

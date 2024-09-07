@@ -1,8 +1,6 @@
 from mesa import Agent
 import numpy as np
 from Utilities.Simpler_profit_maxxin import profit_maximization
-from sklearn.linear_model import LinearRegression
-from sklearn.preprocessing import StandardScaler
 from Utilities.expectations import expect_demand, expect_price, get_market_demand, get_expectations,get_supply
 from Utilities.Strategic_adjustments import get_max_wage, get_min_sale_price, get_max_capital_price,calculate_production_capacity, get_desired_wage, get_desired_capital_price, get_desired_price
 import logging
@@ -50,7 +48,8 @@ class Firm(Agent):
         self.expected_price = 0
         self.get_total_labor_units()
         self.pay_wages()
-        print(f"firm id {self.unique_id} budget {self.budget}")
+        self.update_average_price()
+
     def update_expectations(self):
 
         if self.model.step_count < 1:
@@ -58,9 +57,9 @@ class Firm(Agent):
             self.expected_price = np.full(self.model.config.TIME_HORIZON,1)
             self.expectations =[np.mean(self.expected_demand), np.mean(self.expected_price)]
             return
-        print(f"firm type {self.firm_type}")
+
         demand, price =  get_market_demand(self, self.firm_type)
-        print(f"demand {demand} price {price}")
+
         self.historic_demand.append(demand)
         self.historic_price.append(price)
         self.expected_demand, self.expected_price = get_expectations(self, self.historic_demand, self.historic_price, self.model.config.TIME_HORIZON)
@@ -81,7 +80,7 @@ class Firm(Agent):
         if self.budget < 0:
 
             return # Skip production if budget is negative
-        print("Calling profit_maximization with parameters:", {
+        """print("Calling profit_maximization with parameters:", {
             'current_capital': self.capital,
             'current_labor': self.total_labor_units,
             'current_price': self.price,
@@ -96,7 +95,7 @@ class Firm(Agent):
             'discount_rate': self.model.config.DISCOUNT_RATE,
             'budget': self.budget,
             'wage': self.wage * self.max_working_hours # Per unit wage
-        })
+        })"""
         self.per_worker_income = self.wage * self.max_working_hours
 
         result = profit_maximization(
@@ -193,7 +192,11 @@ class Firm(Agent):
         for worker in self.workers:
             self.workers[worker]['wage'] = self.desireds[0]
 
-
+    def update_average_price(self):
+      if len(self.prices) > 5:
+        self.prices = self.prices[-5:]
+      average_price = np.mean(self.prices)
+      self.price = average_price
 
 
     def pay_wages(self):
@@ -278,7 +281,7 @@ class Firm(Agent):
 
     def sell_goods(self, quantity, price):
         inventory_change = self.inventory - quantity
-        print(f"Inventory change: {inventory_change}, sales {quantity}")
+
         self.inventory -= quantity
         self.sales += quantity
         self.budget += quantity * price  # Price already adjusted in execute_capital_market
@@ -295,11 +298,13 @@ class Firm(Agent):
       consumption_supply = get_supply(self,"consumption")
       consumption_demand, consumption_price = get_market_demand(self,"consumption")
       desired_wage = get_desired_wage(self, labor_supply, labor_demand)
-      if self.get_market_type == 'consumption':
-        desired_price = get_desired_price(self, consumption_supply, consumption_demand,self.price, self.zero_profit_conditions[1])
+      print(f"Desired Wage: {desired_wage}, labor_supply: {labor_supply}, labor_demand: {labor_demand}")
+      if self.firm_type == 'consumption':
+        desired_price = get_desired_price(self, consumption_supply, consumption_demand,self.desireds[1], self.zero_profit_conditions[1], self.price)
+        print(f"Desired Price: {desired_price}, consumption_supply: {consumption_supply}, consumption_demand: {consumption_demand}")
         desired_capital_price = get_desired_capital_price(self)
       else:
-        desired_price = get_desired_price(self,capital_supply, capital_demand,self.price, self.zero_profit_conditions[1])
+        desired_price = get_desired_price(self,capital_supply, capital_demand, self.desireds[1], self.zero_profit_conditions[1], self.price)
         desired_capital_price = desired_price
 
       self.desireds = [desired_wage, desired_price, desired_capital_price]
@@ -316,13 +321,7 @@ class Firm(Agent):
 
     def update_after_markets(self):
         pass
-    def get_market_type(self):
-        if isinstance(self, Firm1):
-            return 'capital'
-        elif isinstance(self, Firm2):
-            return 'consumption'
-        else:
-            return 'labor'
+
 
 class Firm1(Firm):
     def __init__(self, unique_id, model):

@@ -57,9 +57,7 @@ class EconomyModel(Model):
         self.labor_transactions.clear()
         self.capital_transactions.clear()
         self.consumption_transactions.clear()
-        self.pre_labor_transactions.fill(0)
-        self.pre_capital_transactions.fill(0)
-        self.pre_consumption_transactions.fill(0)
+
 
         # Execute the step
         self.schedule.step()
@@ -105,7 +103,7 @@ class EconomyModel(Model):
         sellers = [(worker.available_hours(), worker.expected_wage, worker, worker.get_min_wage())
                    for worker in self.schedule.agents
                    if isinstance(worker, Worker) and worker.available_hours() > 0]
-        print("Labor Market Buyers", buyers, "Labor Market Sellers", sellers)
+
         transactions = market_matching(buyers, sellers)
         #print("Labor Market Transaction", transactions)
         buyer_demand = sum(b[0] for b in buyers) if buyers else 0
