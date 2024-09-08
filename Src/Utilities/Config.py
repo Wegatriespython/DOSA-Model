@@ -39,9 +39,9 @@ class Config:
         self.INITIAL_RELATIVE_PRICE_CAPITAL = 3.0  # Initial price of capital goods relative to consumption goods
         self.INITIAL_RELATIVE_PRICE_LABOR = 1.0  # Initial price of labor relative to consumption goods
         # Firm2 specific parameters
-        self.FIRM2_INITIAL_CAPITAL = 5
+        self.FIRM2_INITIAL_CAPITAL = 10
         self.FIRM2_INITIAL_INVENTORY = 2
-        self.FIRM2_INITIAL_DEMAND = 3
+        self.FIRM2_INITIAL_DEMAND = 6
         self.FIRM2_INITIAL_INVESTMENT_DEMAND = 1
         self.FIRM2_INITIAL_DESIRED_CAPITAL = 5
         self.FIRM2_MACHINE_OUTPUT_PER_PERIOD = 10

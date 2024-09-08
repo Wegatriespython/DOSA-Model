@@ -8,12 +8,12 @@ def get_market_demand(self, market_type):
     return 0
   if market_type == 'capital':
     demand = self.model.pre_capital_transactions[0]
-    price = (self.model.pre_capital_transactions[4]+self.model.pre_capital_transactions[5])/2
+    price = (self.model.pre_capital_transactions[2]+self.model.pre_capital_transactions[3])/2
     demand = demand / 2
     return demand, price
   elif market_type == 'consumption':
     demand = self.model.pre_consumption_transactions[0]
-    price = (self.model.pre_consumption_transactions[4] + self.model.pre_consumption_transactions[5]) / 2
+    price = (self.model.pre_consumption_transactions[2] + self.model.pre_consumption_transactions[3]) / 2
     demand = demand / 5
     return demand, price
   else :

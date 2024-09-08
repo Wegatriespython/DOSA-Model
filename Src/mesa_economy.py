@@ -184,6 +184,7 @@ class EconomyModel(Model):
         transactions = market_matching(buyers, sellers)
 
         self.consumption_transactions = transactions
+        #t[0] is buyer, t[1] is seller, t[2] is quantity, t[3] is price
         consumption_transactions_history = np.array([len(transactions), sum(t[2] for t in transactions), sum(t[3] for t in transactions)])
         self.consumption_transactions_history.append(consumption_transactions_history)
         for buyer, seller, quantity, price in transactions:

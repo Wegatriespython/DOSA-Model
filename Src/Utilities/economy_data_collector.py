@@ -91,57 +91,39 @@ class EconomyDataCollector:
     def get_total_money(model):
         return sum(firm.budget for firm in model.schedule.agents if isinstance(firm, (Firm1, Firm2))) + \
                 sum(worker.savings for worker in model.schedule.agents if isinstance(worker, Worker))
-
     @staticmethod
     def get_average_market_demand(model):
-        demands = [firm.expected_demand for firm in model.schedule.agents if isinstance(firm, (Firm1, Firm2))]
-        return sum(demands) / len(demands) if demands else 0
-    @staticmethod
-    def get_average_consumption_demand(model):
-        demands = [agent.desired_consumption for agent in model.schedule.agents if isinstance(agent, Worker)]
-        return sum(demands)/5  if demands else 0
-    @staticmethod
-    def get_average_consumption_demand_expected(model):
-        demands = [firm.expected_demand for firm in model.schedule.agents if isinstance(firm,  Firm2)]
-        return sum(demands) / len(demands) if demands else 0
-    @staticmethod
-    def average_sales(model):
-        sales = [firm.sales for firm in model.schedule.agents if isinstance(firm, (Firm2, Firm1))]
-        return sum(sales) / len(sales) if sales else 0
+        return (model.pre_labor_transactions[0] + model.pre_capital_transactions[0] + model.pre_consumption_transactions[0]) / 3
+
     @staticmethod
     def get_average_capital_price(model):
-        prices = [firm.price for firm in model.schedule.agents if isinstance(firm, Firm1)]
-        return sum(prices) / len(prices) if prices else 3
+        return model.pre_capital_transactions[2] if len(model.pre_capital_transactions) > 2 else 0
 
     @staticmethod
-    def get_average_wage(model):
-        if model.step_count == 0:
-            return model.config.MINIMUM_WAGE
-        employed_workers = [worker for worker in model.schedule.agents if isinstance(worker, Worker) and worker.total_working_hours > 0]
-        if employed_workers:
-            return sum(worker.wage for worker in employed_workers) / len(employed_workers)
-        return model.config.MINIMUM_WAGE
+    def get_average_consumption_demand(model):
+        return model.pre_consumption_transactions[0] if len(model.pre_consumption_transactions) > 0 else 0
+
+    @staticmethod
+    def get_average_consumption_demand_expected(model):
+        return model.pre_consumption_transactions[0] if len(model.pre_consumption_transactions) > 0 else 0
+
     @staticmethod
     def get_average_consumption_expected_price(model):
-        prices = [firm.expected_price for firm in model.schedule.agents if isinstance(firm, Firm2)]
-        if prices:
-            return sum(prices) / len(prices)
-        return 0
-    @staticmethod
-    def get_average_consumption_good_price(model):
-        prices = [firm.price for firm in model.schedule.agents if isinstance(firm, Firm2)]
-        if prices:
-            return sum(prices) / len(prices)
-        return 0
+        return model.pre_consumption_transactions[2] if len(model.pre_consumption_transactions) > 2 else 0
 
     @staticmethod
+    def get_average_consumption_good_price(model):
+        return np.mean([t[3] for t in model.consumption_transactions]) if model.consumption_transactions else 0
+    @staticmethod
+    def get_average_wage(model):
+      return np.mean([t[3] for t in model.labor_transactions]) if model.labor_transactions else 0
+    @staticmethod
     def get_total_demand(model):
-        capital_demand= sum(firm.investment_demand for firm in model.schedule.agents if isinstance(firm,  Firm2))
-        consumption_demand = sum(worker.desired_consumption for worker in model.schedule.agents if isinstance(worker, Worker))
-        return capital_demand + consumption_demand
+        return model.pre_labor_transactions[0] + model.pre_capital_transactions[0] + model.pre_consumption_transactions[0]
+
     @staticmethod
     def get_total_sales(model):
-        return sum(firm.sales for firm in model.schedule.agents if isinstance(firm, (Firm1, Firm2)))
+        return sum(t[2] for t in model.labor_transactions) + sum(t[2] for t in model.capital_transactions) + sum(t[2] for t in model.consumption_transactions)
     @staticmethod
     def get_total_production(model):
         return sum(firm.production for firm in model.schedule.agents if isinstance(firm, (Firm1, Firm2)))

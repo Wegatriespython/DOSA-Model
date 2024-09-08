@@ -55,29 +55,20 @@ def calculate_production_capacity(productivity, capital, capital_elasticity, tot
 def get_desired_capital_price(self):
     average_capital_price = self.model.data_collector.get_average_capital_price(self.model)
     return average_capital_price
-def get_desired_wage(self, labor_supply, labor_demand):
+
+def get_desired_wage(self, labor_supply, labor_demand, labor_actual):
   labor_wanted = self.optimals[0] * 16
   wage = self.wage
   max_wage = self.zero_profit_conditions[0]
   min_wage = self.model.config.MINIMUM_WAGE
-  payout_optimal = labor_wanted * wage
-  payout_max = labor_wanted * max_wage
-  # Pay less when there is excess labor in the market. Pay more when there is a labor shortage.
-  historical_labor_demand = self.optimals_cache[0]
-  # If labor supply is greater than labor demand, reduce wage
-  #
-  if labor_supply > labor_demand:
-      wage = min_wage + (wage - min_wage) * 0.2
-
-  if self.get_total_labor_units() < historical_labor_demand[0]:
+  if labor_wanted > labor_actual:
       wage = wage + (max_wage - wage)* 0.2
-  else:
+  else :
       wage = max(min_wage, wage * 0.95)
-
-
   return wage
+
 def get_desired_price(self, supply, demand, price, min_price, real_price):
-    if (supply < demand * 5):
+    if (price < real_price):
        price = price * 1.05
        return price
     else:

@@ -80,14 +80,14 @@ class Firm(Agent):
         if self.budget < 0:
 
             return # Skip production if budget is negative
-        """print("Calling profit_maximization with parameters:", {
+        print("Calling profit_maximization with parameters:", {
             'current_capital': self.capital,
             'current_labor': self.total_labor_units,
             'current_price': self.price,
             'current_productivity': self.productivity,
             'expected_demand': self.expected_demand,
             'expected_price': self.expected_price,
-            'capital_price': self.model.data_collector.get_average_capital_price(self.model),  # Updated
+            'capital_price': 3,  # Updated
             'capital_elasticity': self.capital_elasticity,
             'current_inventory': self.inventory,
             'depreciation_rate': self.model.config.DEPRECIATION_RATE,
@@ -95,7 +95,7 @@ class Firm(Agent):
             'discount_rate': self.model.config.DISCOUNT_RATE,
             'budget': self.budget,
             'wage': self.wage * self.max_working_hours # Per unit wage
-        })"""
+        })
         self.per_worker_income = self.wage * self.max_working_hours
 
         result = profit_maximization(
@@ -105,7 +105,7 @@ class Firm(Agent):
             self.productivity,
             self.expected_demand,
             self.expected_price,
-            self.model.data_collector.get_average_capital_price(self.model),  # Updated
+            3,  # Updated
             self.capital_elasticity,
             self.inventory,
             self.model.config.DEPRECIATION_RATE,
@@ -159,7 +159,8 @@ class Firm(Agent):
             optimal_capital = self.optimals[1]
             self.investment_demand = max(0, optimal_capital - self.capital)
             if optimal_capital < self.capital:
-                self.capital_inventory = self.capital - optimal_capital
+                self.capital_inventory = 0
+
                 self.capital_resale_price = self.model.data_collector.get_average_capital_price(self.model)
                 self.captial_min_price = 0.1
             return self.investment_demand
@@ -195,8 +196,9 @@ class Firm(Agent):
     def update_average_price(self):
       if len(self.prices) > 5:
         self.prices = self.prices[-5:]
-      average_price = np.mean(self.prices)
-      self.price = average_price
+        average_price = np.mean(self.prices)
+        self.price = average_price
+
 
 
     def pay_wages(self):
@@ -216,7 +218,9 @@ class Firm(Agent):
             budget_change = wage * hours
 
             if self.budget >= budget_change:
+
                 self.budget -= budget_change
+
                 worker.get_paid(budget_change)
             else:
                 worker.got_paid = False
@@ -284,6 +288,7 @@ class Firm(Agent):
 
         self.inventory -= quantity
         self.sales += quantity
+        budget_change = quantity * price
         self.budget += quantity * price  # Price already adjusted in execute_capital_market
         self.prices.append(price)
     def nash_improvements(self):
@@ -297,7 +302,8 @@ class Firm(Agent):
       capital_demand, capital_price = get_market_demand(self,"capital")
       consumption_supply = get_supply(self,"consumption")
       consumption_demand, consumption_price = get_market_demand(self,"consumption")
-      desired_wage = get_desired_wage(self, labor_supply, labor_demand)
+      actual_labor = self.get_total_labor_units()
+      desired_wage = get_desired_wage(self, labor_supply, labor_demand, actual_labor)
       print(f"Desired Wage: {desired_wage}, labor_supply: {labor_supply}, labor_demand: {labor_demand}")
       if self.firm_type == 'consumption':
         desired_price = get_desired_price(self, consumption_supply, consumption_demand,self.desireds[1], self.zero_profit_conditions[1], self.price)
@@ -363,7 +369,7 @@ class Firm2(Firm):
         self.productivity = model.config.INITIAL_PRODUCTIVITY
         self.inventory = model.config.FIRM2_INITIAL_INVENTORY
         self.historic_demand = [model.config.FIRM2_INITIAL_DEMAND]
-        self.budget = self.capital
+        self.budget = 5
         self.historic_sales = [model.config.INITIAL_SALES]
         self.price = self.model.config.INITIAL_PRICE
         self.historic_inventory = [self.inventory]

@@ -54,7 +54,7 @@ def _profit_maximization(
     # Sets
     model.T = pyo.RangeSet(0, expected_periods - 1)
 
-    max_labor = 30
+    max_labor = 6
     max_capital = current_capital
 
     guess_capital = (current_capital + max_capital)/2
@@ -67,8 +67,8 @@ def _profit_maximization(
     scale_demand = max(1, max(expected_demand))
 
     # Variables with scaling and lower bounds
-    model.labor = pyo.Var(domain=pyo.NonNegativeReals, initialize=max(1e-6, guess_labor), bounds=(1e-6, None))
-    model.capital = pyo.Var(domain=pyo.NonNegativeReals, initialize=max(1e-6, guess_capital), bounds=(1e-6, None))
+    model.labor = pyo.Var(domain=pyo.NonNegativeReals, initialize=max(1e-6, guess_labor), bounds=(1e-6, max_labor))
+    model.capital = pyo.Var(domain=pyo.NonNegativeReals, initialize=max(1e-6, guess_capital), bounds=(1e-6, max_capital))
     model.production = pyo.Var(domain=pyo.NonNegativeReals, initialize=1e-6)
     model.inventory = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=max(1e-6, current_inventory))
     model.sales = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=1e-6)

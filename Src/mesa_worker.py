@@ -10,8 +10,9 @@ class Worker(Agent):
         self.employers = {}  # Dictionary to store employers and corresponding working hours
         self.total_working_hours = 0
         self.max_working_hours = 16
+        self.consumption_check = 0
         self.dissatistifaction = 0
-        self.wage = 0.0625
+        self.wage = model.config.MINIMUM_WAGE
         self.income = 0
         self.savings = self.model.config.INITIAL_SAVINGS
         self.optimals = []
@@ -36,14 +37,14 @@ class Worker(Agent):
         self.update_expectations()
         self.update_skills()
     def update_utilty(self):
-        self.consumption = 0
+
 
         if self.model.step_count > 0:
 
-          quantity, extra= get_market_demand(self, 'labor')
+          quantity, expected_wage= get_market_demand(self, 'labor')
           demand, prices = get_market_demand(self, 'consumption')
-          wage = self.wage
-          wage = np.full(self.model.config.TIME_HORIZON, wage)
+          self.expected_wage = expected_wage
+          wage = np.full(self.model.config.TIME_HORIZON, expected_wage)
           prices = np.full(self.model.config.TIME_HORIZON, prices)
           results = maximize_utility(self.savings, wage, prices)
           self.desired_consumption, self.working_hours, self.leisure, self.desired_savings = [arr[0] for arr in results]
@@ -58,13 +59,21 @@ class Worker(Agent):
         wage_non_zero = list(filter(lambda x: x != 0, self.wage_history)) if any(self.wage_history) else []
         wage_avg = sum(wage_non_zero) / len(wage_non_zero) if wage_non_zero else 0
         demand, prices = get_market_demand(self, 'consumption')
-        if self.desired_consumption != 0:
+        print(f"consumption {self.consumption}, desired consumption {self.desired_consumption},check {self.consumption_check}")
 
-          self.expected_wage = self.optimals[0] * prices / self.optimals[1] if self.optimals[1]  else  self.optimals[0] * prices
-        else : self.expected_wage =   prices
-
-        self.expected_price = prices
-
+        if self.consumption < self.desired_consumption:
+            self.expected_price *= 1.05
+            self.expected_price = min(self.expected_price, self.get_max_consumption_price())
+            print("expected_price", self.expected_price)
+        else:
+            self.expected_price *= 1
+        if self.total_working_hours < self.optimals[1]:
+            self.expected_wage *= .95
+            self.expected_wage = max(self.expected_wage, self.model.config.MINIMUM_WAGE)
+        else:
+            self.expected_wage *= 1.05
+        self.consumption = 0
+        self.consumption_check = 0
 
     def get_min_wage(self):
         check_wage = max(self.model.config.MINIMUM_WAGE, self.wage)
@@ -109,8 +118,9 @@ class Worker(Agent):
     def consume(self, quantity, price):
         total_cost = quantity * price
         self.price_history.append(price)
-        self.consumption = quantity
-        self.dissatistifaction = min(0, self.desired_consumption - self.consumption)
+        self.consumption += quantity
+        self.consumption_check += quantity
+        print(f"consumption {self.consumption}, check {self.consumption_check}")
         self.savings -= total_cost
         self.savings = max(0, self.savings) #prevent negative savings
 
