@@ -35,6 +35,7 @@ class Firm(Agent):
 
     def update_firm_state(self):
        #self.train_demand_predictor()
+
         depreciation_amount = max(0, self.inventory * self.model.config.DEPRECIATION_RATE)
         self.inventory = max(0, self.inventory - depreciation_amount)
         if self.firm_type == 'consumption':
@@ -62,7 +63,7 @@ class Firm(Agent):
 
         self.historic_demand.append(demand)
         self.historic_price.append(price)
-        self.expected_demand, self.expected_price = get_expectations(self, self.historic_demand, self.historic_price, self.model.config.TIME_HORIZON)
+        self.expected_demand, self.expected_price = get_expectations(demand, self.historic_demand,  price,self.historic_price,self.model.config.TIME_HORIZON)
         self.expectations = [np.mean(self.expected_demand), np.mean(self.expected_price)]
         self.expectations_cache.append(self.expectations)
         return
@@ -296,21 +297,15 @@ class Firm(Agent):
       if self.model.step_count < 2:
         self.desireds = [self.wage, self.price, self.model.config.INITIAL_RELATIVE_PRICE_CAPITAL]
         return
-      labor_supply = get_supply(self,"labor")
-      labor_demand, labor_price = get_market_demand(self,"labor")
-      capital_supply = get_supply(self,"capital")
-      capital_demand, capital_price = get_market_demand(self,"capital")
-      consumption_supply = get_supply(self,"consumption")
-      consumption_demand, consumption_price = get_market_demand(self,"consumption")
-      actual_labor = self.get_total_labor_units()
-      desired_wage = get_desired_wage(self, labor_supply, labor_demand, actual_labor)
-      print(f"Desired Wage: {desired_wage}, labor_supply: {labor_supply}, labor_demand: {labor_demand}")
+
+      desired_wage = get_desired_wage(self.desireds[0], self.zero_profit_conditions[0], self.wage, self.model.config.MINIMUM_WAGE)
+
       if self.firm_type == 'consumption':
-        desired_price = get_desired_price(self, consumption_supply, consumption_demand,self.desireds[1], self.zero_profit_conditions[1], self.price)
-        print(f"Desired Price: {desired_price}, consumption_supply: {consumption_supply}, consumption_demand: {consumption_demand}")
+        desired_price = get_desired_price(self.desireds[1], self.zero_profit_conditions[1], self.price)
+
         desired_capital_price = get_desired_capital_price(self)
       else:
-        desired_price = get_desired_price(self,capital_supply, capital_demand, self.desireds[1], self.zero_profit_conditions[1], self.price)
+        desired_price = get_desired_price(self.desireds[1], self.zero_profit_conditions[1], self.price)
         desired_capital_price = desired_price
 
       self.desireds = [desired_wage, desired_price, desired_capital_price]

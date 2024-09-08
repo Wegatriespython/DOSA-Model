@@ -9,7 +9,7 @@ class EconomyDataCollector:
         self.data_collection = {}
         self.datacollector = DataCollector(
             model_reporters={
-                "Total Labor": self.get_total_labor,
+                "Total Labor Supply": self.get_total_labor_supply,
                 "Total Capital": self.get_total_capital,
                 "Total Goods": self.get_total_goods,
                 "Total Money": self.get_total_money,
@@ -29,10 +29,14 @@ class EconomyDataCollector:
                 "labor_raw_supply": lambda m: m.pre_labor_transactions[1] if len(m.pre_labor_transactions) > 1 else 0,
                 "labor_raw_buyer_price": lambda m: m.pre_labor_transactions[2] if len(m.pre_labor_transactions) > 2 else 0,
                 "labor_raw_seller_price": lambda m: m.pre_labor_transactions[3] if len(m.pre_labor_transactions) > 3 else 0,
+                "labor_raw_buyer_max": lambda m: m.pre_labor_transactions[4] if len(m.pre_labor_transactions) > 4 else 0,
+                "labor_raw_seller_min": lambda m: m.pre_labor_transactions[5] if len(m.pre_labor_transactions) > 5 else 0,
                 "capital_raw_demand": lambda m: m.pre_capital_transactions[0] if len(m.pre_capital_transactions) > 0 else 0,
                 "capital_raw_supply": lambda m: m.pre_capital_transactions[1] if len(m.pre_capital_transactions) > 1 else 0,
                 "capital_raw_buyer_price": lambda m: m.pre_capital_transactions[2] if len(m.pre_capital_transactions) > 2 else 0,
                 "capital_raw_seller_price": lambda m: m.pre_capital_transactions[3] if len(m.pre_capital_transactions) > 3 else 0,
+                "capital_raw_buyer_max": lambda m: m.pre_capital_transactions[4] if len(m.pre_capital_transactions) > 4 else 0,
+                "capital_raw_seller_min": lambda m: m.pre_capital_transactions[5] if len(m.pre_capital_transactions) > 5 else 0,
                 "consumption_raw_demand": lambda m: m.pre_consumption_transactions[0] if len(m.pre_consumption_transactions) > 0 else 0,
                 "consumption_raw_supply": lambda m: m.pre_consumption_transactions[1] if len(m.pre_consumption_transactions) > 1 else 0,
                 "consumption_raw_buyer_price": lambda m: m.pre_consumption_transactions[2] if len(m.pre_consumption_transactions) > 2 else 0,
@@ -52,7 +56,8 @@ class EconomyDataCollector:
                 "Type": lambda a: type(a).__name__,
                 "Capital": lambda a: getattr(a, 'capital', None),
                 "Labor": lambda a: len(getattr(a, 'workers', [])),
-                "Working_Hours": lambda a: getattr(a, 'total_working_hours', None),
+                "Total_Working_Hours": lambda a: getattr(a, 'total_working_hours', None),
+                "Working_Hours": lambda a: getattr(a, 'working_hours', None),
                 "Labor_Demand": lambda a: getattr(a, 'total_working_hours', None),
                 "Production": lambda a: getattr(a, 'production', None),
                 "Optimals": lambda a: getattr(a, 'optimals', None),
@@ -74,8 +79,8 @@ class EconomyDataCollector:
             }
         )
     @staticmethod
-    def get_total_labor(model):
-        return sum(worker.total_working_hours for worker in model.schedule.agents if isinstance(worker, Worker))
+    def get_total_labor_supply(model):
+        return sum(worker.available_hours() for worker in model.schedule.agents if isinstance(worker, Worker))
     @staticmethod
     def get_total_labor_demand(model):
         return sum(firm.labor_demand for firm in model.schedule.agents if isinstance(firm, (Firm1,Firm2)))
@@ -173,5 +178,5 @@ class EconomyDataCollector:
     @staticmethod
     def calculate_global_productivity(model):
         total_output = sum(firm.production for firm in model.schedule.agents if isinstance(firm, (Firm1, Firm2)))
-        total_labor_hours = EconomyDataCollector.get_total_labor(model)
+        total_labor_hours = EconomyDataCollector.get_total_labor_supply(model)
         return total_output / total_labor_hours if total_labor_hours > 0 else 0

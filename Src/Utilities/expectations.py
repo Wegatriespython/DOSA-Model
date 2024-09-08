@@ -36,10 +36,32 @@ def get_supply(self, market_type):
 
 
 
-def get_expectations(self ,demand, price, periods):
-   expected_demand = expect_demand(demand, periods)
-   expected_price = expect_price(price, periods)
+def get_expectations(demand, historic_demand, price, historic_price, periods):
+   expected_demand = expect_demand_ar(historic_demand,demand, periods)
+   expected_price = expect_price_ar(historic_price,price, periods)
    return expected_demand, expected_price
+
+def expect_demand_ar(historic_demand, current_demand, periods=6, alpha=0.3):
+    """
+    Autoregressive demand expectation model centered on historic mean.
+
+    :param historic_demand: List of historical demand
+    :param current_demand: Current demand
+    :param periods: Number of future periods to forecast
+    :param alpha: Smoothing factor for the autoregressive component (0 < alpha < 1)
+    :return: Array of expected demand
+    """
+    if len(historic_demand) < 5 :
+        return np.full(periods, current_demand)
+    else:
+        historic_mean = np.mean(historic_demand)
+        expected = np.full(periods, historic_mean)
+        for i in range(1, min(len(historic_demand), periods) + 1):
+            expected[-i] = alpha * historic_demand[-i] + (1 - alpha) * expected[-i]
+        return expected
+
+
+
 
 
 def expect_demand(demand, periods=6):

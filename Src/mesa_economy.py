@@ -110,8 +110,9 @@ class EconomyModel(Model):
         seller_inventory = sum(s[0] for s in sellers) if sellers else 0
         avg_buyer_price = sum(b[1] for b in buyers) / len(buyers) if buyers else 0
         avg_seller_price = sum(s[1] for s in sellers) / len(sellers) if sellers else 0
-
-        self.pre_labor_transactions = np.array([buyer_demand, seller_inventory, avg_buyer_price, avg_seller_price])
+        avg_buyer_max = sum(b[3] for b in buyers)/ len(buyers) if buyers else 0
+        avg_seller_min = sum(s[3] for s in sellers)/ len(sellers) if sellers else 0
+        self.pre_labor_transactions = np.array([buyer_demand, seller_inventory, avg_buyer_price, avg_seller_price,avg_buyer_max, avg_seller_min])
         self.labor_transactions = transactions
         labor_transactions_history = np.array([len(transactions), sum(t[2] for t in transactions), sum(t[3] for t in transactions)])
         self.labor_transactions_history.append(labor_transactions_history)

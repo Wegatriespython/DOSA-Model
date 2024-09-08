@@ -2,7 +2,7 @@ from mesa import Agent
 import numpy as np
 from Utilities.Config import Config
 from Utilities.utility_function import maximize_utility
-from Utilities.expectations import get_market_demand
+from Utilities.expectations import expect_price_ar, get_expectations, get_market_demand
 
 class Worker(Agent):
     def __init__(self, unique_id, model):
@@ -28,7 +28,7 @@ class Worker(Agent):
         self.price = model.config.INITIAL_PRICE
         self.price_history = [model.config.INITIAL_PRICE]
         self.MIN_CONSUMPTION = 1
-        self.wage_history = [model.config.MINIMUM_WAGE] * 5
+        self.wage_history = [model.config.MINIMUM_WAGE]
         self.mode = 'decentralized'
 
     def step(self):
@@ -42,11 +42,11 @@ class Worker(Agent):
         if self.model.step_count > 0:
 
           quantity, expected_wage= get_market_demand(self, 'labor')
-          demand, prices = get_market_demand(self, 'consumption')
+          demand, price = get_market_demand(self, 'consumption')
           self.expected_wage = expected_wage
-          wage = np.full(self.model.config.TIME_HORIZON, expected_wage)
-          prices = np.full(self.model.config.TIME_HORIZON, prices)
-          results = maximize_utility(self.savings, wage, prices)
+          wage = expect_price_ar(self.wage_history,expected_wage, self.model.config.TIME_HORIZON)
+          prices = expect_price_ar(self.price_history, price ,self.model.config.TIME_HORIZON)
+          results = maximize_utility(self.savings, wage, prices,0.95, self.model.config.TIME_HORIZON, alpha=0.9, max_working_hours=16)
           self.desired_consumption, self.working_hours, self.leisure, self.desired_savings = [arr[0] for arr in results]
 
           self.optimals = [self.desired_consumption, self.working_hours, self.desired_savings]
@@ -62,11 +62,13 @@ class Worker(Agent):
         print(f"consumption {self.consumption}, desired consumption {self.desired_consumption},check {self.consumption_check}")
 
         if self.consumption < self.desired_consumption:
-            self.expected_price *= 1.05
-            self.expected_price = min(self.expected_price, self.get_max_consumption_price())
-            print("expected_price", self.expected_price)
+            self.expected_price = self.expected_price + (self.get_max_consumption_price()- self.expected_price)*.2
+
+        elif self.price > self.expected_price:
+            self.expected_price = self.expected_price + (self.get_max_consumption_price()- self.expected_price)*.2
         else:
-            self.expected_price *= 1
+            self.expected_price *= .95
+
         if self.total_working_hours < self.optimals[1]:
             self.expected_wage *= .95
             self.expected_wage = max(self.expected_wage, self.model.config.MINIMUM_WAGE)
@@ -74,10 +76,10 @@ class Worker(Agent):
             self.expected_wage *= 1.05
         self.consumption = 0
         self.consumption_check = 0
+        self.price = 0
 
     def get_min_wage(self):
-        check_wage = max(self.model.config.MINIMUM_WAGE, self.wage)
-        min_wage = min(check_wage, self.expected_wage)
+        min_wage = self.model.config.MINIMUM_WAGE
         return min_wage
 
     def update_skills(self):
@@ -120,6 +122,7 @@ class Worker(Agent):
         self.price_history.append(price)
         self.consumption += quantity
         self.consumption_check += quantity
+        self.price = price
         print(f"consumption {self.consumption}, check {self.consumption_check}")
         self.savings -= total_cost
         self.savings = max(0, self.savings) #prevent negative savings

@@ -5,13 +5,15 @@ def get_max_wage(total_working_hours, productivity, capital, capital_elasticity,
         max_wage = revenue_per_hour
     else:
         labor_demand = optimals[0]
-        new_units = labor_demand / 16
-        production_capacity = calculate_production_capacity(productivity, capital, capital_elasticity, total_labor_units)
+        new_units = labor_demand
+
         new_production_capacity = calculate_production_capacity(productivity, capital, capital_elasticity, new_units)
-        extra_revenue = (new_production_capacity - production_capacity) * price
+
+        extra_revenue = (new_production_capacity ) * price
+
         extra_revenue_per_hour = extra_revenue / 16
         max_wage = extra_revenue_per_hour
-
+        print('max_wage', max_wage)
     return max(max_wage, minimum_wage)
 
 def get_min_sale_price(firm_type, workers, productivity, capital, capital_elasticity, total_labor_units, inventory):
@@ -56,21 +58,19 @@ def get_desired_capital_price(self):
     average_capital_price = self.model.data_collector.get_average_capital_price(self.model)
     return average_capital_price
 
-def get_desired_wage(self, labor_supply, labor_demand, labor_actual):
-  labor_wanted = self.optimals[0] * 16
-  wage = self.wage
-  max_wage = self.zero_profit_conditions[0]
-  min_wage = self.model.config.MINIMUM_WAGE
-  if labor_wanted > labor_actual:
-      wage = wage + (max_wage - wage)* 0.2
+def get_desired_wage(desired_wage, max_wage, real_wage, min_wage):
+
+  if desired_wage < real_wage:
+      wage = real_wage + (max_wage - real_wage)* 0.2
+      print(f"increasing wage to {wage}")
   else :
-      wage = max(min_wage, wage * 0.95)
+      wage = real_wage - (real_wage - min_wage) * 0.2
   return wage
 
-def get_desired_price(self, supply, demand, price, min_price, real_price):
-    if (price < real_price):
-       price = price * 1.05
+def get_desired_price(desired_price, min_price, real_price):
+    if (desired_price < real_price):
+       price = desired_price * 1.05
        return price
     else:
-        price = price - (price - min_price) * 0.2
+        price = desired_price - (desired_price - min_price) * 0.2
         return price

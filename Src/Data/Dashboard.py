@@ -261,8 +261,8 @@ def update_transaction_graph(selected_market):
     pre_transaction_fig.add_trace(go.Scatter(x=model_data['Step'], y=model_data[f'{selected_market}_raw_supply'], mode='lines', name='Supply'))
     pre_transaction_fig.add_trace(go.Scatter(x=model_data['Step'], y=model_data[f'{selected_market}_raw_buyer_price'], mode='lines', name='Buyer Price', yaxis='y2'))
     pre_transaction_fig.add_trace(go.Scatter(x=model_data['Step'], y=model_data[f'{selected_market}_raw_seller_price'], mode='lines', name='Seller Price', yaxis='y2'))
-    pre_transaction_fig.add_trace(go.Scatter(x=model_data['Step'], y = model_data[f'consumption_raw_buyer_max'], mode ='lines', name ='Buyer_Max', yaxis ='y2'))
-    pre_transaction_fig.add_trace(go.Scatter(x=model_data['Step'], y = model_data[f'consumption_raw_seller_min'], mode = 'lines', name ='Seller_Min', yaxis ='y2'))
+    pre_transaction_fig.add_trace(go.Scatter(x=model_data['Step'], y = model_data[f'{selected_market}_raw_buyer_max'], mode ='lines', name ='Buyer_Max', yaxis ='y2'))
+    pre_transaction_fig.add_trace(go.Scatter(x=model_data['Step'], y = model_data[f'{selected_market}_raw_seller_min'], mode = 'lines', name ='Seller_Min', yaxis ='y2'))
 
 
     pre_transaction_fig.update_layout(
