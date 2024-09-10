@@ -6,7 +6,7 @@ class Config:
         #
 
         self.MAX_WORKING_HOURS = 16
-        self.TIME_HORIZON = 6
+        self.TIME_HORIZON = 100
         self.INITIAL_SALES = 1
         self.INITIAL_PRODUCTIVITY = 1
         self.INITIAL_PRICE = 1
@@ -38,7 +38,7 @@ class Config:
         self.INITIAL_RELATIVE_PRICE_CAPITAL = 3.0  # Initial price of capital goods relative to consumption goods
         self.INITIAL_RELATIVE_PRICE_LABOR = 1.0  # Initial price of labor relative to consumption goods
         # Firm2 specific parameters
-        self.FIRM2_INITIAL_CAPITAL = 10
+        self.FIRM2_INITIAL_CAPITAL = 6
         self.FIRM2_INITIAL_INVENTORY = 2
         self.FIRM2_INITIAL_DEMAND = 6
         self.FIRM2_INITIAL_INVESTMENT_DEMAND = 1

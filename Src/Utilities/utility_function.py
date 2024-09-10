@@ -6,14 +6,14 @@ from functools import lru_cache
 # Global variable to store the last solution for warm start
 last_solution = None
 
-@lru_cache(maxsize=512)
-def memoized_maximize_utility(savings, wages, prices, discount_factor, periods, alpha, max_working_hours):
-    return _maximize_utility(savings, wages, prices, discount_factor, periods, alpha, max_working_hours)
+@lru_cache(maxsize=1024)
+def memoized_maximize_utility(savings, wages, prices, discount_factor, periods, alpha, max_working_hours, linear_solver):
+    return _maximize_utility(savings, wages, prices, discount_factor, periods, alpha, max_working_hours, linear_solver)
 
-def maximize_utility(savings, wages, prices, discount_factor=0.95, periods=20, alpha=0.9, max_working_hours=16, linear_solver='ma27'):
+def maximize_utility(savings, wages, prices, discount_factor=0.95, periods=20, alpha=0.9, max_working_hours=16, linear_solver='mumps'):
     global last_solution
 
-    result = memoized_maximize_utility(savings, tuple(wages), tuple(prices), discount_factor, periods, alpha, max_working_hours)
+    result = memoized_maximize_utility(savings, tuple(wages), tuple(prices), discount_factor, periods, alpha, max_working_hours, linear_solver)
 
     if result is not None:
         last_solution = result  # Update last_solution for warm start
@@ -22,7 +22,7 @@ def maximize_utility(savings, wages, prices, discount_factor=0.95, periods=20, a
 
     return result
 
-def _maximize_utility(savings, wages, prices, discount_factor, periods, alpha, max_working_hours, linear_solver='ma27'):
+def _maximize_utility(savings, wages, prices, discount_factor, periods, alpha, max_working_hours, linear_solver):
     global last_solution
 
     model = pyo.ConcreteModel()

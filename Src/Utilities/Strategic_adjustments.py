@@ -58,19 +58,21 @@ def get_desired_capital_price(self):
     average_capital_price = self.model.data_collector.get_average_capital_price(self.model)
     return average_capital_price
 
-def get_desired_wage(desired_wage, max_wage, real_wage, min_wage):
+def get_desired_wage(desired_wage,desired_labor, actual_labor, max_wage, real_wage, min_wage):
 
-  if desired_wage < real_wage:
+  if  actual_labor < desired_labor :
       wage = real_wage + (max_wage - real_wage)* 0.2
       print(f"increasing wage to {wage}")
   else :
       wage = real_wage - (real_wage - min_wage) * 0.2
   return wage
 
-def get_desired_price(desired_price, min_price, real_price):
-    if (desired_price < real_price):
-       price = desired_price * 1.05
-       return price
-    else:
+def get_desired_price(desired_price, desired_sales, actual_sales, min_price, real_price):
+      if desired_price < real_price:
+        price = desired_price * 1.1
+        return price
+
+      else:
+        print(f"Cutting prices{desired_price} real{real_price}")
         price = desired_price - (desired_price - min_price) * 0.2
         return price

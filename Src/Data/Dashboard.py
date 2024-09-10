@@ -156,7 +156,7 @@ def update_market_graph(selected_market, selected_variables):
         inventory = agent_data[agent_data['Type'] == 'Firm2'].groupby('Step')['Inventory'].sum()
         price = model_data['Average Consumption Good Price']
         sales = agent_data[agent_data['Type'] == 'Firm2'].groupby('Step')['Sales'].sum()
-        wage = agent_data[agent_data['Type'] == 'Firm2'].groupby('Step')['Per_Worker_Income'].mean()
+        wage = agent_data[agent_data['Type'] == 'Firm2'].groupby('Step')['Wages_Firm'].mean()
 
     common_index = model_data['Step']
     figure = go.Figure()
@@ -238,15 +238,25 @@ def update_worker_graph(_):
     avg_savings = worker_data.groupby('Step')['Savings'].mean()
     avg_working_hours = worker_data.groupby('Step')['Working_Hours'].mean()
 
+
     figure = go.Figure()
     figure.add_trace(go.Scatter(x=avg_savings.index, y=avg_savings.values, mode='lines', name='Average Savings'))
     figure.add_trace(go.Scatter(x=avg_working_hours.index, y=avg_working_hours.values, mode='lines', name='Average Working Hours', yaxis='y2'))
+    expectations_data = worker_data[worker_data['worker_expectations'].notna()]
+    for i, label in enumerate(['Expected Wage', 'Expected Price']):
+        y = expectations_data['worker_expectations'].apply(lambda exp: exp[i] if isinstance(exp, list) and len(exp) > i else None)
+        figure.add_trace(go.Scatter(x=expectations_data['Step'], y=y, mode='lines', name=f'Worker {label}', yaxis='y3'))
 
-    figure.update_layout(title='Worker Metrics',
-                         xaxis_title='Time Step',
-                         yaxis_title='Savings',
-                         yaxis2=dict(title='Working Hours', overlaying='y', side='right'))
+    figure.update_layout(
+        title='Worker Metrics and Expectations',
+        xaxis_title='Time Step',
+        yaxis=dict(title='Savings', side='left'),
+        yaxis2=dict(title='Working Hours', overlaying='y', side='right'),
+        yaxis3=dict(title='Expectations', overlaying='y', side='right', position=0.95),
+        legend=dict(x=1.05, y=1, traceorder='normal')
+    )
     return figure
+
 @app.callback(
     [Output('pre-transaction-graph', 'figure'),
         Output('transaction-graph', 'figure')],

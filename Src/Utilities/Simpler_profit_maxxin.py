@@ -11,18 +11,18 @@ def memoized_profit_maximization(
     current_capital, current_labor, current_price, current_productivity,
     expected_demand, expected_price, capital_price, capital_elasticity,
     current_inventory, depreciation_rate, expected_periods, discount_rate,
-    budget, wage):
+    budget, wage, linear_solver):
     return _profit_maximization(
         current_capital, current_labor, current_price, current_productivity,
         expected_demand, expected_price, capital_price, capital_elasticity,
         current_inventory, depreciation_rate, expected_periods, discount_rate,
-        budget, wage)
+        budget, wage, linear_solver)
 
 def profit_maximization(
     current_capital, current_labor, current_price, current_productivity,
     expected_demand, expected_price, capital_price, capital_elasticity,
     current_inventory, depreciation_rate, expected_periods, discount_rate,
-    budget, wage, linear_solver='ma27'):
+    budget, wage, linear_solver='mumps'):
 
     global last_solution
 
@@ -34,7 +34,7 @@ def profit_maximization(
         current_capital, current_labor, current_price, current_productivity,
         expected_demand_tuple, expected_price_tuple, capital_price, capital_elasticity,
         current_inventory, depreciation_rate, expected_periods, discount_rate,
-        budget, wage)
+        budget, wage,linear_solver)
 
     if result is not None:
         last_solution = (result['optimal_labor'], result['optimal_capital'])
@@ -47,7 +47,7 @@ def _profit_maximization(
         current_capital, current_labor, current_price, current_productivity,
         expected_demand, expected_price, capital_price, capital_elasticity,
         current_inventory, depreciation_rate, expected_periods, discount_rate,
-        budget, wage, linear_solver='ma27'):
+        budget, wage, linear_solver):
 
     model = pyo.ConcreteModel()
 

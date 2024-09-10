@@ -69,7 +69,6 @@ class EconomyModel(Model):
                 agent.update_expectations()
                 agent.make_production_decision()
                 agent.get_zero_profit_conditions()
-                agent.nash_improvements()
                 agent.adjust_labor()
                 if isinstance(agent, Firm2):
                     agent.adjust_investment_demand()
@@ -164,10 +163,11 @@ class EconomyModel(Model):
         buyers = [(worker.desired_consumption, worker.expected_price, worker, worker.get_max_consumption_price())
                   for worker in self.schedule.agents
                   if isinstance(worker, Worker) and worker.savings > 0]
-        #print("Buyers", buyers)
+
         sellers = [(firm.inventory, firm.desireds[1], firm, firm.zero_profit_conditions[1])
                    for firm in self.schedule.agents
                    if isinstance(firm, Firm2) and firm.inventory > 0]
+
         if sellers:
             min_price = max(sellers, key=lambda x: x[1])[1]
             max_inventory = max(sellers, key=lambda x: x[0])[0]

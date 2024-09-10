@@ -62,6 +62,7 @@ class EconomyDataCollector:
                 "Production": lambda a: getattr(a, 'production', None),
                 "Optimals": lambda a: getattr(a, 'optimals', None),
                 "Expectations": lambda a: getattr(a, 'expectations', None),
+                "worker_expectations": lambda a: getattr(a, 'worker_expectations', None),
                 "Investment": lambda a: getattr(a, 'investment_demand', None),
                 "Sales": lambda a: getattr(a, 'sales', None),
                 "Wages_Firm": lambda a: getattr(a, 'wage', None),

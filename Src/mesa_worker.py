@@ -10,6 +10,7 @@ class Worker(Agent):
         self.employers = {}  # Dictionary to store employers and corresponding working hours
         self.total_working_hours = 0
         self.max_working_hours = 16
+        self.worker_expectations = []
         self.consumption_check = 0
         self.dissatistifaction = 0
         self.wage = model.config.MINIMUM_WAGE
@@ -41,11 +42,13 @@ class Worker(Agent):
 
         if self.model.step_count > 0:
 
-          quantity, expected_wage= get_market_demand(self, 'labor')
+          quantity, mkt_wages= get_market_demand(self, 'labor')
           demand, price = get_market_demand(self, 'consumption')
-          self.expected_wage = expected_wage
-          wage = expect_price_ar(self.wage_history,expected_wage, self.model.config.TIME_HORIZON)
+
+          wage = expect_price_ar(self.wage_history, self.wage, self.model.config.TIME_HORIZON)
           prices = expect_price_ar(self.price_history, price ,self.model.config.TIME_HORIZON)
+          self.worker_expectations = [wage[0], prices[0]]
+          print(self.worker_expectations)
           results = maximize_utility(self.savings, wage, prices,0.95, self.model.config.TIME_HORIZON, alpha=0.9, max_working_hours=16)
           self.desired_consumption, self.working_hours, self.leisure, self.desired_savings = [arr[0] for arr in results]
 
@@ -55,25 +58,20 @@ class Worker(Agent):
 
     def update_expectations(self):
 
-      if self.model.step_count > 0:
-        wage_non_zero = list(filter(lambda x: x != 0, self.wage_history)) if any(self.wage_history) else []
-        wage_avg = sum(wage_non_zero) / len(wage_non_zero) if wage_non_zero else 0
-        demand, prices = get_market_demand(self, 'consumption')
-        print(f"consumption {self.consumption}, desired consumption {self.desired_consumption},check {self.consumption_check}")
+      if self.model.step_count > 1:
 
         if self.consumption < self.desired_consumption:
-            self.expected_price = self.expected_price + (self.get_max_consumption_price()- self.expected_price)*.2
-
-        elif self.price > self.expected_price:
-            self.expected_price = self.expected_price + (self.get_max_consumption_price()- self.expected_price)*.2
+            self.expected_price = self.expected_price + (self.get_max_consumption_price()- self.expected_price)* 0.5
+            print(f"desired consumption{self.desired_consumption}, actual consumption{self.consumption}")
         else:
             self.expected_price *= .95
 
-        if self.total_working_hours < self.optimals[1]:
+        if self.working_hours < self.total_working_hours:
             self.expected_wage *= .95
             self.expected_wage = max(self.expected_wage, self.model.config.MINIMUM_WAGE)
         else:
             self.expected_wage *= 1.05
+
         self.consumption = 0
         self.consumption_check = 0
         self.price = 0
@@ -106,6 +104,29 @@ class Worker(Agent):
             self.total_working_hours = max(0, self.total_working_hours)
             del self.employers[employer]
             self.update_average_wage()
+    def quit(self):
+
+        # Sort employers by hours worked, in descending order
+        sorted_employers = sorted(self.employers.items(), key=lambda x: x[1]['hours'], reverse=True)
+
+        for employer, details in sorted_employers:
+            if self.total_working_hours <= self.working_hours:
+                break
+
+            hours_to_quit = min(details['hours'], self.total_working_hours - self.working_hours)
+
+            if hours_to_quit == details['hours']:
+                # Quit the job entirely
+                self.get_fired(employer)
+            else:
+                # Reduce hours for this job
+                self.employers[employer]['hours'] -= hours_to_quit
+                self.total_working_hours -= hours_to_quit
+
+            if self.total_working_hours <= self.working_hours:
+                break
+
+            self.update_average_wage()
 
     def update_average_wage(self):
         if self.total_working_hours > 0:
@@ -123,13 +144,12 @@ class Worker(Agent):
         self.consumption += quantity
         self.consumption_check += quantity
         self.price = price
-        print(f"consumption {self.consumption}, check {self.consumption_check}")
         self.savings -= total_cost
         self.savings = max(0, self.savings) #prevent negative savings
 
     def get_max_consumption_price(self):
 
-        amt = self.savings/20 + (self.wage * 16)
+        amt = self.savings/(self.model.config.TIME_HORIZON) + (self.wage * 16)
 
         if amt < self.savings:
           return amt
@@ -142,7 +162,8 @@ class Worker(Agent):
     def available_hours(self):
         if self.total_working_hours >= self.max_working_hours:
             return 0
-        elif self.working_hours + self.total_working_hours >= self.max_working_hours:
-            return max(0, self.max_working_hours - self.total_working_hours)
-        else:
-            return self.working_hours
+        elif self.working_hours > self.total_working_hours:
+            return self.working_hours - self.total_working_hours
+        else :
+          self.quit()
+          return 0

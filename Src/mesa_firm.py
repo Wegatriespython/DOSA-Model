@@ -47,6 +47,7 @@ class Firm(Agent):
         self.investment_demand = 0
         self.expected_demand = 0
         self.expected_price = 0
+
         self.get_total_labor_units()
         self.pay_wages()
         self.update_average_price()
@@ -57,6 +58,8 @@ class Firm(Agent):
             self.expected_demand= np.full(self.model.config.TIME_HORIZON,6)
             self.expected_price = np.full(self.model.config.TIME_HORIZON,1)
             self.expectations =[np.mean(self.expected_demand), np.mean(self.expected_price)]
+            self.desireds = [self.wage, self.price, self.model.config.INITIAL_RELATIVE_PRICE_CAPITAL]
+
             return
 
         demand, price =  get_market_demand(self, self.firm_type)
@@ -64,7 +67,7 @@ class Firm(Agent):
         self.historic_demand.append(demand)
         self.historic_price.append(price)
         self.expected_demand, self.expected_price = get_expectations(demand, self.historic_demand,  price,self.historic_price,self.model.config.TIME_HORIZON)
-        self.expectations = [np.mean(self.expected_demand), np.mean(self.expected_price)]
+        self.expectations = [self.expected_demand[0], self.expected_price[0]]
         self.expectations_cache.append(self.expectations)
         return
 
@@ -182,6 +185,8 @@ class Firm(Agent):
         else:
             #print("Hiring new Worker")
             self.workers[worker] = {'hours':hours, 'wage':wage}
+
+
             self.total_working_hours += hours
             worker.get_hired(self, wage, hours)
 
@@ -191,8 +196,9 @@ class Firm(Agent):
             self.total_working_hours += hours
             worker.update_hours(self, hours)
     def wage_adjustment(self):
-        for worker in self.workers:
-            self.workers[worker]['wage'] = self.desireds[0]
+      #Implement periodic wage adjustments, ideally workforce should quit to create turnover, causing firms to implement wage_adjustments to lower turnover, but non-essential for thesis.
+      return
+
 
     def update_average_price(self):
       if len(self.prices) > 5:
@@ -207,14 +213,14 @@ class Firm(Agent):
 
         fire_list = []
         wage_total = 0
-        employees_total=0
+        employees_total = len(self.workers)
         skill_total = 0
         self.wage_adjustment()
         for worker in self.workers:
             wage = self.workers[worker]['wage']
             hours = self.workers[worker]['hours']
+
             wage_total += wage
-            employees_total += 1
             skill_total += worker.skills
             budget_change = wage * hours
 
@@ -231,6 +237,9 @@ class Firm(Agent):
             self.fire_worker(worker)
         if employees_total > 0:
             self.wage = wage_total/employees_total
+            print(f"Wage_total : {wage_total}, employes_total : {employees_total} Average wage:{self.wage}")
+
+
         return self.wage
 
 
@@ -298,17 +307,20 @@ class Firm(Agent):
         self.desireds = [self.wage, self.price, self.model.config.INITIAL_RELATIVE_PRICE_CAPITAL]
         return
 
-      desired_wage = get_desired_wage(self.desireds[0], self.zero_profit_conditions[0], self.wage, self.model.config.MINIMUM_WAGE)
+      desired_wage = get_desired_wage(self.desireds[0],self.optimals[0], self.get_total_labor_units(), self.zero_profit_conditions[0], self.wage, self.model.config.MINIMUM_WAGE)
 
       if self.firm_type == 'consumption':
-        desired_price = get_desired_price(self.desireds[1], self.zero_profit_conditions[1], self.price)
+        desired_price = get_desired_price(self.desireds[1],self.optimals[4],self.sales, self.zero_profit_conditions[1], self.price)
 
         desired_capital_price = get_desired_capital_price(self)
       else:
-        desired_price = get_desired_price(self.desireds[1], self.zero_profit_conditions[1], self.price)
+        desired_price = get_desired_price(self.desireds[1],self.optimals[4],self.sales, self.zero_profit_conditions[1], self.price)
         desired_capital_price = desired_price
 
       self.desireds = [desired_wage, desired_price, desired_capital_price]
+
+
+
       return self.desireds
 
     def get_zero_profit_conditions(self):

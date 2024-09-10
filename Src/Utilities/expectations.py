@@ -94,6 +94,7 @@ def expect_price_ar(historic_prices, current_price, periods=6, alpha=0.3):
         for _ in range(periods):
             # Autoregressive formula: next_price = α * last_price + (1-α) * historic_mean
             next_price = alpha * last_price + (1 - alpha) * historic_mean
+            next_price = round(next_price, 2)
             expected_prices.append(next_price)
             last_price = next_price
 

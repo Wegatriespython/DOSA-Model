@@ -25,8 +25,17 @@ def market_matching(buyers, sellers):
         if buyers[0][1] < sellers[0][1]:
             if round == 1:
                 # Start round 2: swap prices
-                new_buyers = [(b[0], b[3], b[2], b[1]) for b in buyers]  # b[3] is max price
-                new_sellers = [(s[0], s[3], s[2], s[1]) for s in sellers]  # s[3] is min price
+                total_demand = sum(b[0] for b in buyers)
+                total_supply = sum(s[0] for s in sellers)
+
+                if total_demand > total_supply:
+                    # Sellers Advantage
+                    new_buyers = [(b[0], b[3], b[2], b[1]) for b in buyers]  # b[3] is max price
+                    new_sellers = [(s[0], s[1], s[2], s[3]) for s in sellers]  # s[3] is min price
+                else:
+                    # Buyers Advantage
+                    new_buyers = [(b[0], b[1], b[2], b[3]) for b in buyers]  # b[3] is max price
+                    new_sellers = [(s[0], s[3], s[2], s[1]) for s in sellers]  # s[3] is min price
                 return match_recursively(new_buyers, new_sellers, transactions, 2)
             else:
                 return transactions  # No more matches possible
