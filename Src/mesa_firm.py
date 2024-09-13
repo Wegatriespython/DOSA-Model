@@ -69,7 +69,8 @@ class Firm(Agent):
 
         self.historic_demand.append(demand)
         self.historic_price.append(price)
-        self.expected_demand, self.expected_price = get_expectations(demand, self.historic_demand,  price ,self.historic_price,(self.model.config.TIME_HORIZON))
+
+        self.expected_price, self.expected_demand = get_expectations(demand, self.historic_demand,  price ,self.historic_price,(self.model.config.TIME_HORIZON))
         self.expectations = [self.expected_demand[0], self.expected_price[0]]
         self.expectations_cache.append(self.expectations)
         return
@@ -181,6 +182,8 @@ class Firm(Agent):
         self.production =  min(optimal_production, calculate_production_capacity(self.productivity, self.capital, self.capital_elasticity, self.get_total_labor_units()))
 
         self.inventory += max(0, self.production)
+
+
         return self.production
 
     def hire_worker(self, worker, wage, hours):
@@ -208,8 +211,11 @@ class Firm(Agent):
     def update_average_price(self):
       if self.model.step_count >2:
 
-        average_price = np.mean(self.prices)
-        self.price = average_price
+        if len(self.prices) > 0 :
+          self.prices = [p for p in self.prices if not np.isnan(p)]
+          average_price = np.mean(self.prices)
+
+          self.price = average_price
 
 
 
@@ -242,7 +248,8 @@ class Firm(Agent):
             self.fire_worker(worker)
         if employees_total > 0:
             self.wage = wage_total/employees_total
-            print(f"Wage_total : {wage_total}, employes_total : {employees_total} Average wage:{self.wage}")
+
+
 
 
         return self.wage
@@ -315,7 +322,7 @@ class Firm(Agent):
       desired_wage = get_desired_wage(self.desireds[0],self.optimals[0], self.get_total_labor_units(), self.zero_profit_conditions[0], self.wage, self.model.config.MINIMUM_WAGE)
 
       if self.firm_type == 'consumption':
-        desired_price = get_desired_price(self.desireds[1],self.optimals[4],self.sales, self.zero_profit_conditions[1], self.price)
+        desired_price = get_desired_price(self.desireds[1],self.production,self.sales, self.zero_profit_conditions[1], self.price, self.optimals[3], self.inventory)
 
         desired_capital_price = get_desired_capital_price(self)
       else:
@@ -329,8 +336,14 @@ class Firm(Agent):
       return self.desireds
 
     def get_zero_profit_conditions(self):
+      if len(self.zero_profit_conditions)>0 :
+          print(self.zero_profit_conditions[1])
       max_wage = get_max_wage(self.total_working_hours, self.productivity, self.capital, self.capital_elasticity, self.price, self.get_total_labor_units(), self.optimals, self.model.config.MINIMUM_WAGE)
       min_sale_price = get_min_sale_price(self.firm_type, self.workers, self.productivity, self.capital, self.capital_elasticity, self.get_total_labor_units(), self.inventory)
+
+      if min_sale_price < 0.5:
+        breakpoint()
+
       max_capital_price = get_max_capital_price(self.investment_demand, self.optimals, self.price, self.capital_elasticity, self.model.config.TIME_HORIZON, self.model.config.DISCOUNT_RATE)
       self.zero_profit_conditions = [max_wage, min_sale_price, max_capital_price]
       self.zero_profit_conditions_cache.append(self.zero_profit_conditions)

@@ -13,7 +13,7 @@ def get_max_wage(total_working_hours, productivity, capital, capital_elasticity,
 
         extra_revenue_per_hour = extra_revenue / 16
         max_wage = extra_revenue_per_hour
-        print('max_wage', max_wage)
+
     return max(max_wage, minimum_wage)
 
 def get_min_sale_price(firm_type, workers, productivity, capital, capital_elasticity, total_labor_units, inventory):
@@ -24,7 +24,7 @@ def get_min_sale_price(firm_type, workers, productivity, capital, capital_elasti
         total_output = calculate_production_capacity(productivity, capital, capital_elasticity, total_labor_units) + inventory
         if total_output <= 0 or total_cost <= 0.001:
             return 0.5
-        return total_cost / total_output
+        return max(total_cost / total_output, 0.5)
     else:
         total_working_hours = sum([worker['hours'] for worker in workers.values()])
         average_wage = sum([worker['wage'] * worker['hours'] for worker in workers.values()]) / total_working_hours if total_working_hours > 0 else 0
@@ -62,17 +62,35 @@ def get_desired_wage(desired_wage,desired_labor, actual_labor, max_wage, real_wa
 
   if  actual_labor < desired_labor :
       wage = real_wage + (max_wage - real_wage)* 0.2
-      print(f"increasing wage to {wage}")
-  else :
+
+      return wage
+  if desired_wage > real_wage:
       wage = real_wage - (real_wage - min_wage) * 0.2
+
+
+  else:
+      wage = real_wage + (max_wage - real_wage) * 0.2
+
   return wage
 
-def get_desired_price(desired_price, desired_sales, actual_sales, min_price, real_price):
-      if desired_price < real_price:
-        price = desired_price + (real_price - desired_price) * 0.2
-        return price
+def get_desired_price(desired_price, desired_sales, actual_sales, min_price, real_price, optimal_inventory, inventory):
 
-      else:
-        print(f"Cutting prices{desired_price} real{real_price}")
-        price = desired_price - (desired_price - min_price) * 0.2
-        return price
+  if round(actual_sales) < round(desired_sales):
+
+    print(f"actual_sales < desired_sales {actual_sales} < {desired_sales}")
+
+    price = real_price - (real_price - min_price) * 0.05
+
+    return price
+
+  if desired_price < real_price:
+    inventory_ratio = optimal_inventory/inventory if inventory > 0 else 1
+    price = real_price + (real_price - desired_price) * 0.1 * inventory_ratio if inventory_ratio <=1 else real_price + (real_price - desired_price) * 0.05
+
+
+  else:
+    # real_price < desired_price
+
+    price = real_price - (desired_price - real_price) * 0.1
+
+  return price

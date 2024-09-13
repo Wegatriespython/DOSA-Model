@@ -58,3 +58,42 @@ def market_matching(buyers, sellers):
         return match_recursively(new_buyers, new_sellers, transactions, round)
 
     return match_recursively(buyers, sellers, [], 1)
+
+
+def test_market_matching():
+    # Test case 1: Normal case where transactions should occur
+    buyers = [
+        (100, 10, "Buyer1", 12),  # (quantity, price, id, max_price)
+        (50, 9, "Buyer2", 11)
+    ]
+    sellers = [
+        (80, 8, "Seller1", 6),   # (quantity, price, id, min_price)
+        (100, 9, "Seller2", 7)
+    ]
+
+    transactions = market_matching(buyers, sellers)
+
+    print("Test case 1:")
+    print("Transactions:", transactions)
+    assert len(transactions) > 0, "Expected transactions to occur"
+
+    # Test case 2: No transactions should occur
+    buyers = [
+        (100, 5, "Buyer1", 6),
+        (50, 4, "Buyer2", 5)
+    ]
+    sellers = [
+        (80, 8, "Seller1", 7),
+        (100, 9, "Seller2", 8)
+    ]
+
+    transactions = market_matching(buyers, sellers)
+
+    print("\nTest case 2:")
+    print("Transactions:", transactions)
+    assert len(transactions) == 0, "Expected no transactions to occur"
+
+    print("\nAll tests passed!")
+
+# Run the test
+test_market_matching()

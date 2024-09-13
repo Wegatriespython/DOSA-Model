@@ -2,7 +2,7 @@ from mesa import Agent
 import numpy as np
 from Utilities.Config import Config
 from Utilities.utility_function import maximize_utility
-from Utilities.expectations import expect_price_ar, get_expectations, get_market_demand
+from Utilities.expectations import  get_market_demand, expect_price_ar
 
 class Worker(Agent):
     def __init__(self, unique_id, model):
@@ -12,6 +12,8 @@ class Worker(Agent):
         self.max_working_hours = 16
         self.worker_expectations = []
         self.consumption_check = 0
+        self.wage_history1 = []
+        self.price_history1 = []
         self.dissatistifaction = 0
         self.wage = model.config.MINIMUM_WAGE
         self.income = 0
@@ -28,6 +30,7 @@ class Worker(Agent):
         self.desired_savings = 0
         self.price = model.config.INITIAL_PRICE
         self.price_history = [model.config.INITIAL_PRICE]
+        self.prices = []
         self.MIN_CONSUMPTION = 1
         self.wage_history = [model.config.MINIMUM_WAGE]
         self.mode = 'decentralized'
@@ -40,31 +43,48 @@ class Worker(Agent):
     def update_utilty(self):
 
 
-        if self.model.step_count > 0:
+        if self.model.step_count > 1:
 
           quantity, mkt_wages= get_market_demand(self, 'labor')
           demand, price = get_market_demand(self, 'consumption')
+          self.wage_history1.append(mkt_wages)
+          self.price_history1.append(price)
 
-          wage = expect_price_ar(self.wage_history, self.wage, self.model.config.TIME_HORIZON)
-          prices = expect_price_ar(self.price_history, price ,self.model.config.TIME_HORIZON)
+          wage = expect_price_ar(self.wage_history1, mkt_wages, self.model.config.TIME_HORIZON)
+          prices = expect_price_ar(self.price_history1, price, self.model.config.TIME_HORIZON)
+
           self.worker_expectations = [wage[0], prices[0]]
-          print(self.worker_expectations)
+
           results = maximize_utility(self.savings, wage, prices,0.95, self.model.config.TIME_HORIZON, alpha=0.9, max_working_hours=16)
           self.desired_consumption, self.working_hours, self.leisure, self.desired_savings = [arr[0] for arr in results]
 
           self.optimals = [self.desired_consumption, self.working_hours, self.desired_savings]
 
-          print(f"{self.optimals}")
+
 
     def update_expectations(self):
 
       if self.model.step_count > 1:
-
-        if self.consumption < self.desired_consumption:
-            self.expected_price = self.expected_price + (self.get_max_consumption_price()- self.expected_price)* 0.2
-            print(f"desired consumption{self.desired_consumption}, actual consumption{self.consumption}")
+        if len(self.prices) > 0 :
+          self.prices = [p for p in self.prices if not np.isnan(p)]
+          avg_price = np.mean(self.prices)
         else:
-            self.expected_price *= .95
+          avg_price = self.worker_expectations[1]
+        if self.consumption < self.desired_consumption:
+          # If the worker is consuming less than desired, increase the expected price
+            if self.expected_price > avg_price:
+              self.expected_price = self.expected_price + (self.get_max_consumption_price() - self.expected_price) * 0.5
+            else:
+              self.expected_price = min((avg_price + (avg_price - self.expected_price) * 0.5), self.get_max_consumption_price())
+
+        elif self.expected_price < avg_price:
+          # if consuming sufficient yet, overpaying, then round 2 clearing is happening, worker needs to increase bid to lower prices.
+            self.expected_price = avg_price - (avg_price - self.expected_price) * 0.5
+        else:
+          # if consuming and in round1 then worker can bargain by lowering the bid
+            self.expected_price = avg_price - (self.expected_price - avg_price) * 0.2
+
+
 
         if self.wage < self.expected_wage:
             self.expected_wage *= .95
@@ -144,6 +164,8 @@ class Worker(Agent):
         self.consumption += quantity
         self.consumption_check += quantity
         self.price = price
+        self.prices.append(price)
+
         self.savings -= total_cost
         self.savings = max(0, self.savings) #prevent negative savings
 
