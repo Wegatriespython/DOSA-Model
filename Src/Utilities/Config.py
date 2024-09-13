@@ -6,7 +6,7 @@ class Config:
         #
 
         self.MAX_WORKING_HOURS = 16
-        self.TIME_HORIZON = 100
+        self.TIME_HORIZON = 6
         self.INITIAL_SALES = 1
         self.INITIAL_PRODUCTIVITY = 1
         self.INITIAL_PRICE = 1
@@ -14,7 +14,7 @@ class Config:
         self.DEPRECIATION_RATE = 0.00
         self.INITIAL_SKILLS = .1
         self.DISCOUNT_RATE = 0.05
-        self.INITIAL_SAVINGS = 15
+        self.INITIAL_SAVINGS = 2
         self.MIN_CONSUMPTION = 1
         self.PRODUCTION_FACTOR = 0.1
         self.WAGE_OFFER_FACTOR = 1.1

@@ -61,12 +61,12 @@ class Worker(Agent):
       if self.model.step_count > 1:
 
         if self.consumption < self.desired_consumption:
-            self.expected_price = self.expected_price + (self.get_max_consumption_price()- self.expected_price)* 0.5
+            self.expected_price = self.expected_price + (self.get_max_consumption_price()- self.expected_price)* 0.2
             print(f"desired consumption{self.desired_consumption}, actual consumption{self.consumption}")
         else:
             self.expected_price *= .95
 
-        if self.working_hours < self.total_working_hours:
+        if self.wage < self.expected_wage:
             self.expected_wage *= .95
             self.expected_wage = max(self.expected_wage, self.model.config.MINIMUM_WAGE)
         else:

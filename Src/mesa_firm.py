@@ -47,15 +47,18 @@ class Firm(Agent):
         self.investment_demand = 0
         self.expected_demand = 0
         self.expected_price = 0
-
         self.get_total_labor_units()
         self.pay_wages()
         self.update_average_price()
+        self.prices = []
+        if self.budget < self.wage:
+            self.model.schedule.remove(self)
+
 
     def update_expectations(self):
 
         if self.model.step_count < 1:
-            self.expected_demand= np.full(self.model.config.TIME_HORIZON,6)
+            self.expected_demand= np.full(self.model.config.TIME_HORIZON ,6)
             self.expected_price = np.full(self.model.config.TIME_HORIZON,1)
             self.expectations =[np.mean(self.expected_demand), np.mean(self.expected_price)]
             self.desireds = [self.wage, self.price, self.model.config.INITIAL_RELATIVE_PRICE_CAPITAL]
@@ -66,7 +69,7 @@ class Firm(Agent):
 
         self.historic_demand.append(demand)
         self.historic_price.append(price)
-        self.expected_demand, self.expected_price = get_expectations(demand, self.historic_demand,  price,self.historic_price,self.model.config.TIME_HORIZON)
+        self.expected_demand, self.expected_price = get_expectations(demand, self.historic_demand,  price ,self.historic_price,(self.model.config.TIME_HORIZON))
         self.expectations = [self.expected_demand[0], self.expected_price[0]]
         self.expectations_cache.append(self.expectations)
         return
@@ -74,6 +77,8 @@ class Firm(Agent):
 
 
     def make_production_decision(self):
+
+
         self.historic_sales.append(self.sales)
         if len(self.historic_sales)>5:
             self.historic_sales = self.historic_sales[-5:]
@@ -201,8 +206,8 @@ class Firm(Agent):
 
 
     def update_average_price(self):
-      if len(self.prices) > 5:
-        self.prices = self.prices[-5:]
+      if self.model.step_count >2:
+
         average_price = np.mean(self.prices)
         self.price = average_price
 

@@ -6,11 +6,11 @@ from functools import lru_cache
 # Global variable to store the last solution for warm start
 last_solution = None
 
-@lru_cache(maxsize=1024)
+@lru_cache(maxsize=2056)
 def memoized_maximize_utility(savings, wages, prices, discount_factor, periods, alpha, max_working_hours, linear_solver):
     return _maximize_utility(savings, wages, prices, discount_factor, periods, alpha, max_working_hours, linear_solver)
 
-def maximize_utility(savings, wages, prices, discount_factor=0.95, periods=20, alpha=0.9, max_working_hours=16, linear_solver='mumps'):
+def maximize_utility(savings, wages, prices, discount_factor=0.95, periods=20, alpha=0.9, max_working_hours=16, linear_solver='ma57'):
     global last_solution
 
     result = memoized_maximize_utility(savings, tuple(wages), tuple(prices), discount_factor, periods, alpha, max_working_hours, linear_solver)
@@ -31,9 +31,10 @@ def _maximize_utility(savings, wages, prices, discount_factor, periods, alpha, m
     model.T = pyo.RangeSet(0, periods-1)
 
     # Variables
-    model.consumption = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=1.0, bounds=(0, None))
-    model.working_hours = pyo.Var(model.T, domain=pyo.NonNegativeReals, bounds=(0, max_working_hours))
-    model.leisure = pyo.Var(model.T, domain=pyo.NonNegativeReals, bounds=(0, max_working_hours))
+    model.consumption = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=1.0, bounds=(1e-6, None))
+    model.working_hours = pyo.Var(model.T, domain=pyo.NonNegativeReals, bounds=(1e-6, max_working_hours))
+    model.leisure = pyo.Var(model.T, domain=pyo.NonNegativeReals, bounds=(1e-6
+      , max_working_hours))
     model.savings = pyo.Var(model.T, domain=pyo.NonNegativeReals)
 
     # Parameters
@@ -76,17 +77,21 @@ def _maximize_utility(savings, wages, prices, discount_factor, periods, alpha, m
     # Solve the model
     solver = SolverFactory('ipopt')
     solver.options['max_iter'] = 10000
-    solver.options['tol'] = 1e-6
+    solver.options['tol'] = 1e-3
     solver.options['halt_on_ampl_error'] = 'yes'
     solver.options['linear_solver'] = linear_solver
 
-    # Warm start
-    if last_solution is not None:
-        for t in model.T:
-            model.consumption[t].value = last_solution[0][t]
-            model.working_hours[t].value = last_solution[1][t]
-            model.leisure[t].value = last_solution[2][t]
-            model.savings[t].value = last_solution[3][t]
+    solver.options['warm_start_init_point'] = 'yes'  # Use warm start
+
+
+    solver.options['mu_strategy'] = 'adaptive'
+    solver.options['print_level'] = 5  # Increase print level for more information
+
+
+    solver.options['linear_scaling_on_demand'] = 'yes'  # Perform linear scaling only when needed
+
+
+
 
     try:
         results = solver.solve(model, tee=False)

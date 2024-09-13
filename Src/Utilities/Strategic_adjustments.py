@@ -69,7 +69,7 @@ def get_desired_wage(desired_wage,desired_labor, actual_labor, max_wage, real_wa
 
 def get_desired_price(desired_price, desired_sales, actual_sales, min_price, real_price):
       if desired_price < real_price:
-        price = desired_price * 1.1
+        price = desired_price + (real_price - desired_price) * 0.2
         return price
 
       else:

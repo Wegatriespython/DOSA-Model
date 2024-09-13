@@ -6,7 +6,7 @@ from functools import lru_cache
 # Global variable to store the last solution for warm start
 last_solution = None
 
-@lru_cache(maxsize=512)
+@lru_cache(maxsize=2056)
 def memoized_profit_maximization(
     current_capital, current_labor, current_price, current_productivity,
     expected_demand, expected_price, capital_price, capital_elasticity,
@@ -22,7 +22,7 @@ def profit_maximization(
     current_capital, current_labor, current_price, current_productivity,
     expected_demand, expected_price, capital_price, capital_elasticity,
     current_inventory, depreciation_rate, expected_periods, discount_rate,
-    budget, wage, linear_solver='mumps'):
+    budget, wage, linear_solver='ma57'):
 
     global last_solution
 
@@ -113,10 +113,22 @@ def _profit_maximization(
     # Solve the model
     solver = SolverFactory('ipopt')
     solver.options['max_iter'] = 10000
-    solver.options['tol'] = 1e-6
+    solver.options['tol'] = 1e-3  # Sets the convergence tolerance for the optimization algorithm
     solver.options['halt_on_ampl_error'] = 'yes'
     solver.options['linear_solver'] = linear_solver
+
+    solver.options['warm_start_init_point'] = 'yes'  # Use warm start
+
+
+    solver.options['mu_strategy'] = 'adaptive'
+    solver.options['print_level'] = 1  # Increase print level for more information
+
+
+    solver.options['linear_scaling_on_demand'] = 'yes'  # Perform linear scaling only when needed
+
     results = solver.solve(model, tee=False)
+
+
 
     if results.solver.termination_condition == pyo.TerminationCondition.optimal:
         total_cost = pyo.value(wage * model.labor + (model.capital - current_capital) * capital_price)

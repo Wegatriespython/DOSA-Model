@@ -3,6 +3,8 @@ import cProfile
 import pstats
 import io
 import logging
+import os
+
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -15,12 +17,12 @@ def run_model(steps, timeout=300):  # 5 minutes timeout
 def profile_model_run(steps):
     pr = cProfile.Profile()
     pr.enable()
-    
+
     # Run the model
     model = run_model(steps)
-    
+
     pr.disable()
-    
+
     # Print profiling results
     s = io.StringIO()
     sortby = 'cumulative'
@@ -33,9 +35,9 @@ def profile_model_run(steps):
 if __name__ == "__main__":
     steps = 20  # Number of steps to run
     logging.info(f"Starting model run with profiling for {steps} steps...")
-    
+
     model = profile_model_run(steps)
-    
+
     if model:
         logging.info("Model completed successfully.")
     else:
