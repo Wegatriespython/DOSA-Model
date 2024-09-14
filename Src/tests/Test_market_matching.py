@@ -1,101 +1,53 @@
-import random
-from typing import List, Tuple, Any
-from mesa_market_matching import market_matching
+import os,sys
+src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
-def generate_random_traders(num_traders: int, price_range: Tuple[float, float], quantity_range: Tuple[int, int]) -> List[Tuple[float, int, str]]:
-    return [
-        (round(random.uniform(*price_range), 2), random.randint(*quantity_range), f"Trader_{i}")
-        for i in range(num_traders)
+sys.path.insert(0, src_path)
+from Utilities.mesa_market_matching import market_matching, preference_function
+
+def test_market_matching():
+    # consumption : raw_demand, raw_supply, raw_buyer_price, raw_seller_price, buyer_max, seller_min
+    data = [
+        [30, 10, 1, 1, 1.333333333, 0.5],
+        [30, 0, 1, 0, 1.222222222, 0],
+        [50, 0, 1.111111111, 0, 1.666666667, 0],
+        [60, 14.7, 1.388888889, 0.975, 2.001699781, 0.610077507],
+        [38, 18.36564615, 1.349956571, 0.994669131, 1.96866555, 0.597577256],
+        [29, 17.79897949, 1.08791297, 1.221602143, 1.608516291, 0.606485903],
+        [48, 17.00422365, 1.312864868, 1.466707904, 1.85766681, 0.637527687],
+        [39, 15.95897949, 1.361343087, 1.467965106, 1.577871109, 0.625561908],
+        [34, 14.41801859, 1.219352961, 1.623513538, 1.541673924, 0.596930855],
+        [32, 15.4, 1.155193003, 1.684822703, 1.701505961, 0.615745681],
+        [30, 16.8, 1.282362848, 1.863272052, 1.758415908, 0.627091137],
+        [24, 18.6, 1.418047441, 1.820893091, 1.712877789, 0.643017004],
+        [28, 21.86, 1.468031756, 1.994242148, 1.816241431, 0.592352058],
+        [30, 24.48, 1.617355292, 1.74239088, 1.91076104, 0.527956553],
+        [26, 25.02, 1.585521607, 1.754463826, 1.815724444, 0.531711004],
+        [25, 25.38, 1.587033031, 1.792805229, 1.771332979, 0.537529357],
+        [25, 25.32, 1.53415266, 1.838601663, 1.634600185, 0.554495524],
+        [25, 24.08942221, 1.503035515, 1.314072155, 1.602830514, 0.575294999],
+        [26, 23.60782688, 1.475655243, 1.31982329, 1.691959081, 0.576712037],
+        [26, 22.56, 1.53056132, 1.536929395, 1.681633731, 0.607409742],
+        [25, 22.66425715, 1.543999298, 1.541710877, 1.720179588, 0.611777347],
+        [25, 22, 1.556185627, 1.656159112, 1.700329156, 0.62017144],
+        [25, 21.92, 1.558868884, 1.645093028, 1.623141227, 0.61111829],
+        [25, 21.92, 1.429984396, 1.729824747, 1.541135626, 0.61111829],
+        [25, 21.92, 1.396048735, 1.684686436, 1.516606125, 0.61111829]
     ]
 
-def verify_trades(original_buyers: List[Tuple[float, int, Any]], 
-                  original_sellers: List[Tuple[float, int, Any]], 
-                  transactions: List[Tuple[Any, Any, int, float]]) -> bool:
-    # Check if all trades are valid (buyer price >= seller price)
-    for buyer, seller, quantity, price in transactions:
-        buyer_price = next(b[0] for b in original_buyers if b[2] == buyer)
-        seller_price = next(s[0] for s in original_sellers if s[2] == seller)
-        if buyer_price < seller_price or price > buyer_price or price < seller_price:
-            print(f"Invalid trade: Buyer {buyer} price {buyer_price}, Seller {seller} price {seller_price}, Trade price {price}")
-            return False
+    print("Market matching with updated data:")
+    for i, row in enumerate(data):
+        buyers = [(row[0], row[2], f"Buyer_{i}", row[4], 0)]  # (quantity, bid, id, max_price, preference)
+        sellers = []
+        if row[1] > 0:
+            sellers = [(row[1], row[3], f"Seller_{i}", row[5], 1, 1)]  # (quantity, ask, id, min_price, quality, carbon_intensity)
 
-    # Check if no trader trades more than their initial quantity
-    buyer_trades = {}
-    seller_trades = {}
-    for buyer, seller, quantity, _ in transactions:
-        buyer_trades[buyer] = buyer_trades.get(buyer, 0) + quantity
-        seller_trades[seller] = seller_trades.get(seller, 0) + quantity
-
-    for _, quantity, buyer in original_buyers:
-        if buyer_trades.get(buyer, 0) > quantity:
-            print(f"Buyer {buyer} traded more than initial quantity")
-            return False
-
-    for _, quantity, seller in original_sellers:
-        if seller_trades.get(seller, 0) > quantity:
-            print(f"Seller {seller} traded more than initial quantity")
-            return False
-
-    # Check if the sum of traded quantities matches between buyers and sellers
-    if sum(trade[2] for trade in transactions) != sum(buyer_trades.values()):
-        print("Mismatch in total traded quantity")
-        return False
-
-    return True
-
-def run_test_case(buyers, sellers, case_name: str):
-    print(f"\nRunning test case: {case_name}")
-    print("Buyers:", buyers)
-    print("Sellers:", sellers)
-
-    transactions = market_matching(buyers, sellers)
-
-    print("\nTransactions:")
-    for buyer, seller, quantity, price in transactions:
-        print(f"{buyer} bought {quantity} from {seller} at price {price}")
-
-    if verify_trades(buyers, sellers, transactions):
-        print("Test case passed!")
-    else:
-        print("Test case failed!")
-
-    return transactions
-
-def run_tests():
-    # Test case 1: Basic functionality
-    buyers = [(10, 1, "B1"), (9, 2, "B2"), (5, 3, "B3")]
-    sellers = [(8, 2, "S1"), (9, 3, "S2")]
-    run_test_case(buyers, sellers, "Basic functionality")
-
-    # Test case 2: No buyers
-    buyers = []
-    sellers = [(8, 2, "S1"), (9, 3, "S2")]
-    run_test_case(buyers, sellers, "No buyers")
-
-    # Test case 3: No sellers
-    buyers = [(10, 1, "B1"), (9, 2, "B2"), (5, 3, "B3")]
-    sellers = []
-    run_test_case(buyers, sellers, "No sellers")
-
-    # Test case 4: No matching trades (all seller prices too high)
-    buyers = [(5, 1, "B1"), (4, 2, "B2"), (3, 3, "B3")]
-    sellers = [(8, 2, "S1"), (9, 3, "S2")]
-    run_test_case(buyers, sellers, "No matching trades (all seller prices too high)")
-
-    # Test case 5: Exact matches in price and quantity
-    buyers = [(10, 2, "B1"), (9, 3, "B2")]
-    sellers = [(10, 2, "S1"), (9, 3, "S2")]
-    run_test_case(buyers, sellers, "Exact matches in price and quantity")
-
-    # Test case 6: Large disparities in quantity
-    buyers = [(10, 100, "B1"), (9, 1, "B2")]
-    sellers = [(8, 1, "S1"), (9, 200, "S2")]
-    run_test_case(buyers, sellers, "Large disparities in quantity")
-
-    # Test case 7: Random large dataset
-    buyers = generate_random_traders(50, (1, 100), (1, 100))
-    sellers = generate_random_traders(50, (1, 100), (1, 100))
-    run_test_case(buyers, sellers, "Random large dataset")
+        print(f"\nTransaction {i+1}:")
+        transactions = market_matching(buyers, sellers)
+        if transactions:
+            for t in transactions:
+                print(f"Quantity: {t[2]}, Price: {t[3]}")
+        else:
+            print("No transaction occurred")
 
 if __name__ == "__main__":
-    run_tests()
+    test_market_matching()

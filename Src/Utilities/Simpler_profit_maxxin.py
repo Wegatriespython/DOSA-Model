@@ -11,18 +11,18 @@ def memoized_profit_maximization(
     current_capital, current_labor, current_price, current_productivity,
     expected_demand, expected_price, capital_price, capital_elasticity,
     current_inventory, depreciation_rate, expected_periods, discount_rate,
-    budget, wage, linear_solver):
+    budget, wage,capital_supply,labor_supply, linear_solver):
     return _profit_maximization(
-        current_capital, current_labor, current_price, current_productivity,
-        expected_demand, expected_price, capital_price, capital_elasticity,
-        current_inventory, depreciation_rate, expected_periods, discount_rate,
-        budget, wage, linear_solver)
+      current_capital, current_labor, current_price, current_productivity,
+      expected_demand, expected_price, capital_price, capital_elasticity,
+      current_inventory, depreciation_rate, expected_periods, discount_rate,
+      budget, wage,capital_supply,labor_supply, linear_solver)
 
 def profit_maximization(
     current_capital, current_labor, current_price, current_productivity,
     expected_demand, expected_price, capital_price, capital_elasticity,
     current_inventory, depreciation_rate, expected_periods, discount_rate,
-    budget, wage, linear_solver='ma57'):
+    budget, wage,capital_supply,labor_supply, linear_solver='ma57'):
 
     global last_solution
 
@@ -34,7 +34,7 @@ def profit_maximization(
         current_capital, current_labor, current_price, current_productivity,
         expected_demand_tuple, expected_price_tuple, capital_price, capital_elasticity,
         current_inventory, depreciation_rate, expected_periods, discount_rate,
-        budget, wage,linear_solver)
+        budget, wage,capital_supply,labor_supply,linear_solver)
 
     if result is not None:
         last_solution = (result['optimal_labor'], result['optimal_capital'])
@@ -47,15 +47,15 @@ def _profit_maximization(
         current_capital, current_labor, current_price, current_productivity,
         expected_demand, expected_price, capital_price, capital_elasticity,
         current_inventory, depreciation_rate, expected_periods, discount_rate,
-        budget, wage, linear_solver):
+        budget, wage,capital_supply, labor_supply, linear_solver):
 
     model = pyo.ConcreteModel()
 
     # Sets
     model.T = pyo.RangeSet(0, expected_periods - 1)
+    max_labor = labor_supply/16 + current_labor
+    max_capital = capital_supply + current_capital
 
-    max_labor = 6
-    max_capital = current_capital
 
     guess_capital = (current_capital + max_capital)/2
     guess_labor = (current_labor + max_labor)/2

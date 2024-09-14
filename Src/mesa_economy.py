@@ -95,16 +95,17 @@ class EconomyModel(Model):
 
     def execute_labor_market(self):
 
-        buyers = [(firm.labor_demand, firm.desireds[0], firm, firm.zero_profit_conditions[0])
+        buyers = [(firm.labor_demand, firm.desireds[0], firm, firm.zero_profit_conditions[0], firm.preference_mode
+        )
                   for firm in self.schedule.agents
                   if isinstance(firm, (Firm1, Firm2)) and firm.labor_demand > 0]
 
-        sellers = [(worker.available_hours(), worker.expected_wage, worker, worker.get_min_wage())
+        sellers = [(worker.available_hours(), worker.expected_wage, worker, worker.get_min_wage(), worker.skills, worker.skillscarbon)
                    for worker in self.schedule.agents
                    if isinstance(worker, Worker) and worker.available_hours() > 0]
 
         transactions = market_matching(buyers, sellers)
-        #print("Labor Market Transaction", transactions)
+        #("Labor Market Transaction", transactions)
         buyer_demand = sum(b[0] for b in buyers) if buyers else 0
         seller_inventory = sum(s[0] for s in sellers) if sellers else 0
         avg_buyer_price = sum(b[1] for b in buyers) / len(buyers) if buyers else 0
@@ -128,7 +129,7 @@ class EconomyModel(Model):
 
     def execute_capital_market(self):
 
-        buyers = [(firm.investment_demand, firm.desireds[2], firm, firm.zero_profit_conditions[2])
+        buyers = [(firm.investment_demand, firm.desireds[2], firm, firm.zero_profit_conditions[2], firm.preference_mode)
                   for firm in self.schedule.agents
                   if isinstance(firm, Firm2) and firm.investment_demand > 0]
         print(buyers)
@@ -137,9 +138,9 @@ class EconomyModel(Model):
         for firm in self.schedule.agents:
             match firm:
                 case Firm1() if firm.inventory > 0:
-                    sellers.append((min(firm.inventory,firm.optimals[4]), firm.desireds[1], firm, firm.zero_profit_conditions[1]))
+                    sellers.append((min(firm.inventory,firm.optimals[4]), firm.desireds[1], firm, firm.zero_profit_conditions[1], firm.productivity, firm.carbon_intensity))
                 case Firm2() if firm.capital_inventory > 0:
-                    sellers.append((firm.capital_inventory,firm.capital_resale_price, firm, 0.1))
+                    sellers.append((firm.capital_inventory,firm.capital_resale_price, firm, 0.1, firm.productivity, firm.carbon_intensity))
         buyer_demand = sum(b[0] for b in buyers)  if buyers else 0
         seller_inventory = sum(s[0] for s in sellers)  if sellers else 0
         avg_buyer_price = sum(b[1] for b in buyers) / len(buyers) if buyers else 0
@@ -160,12 +161,13 @@ class EconomyModel(Model):
 
     def execute_consumption_market(self):
         #print("Executing consumption market")
-        buyers = [(worker.desired_consumption, worker.expected_price, worker, worker.get_max_consumption_price())
+        buyers = [(worker.desired_consumption, worker.expected_price, worker, worker.get_max_consumption_price(), worker.preference_mode)
                   for worker in self.schedule.agents
                   if isinstance(worker, Worker) and worker.savings > 0]
 
-        sellers = [(min(firm.inventory, firm.optimals[4]), firm.desireds[1], firm, firm.zero_profit_conditions[1])
+        sellers = [(min(firm.inventory, firm.optimals[4]), firm.desireds[1], firm, firm.zero_profit_conditions[1], firm.quality, firm.carbon_intensity)
                    for firm in self.schedule.agents
+
                    if isinstance(firm, Firm2) and firm.inventory > 0]
 
         if sellers:
@@ -182,6 +184,8 @@ class EconomyModel(Model):
         avg_buyer_max = sum(b[3] for b in buyers)/ len(buyers) if buyers else 0
         avg_seller_min = sum(s[3] for s in sellers)/ len(sellers) if sellers else 0
         self.pre_consumption_transactions = np.array([buyer_demand, seller_inventory, avg_buyer_price, avg_seller_price, avg_buyer_max, avg_seller_min])
+
+
         transactions = market_matching(buyers, sellers)
 
         self.consumption_transactions = transactions

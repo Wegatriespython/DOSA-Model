@@ -3,14 +3,17 @@ import numpy as np
 from Utilities.Config import Config
 from Utilities.utility_function import maximize_utility
 from Utilities.expectations import  get_market_demand, expect_price_ar
+from Utilities.Strategic_adjustments import update_worker_price_expectation, update_worker_wage_expectation
 
 class Worker(Agent):
     def __init__(self, unique_id, model):
         super().__init__(unique_id, model)
         self.employers = {}  # Dictionary to store employers and corresponding working hours
         self.total_working_hours = 0
+        self.preference_mode = self.model.config.PREFERNCE_MODE_LABOR
         self.max_working_hours = 16
         self.worker_expectations = []
+        self.skillscarbon = 1
         self.consumption_check = 0
         self.wage_history1 = []
         self.price_history1 = []
@@ -69,29 +72,13 @@ class Worker(Agent):
           self.prices = [p for p in self.prices if not np.isnan(p)]
           avg_price = np.mean(self.prices)
         else:
-          avg_price = self.worker_expectations[1]
-        if self.consumption < self.desired_consumption:
-          # If the worker is consuming less than desired, increase the expected price
-            if self.expected_price > avg_price:
-              self.expected_price = self.expected_price + (self.get_max_consumption_price() - self.expected_price) * 0.5
-            else:
-              self.expected_price = min((avg_price + (avg_price - self.expected_price) * 0.5), self.get_max_consumption_price())
+          avg_price = 0
 
-        elif self.expected_price < avg_price:
-          # if consuming sufficient yet, overpaying, then round 2 clearing is happening, worker needs to increase bid to lower prices.
-            self.expected_price = avg_price - (avg_price - self.expected_price) * 0.5
-        else:
-          # if consuming and in round1 then worker can bargain by lowering the bid
-            self.expected_price = avg_price - (self.expected_price - avg_price) * 0.2
+        self.expected_price = update_worker_price_expectation(self.worker_expectations[1],self.expected_price,avg_price,self.consumption,self.desired_consumption,self.get_max_consumption_price())
 
 
 
-        if self.wage < self.expected_wage:
-            self.expected_wage *= .95
-            self.expected_wage = max(self.expected_wage, self.model.config.MINIMUM_WAGE)
-        else:
-            self.expected_wage *= 1.05
-
+        self.expected_wage = update_worker_wage_expectation(self.worker_expectations[0],self.expected_wage,self.wage,self.working_hours, self.optimals[1], self.get_min_wage())
         self.consumption = 0
         self.consumption_check = 0
         self.price = 0

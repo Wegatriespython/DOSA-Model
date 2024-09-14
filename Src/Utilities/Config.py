@@ -45,7 +45,9 @@ class Config:
         self.FIRM2_INITIAL_DESIRED_CAPITAL = 5
         self.FIRM2_MACHINE_OUTPUT_PER_PERIOD = 10
         self.INVENTORY_THRESHOLD = 20
-
+        self.PREFERNCE_MODE_CONSUMPTION = 1
+        self.PREFERNCE_MODE_CAPITAL = 1
+        self.PREFERNCE_MODE_LABOR = 0
         # Simulation parameters
         self.INITIAL_WORKERS = 10
         self.INITIAL_CAPITAL_FIRMS = 2  # This was previously INITIAL_FIRM1S

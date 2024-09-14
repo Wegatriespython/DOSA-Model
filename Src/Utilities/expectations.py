@@ -14,7 +14,7 @@ def get_market_demand(self, market_type):
   if market_type == 'capital':
     demand = self.model.pre_capital_transactions[0]
     price = (self.model.pre_capital_transactions[2]+self.model.pre_capital_transactions[3])/2
-    demand = demand / 2
+    demand = demand
     if demand is None or price is None:
       return 0, 0
     return demand, price
@@ -23,7 +23,7 @@ def get_market_demand(self, market_type):
     demand = self.model.pre_consumption_transactions[0]
     price = (self.model.pre_consumption_transactions[2]+self.model.pre_consumption_transactions[3])/2
 
-    demand = demand / 5
+    demand = demand
     if demand is None or price is None:
       return 0, 0
     return demand, price
@@ -31,7 +31,7 @@ def get_market_demand(self, market_type):
     demand = self.model.pre_labor_transactions[0]
     price  = (self.model.pre_labor_transactions[2] + self.model.pre_labor_transactions[3]) / 2
 
-    demand = demand / 30
+    demand = demand
     if demand is None or price is None:
       return 0, 0
     return demand, price

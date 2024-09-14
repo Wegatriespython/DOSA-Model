@@ -1,7 +1,7 @@
 from mesa import Agent
 import numpy as np
 from Utilities.Simpler_profit_maxxin import profit_maximization
-from Utilities.expectations import expect_demand, expect_price, get_market_demand, get_expectations,get_supply
+from Utilities.expectations import expect_demand, expect_price, get_market_demand, get_expectations,get_supply, expect_price_ar
 from Utilities.Strategic_adjustments import get_max_wage, get_min_sale_price, get_max_capital_price,calculate_production_capacity, get_desired_wage, get_desired_capital_price, get_desired_price
 import logging
 
@@ -14,6 +14,7 @@ class Firm(Agent):
         self.prices = []
         self.desireds = []
         self.total_labor_units = 0
+        self.historic_labor_prices= []
         self.per_worker_income = 0
         self.zero_profit_conditions = []
         self.zero_profit_conditions_cache = []
@@ -32,6 +33,10 @@ class Firm(Agent):
         self.mode = 'decentralized'
         self.wage = model.config.INITIAL_WAGE
         self.max_working_hours = model.config.MAX_WORKING_HOURS
+
+
+
+
 
     def update_firm_state(self):
        #self.train_demand_predictor()
@@ -60,18 +65,29 @@ class Firm(Agent):
         if self.model.step_count < 1:
             self.expected_demand= np.full(self.model.config.TIME_HORIZON ,6)
             self.expected_price = np.full(self.model.config.TIME_HORIZON,1)
-            self.expectations =[np.mean(self.expected_demand), np.mean(self.expected_price)]
+            self.expectations =[np.mean(self.expected_demand), np.mean(self.expected_price), 3, 5, 96, 0.0625]
             self.desireds = [self.wage, self.price, self.model.config.INITIAL_RELATIVE_PRICE_CAPITAL]
 
             return
-
+        price_capital = 0
         demand, price =  get_market_demand(self, self.firm_type)
+        if self.firm_type == 'consumption':
+          capital_demand, price_capital = get_market_demand(self, 'capital')
+          print("capital price", np.mean(price_capital))
 
         self.historic_demand.append(demand)
         self.historic_price.append(price)
 
+        labor_demand, wage = get_market_demand(self,'labor')
+        self.historic_labor_prices.append(wage)
+        expected_capital_supply = get_supply(self, "capital")
+        expected_labor_supply = get_supply(self, "labor")
+
         self.expected_price, self.expected_demand = get_expectations(demand, self.historic_demand,  price ,self.historic_price,(self.model.config.TIME_HORIZON))
-        self.expectations = [self.expected_demand[0], self.expected_price[0]]
+
+
+        expected_wages = expect_price_ar(self.historic_labor_prices, wage, self.model.config.TIME_HORIZON)
+        self.expectations = [self.expected_demand[0], self.expected_price[0], price_capital, expected_capital_supply, expected_labor_supply, expected_wages[0]]
         self.expectations_cache.append(self.expectations)
         return
 
@@ -87,7 +103,7 @@ class Firm(Agent):
 
         average_capital_price = self.model.data_collector.get_average_capital_price(self.model)
 
-        if self.budget < 0:
+        if self.budget <= 0:
 
             return # Skip production if budget is negative
         print("Calling profit_maximization with parameters:", {
@@ -97,15 +113,18 @@ class Firm(Agent):
             'current_productivity': self.productivity,
             'expected_demand': self.expected_demand,
             'expected_price': self.expected_price,
-            'capital_price': 3,  # Updated
+            'capital_price': self.expectations[2],  # Updated
             'capital_elasticity': self.capital_elasticity,
             'current_inventory': self.inventory,
             'depreciation_rate': self.model.config.DEPRECIATION_RATE,
             'expected_periods': (self.model.config.TIME_HORIZON),
             'discount_rate': self.model.config.DISCOUNT_RATE,
             'budget': self.budget,
-            'wage': self.wage * self.max_working_hours # Per unit wage
+            'wage': self.wage * self.max_working_hours, # Per unit wage
+            'capital_supply': self.expectations[3],
+            'labor_supply': self.expectations[4]
         })
+
         self.per_worker_income = self.wage * self.max_working_hours
 
         result = profit_maximization(
@@ -115,15 +134,17 @@ class Firm(Agent):
             self.productivity,
             self.expected_demand,
             self.expected_price,
-            3,  # Updated
+            self.expectations[2],  # Updated
             self.capital_elasticity,
             self.inventory,
             self.model.config.DEPRECIATION_RATE,
             (self.model.config.TIME_HORIZON),
             self.model.config.DISCOUNT_RATE,
             self.budget,
-            self.wage * self.max_working_hours # Per unit wage
-        )
+            self.wage * self.max_working_hours,
+            self.expectations[3], #Capital Supply,
+            self.expectations[4] #Labor Supply
+             )
 
         if result is None:
             print("Optimization failed")
@@ -216,6 +237,9 @@ class Firm(Agent):
           average_price = np.mean(self.prices)
 
           self.price = average_price
+        else :
+          # no transactions have been made
+          self.price = 0
 
 
 
@@ -318,16 +342,14 @@ class Firm(Agent):
       if self.model.step_count < 2:
         self.desireds = [self.wage, self.price, self.model.config.INITIAL_RELATIVE_PRICE_CAPITAL]
         return
-
-      desired_wage = get_desired_wage(self.desireds[0],self.optimals[0], self.get_total_labor_units(), self.zero_profit_conditions[0], self.wage, self.model.config.MINIMUM_WAGE)
-
       if self.firm_type == 'consumption':
-        desired_price = get_desired_price(self.desireds[1],self.production,self.sales, self.zero_profit_conditions[1], self.price, self.optimals[3], self.inventory)
+            desired_price = get_desired_price(self.expectations[1], self.desireds[1],self.price,self.sales, self.optimals[4],  self.zero_profit_conditions[1], self.optimals[3], self.inventory)
 
-        desired_capital_price = get_desired_capital_price(self)
+            desired_capital_price = get_desired_capital_price(self)
       else:
-        desired_price = get_desired_price(self.desireds[1],self.optimals[4],self.sales, self.zero_profit_conditions[1], self.price)
-        desired_capital_price = desired_price
+            desired_price = get_desired_price(self.expectations[1], self.desireds[1],self.price,self.sales, self.optimals[4],  self.zero_profit_conditions[1], self.optimals[3], self.inventory)
+            desired_capital_price = 0
+      desired_wage = get_desired_wage(self.expectations[5],self.desireds[0],self.wage, self.optimals[0], self.get_total_labor_units(), self.zero_profit_conditions[0], self.model.config.MINIMUM_WAGE)
 
       self.desireds = [desired_wage, desired_price, desired_capital_price]
 
@@ -336,8 +358,7 @@ class Firm(Agent):
       return self.desireds
 
     def get_zero_profit_conditions(self):
-      if len(self.zero_profit_conditions)>0 :
-          print(self.zero_profit_conditions[1])
+
       max_wage = get_max_wage(self.total_working_hours, self.productivity, self.capital, self.capital_elasticity, self.price, self.get_total_labor_units(), self.optimals, self.model.config.MINIMUM_WAGE)
       min_sale_price = get_min_sale_price(self.firm_type, self.workers, self.productivity, self.capital, self.capital_elasticity, self.get_total_labor_units(), self.inventory)
 
@@ -368,6 +389,10 @@ class Firm1(Firm):
         self.historic_inventory = [self.inventory]
         self.expected_demand = model.config.FIRM1_INITIAL_DEMAND
         self.expected_price = self.price
+        self.productivity = model.config.INITIAL_PRODUCTIVITY
+        self.carbon_intensity = 1
+        self.preference_mode = self.model.config.PREFERNCE_MODE_CAPITAL
+
     def step(self):
         super().step()
   # Reset price to initial value
@@ -400,3 +425,6 @@ class Firm2(Firm):
         self.historic_inventory = [self.inventory]
         self.expected_demand = model.config.FIRM2_INITIAL_DEMAND
         self.expected_price = self.price
+        self.quality = 1
+        self.carbon_intensity = 1
+        self.preference_mode = self.model.config.PREFERNCE_MODE_CONSUMPTION
