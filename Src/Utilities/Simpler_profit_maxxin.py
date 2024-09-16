@@ -11,18 +11,18 @@ def memoized_profit_maximization(
     current_capital, current_labor, current_price, current_productivity,
     expected_demand, expected_price, capital_price, capital_elasticity,
     current_inventory, depreciation_rate, expected_periods, discount_rate,
-    budget, wage,capital_supply,labor_supply, linear_solver):
+    budget, wage,capital_supply,labor_supply,current_debt, linear_solver):
     return _profit_maximization(
       current_capital, current_labor, current_price, current_productivity,
       expected_demand, expected_price, capital_price, capital_elasticity,
       current_inventory, depreciation_rate, expected_periods, discount_rate,
-      budget, wage,capital_supply,labor_supply, linear_solver)
+      budget, wage,capital_supply,labor_supply, current_debt, linear_solver)
 
 def profit_maximization(
     current_capital, current_labor, current_price, current_productivity,
     expected_demand, expected_price, capital_price, capital_elasticity,
     current_inventory, depreciation_rate, expected_periods, discount_rate,
-    budget, wage,capital_supply,labor_supply, linear_solver='ma57'):
+    budget, wage,capital_supply,labor_supply, current_debt,  linear_solver='ma57'):
 
     global last_solution
 
@@ -34,7 +34,7 @@ def profit_maximization(
         current_capital, current_labor, current_price, current_productivity,
         expected_demand_tuple, expected_price_tuple, capital_price, capital_elasticity,
         current_inventory, depreciation_rate, expected_periods, discount_rate,
-        budget, wage,capital_supply,labor_supply,linear_solver)
+        budget, wage,capital_supply,labor_supply, current_debt, linear_solver)
 
     if result is not None:
         last_solution = (result['optimal_labor'], result['optimal_capital'])
@@ -47,7 +47,7 @@ def _profit_maximization(
         current_capital, current_labor, current_price, current_productivity,
         expected_demand, expected_price, capital_price, capital_elasticity,
         current_inventory, depreciation_rate, expected_periods, discount_rate,
-        budget, wage,capital_supply, labor_supply, linear_solver):
+        budget, wage,capital_supply, labor_supply, current_debt, linear_solver):
 
     model = pyo.ConcreteModel()
 
@@ -60,6 +60,8 @@ def _profit_maximization(
     guess_capital = (current_capital + max_capital)/2
     guess_labor = (current_labor + max_labor)/2
 
+    interest_rate = 1/(discount_rate) - 1
+
     # Scaling factors
     scale_capital = max(1, guess_capital)
     scale_labor = max(1, guess_labor)
@@ -67,18 +69,20 @@ def _profit_maximization(
     scale_demand = max(1, max(expected_demand))
 
     # Variables with scaling and lower bounds
-    model.labor = pyo.Var(domain=pyo.NonNegativeReals, initialize=max(1e-6, guess_labor), bounds=(1e-6, max_labor))
-    model.capital = pyo.Var(domain=pyo.NonNegativeReals, initialize=max(1e-6, guess_capital), bounds=(1e-6, max_capital))
-    model.production = pyo.Var(domain=pyo.NonNegativeReals, initialize=1e-6)
+    model.labor = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=max(1e-6, guess_labor), bounds=(1e-6, max_labor))
+    model.capital = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=max(1e-6, guess_capital), bounds=(1e-6, max_capital))
+    model.production = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=1e-6)
     model.inventory = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=max(1e-6, current_inventory))
     model.sales = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=1e-6)
+    model.debt = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=1e-6)
+    model.debt_payment = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=1e-6)
 
     # Objective
     def objective_rule(model):
         obj_value = sum(
             (expected_price[t] * model.sales[t] / scale_price
-             - wage * model.labor / scale_labor
-             - (model.capital - current_capital) * capital_price / scale_capital * (1 if t == 0 else 0)
+             - wage * model.labor[t] / scale_labor
+             - model.debt_payment[t]  # This now includes both principal and interest
              - depreciation_rate * expected_price[t] * model.inventory[t] / scale_price
             ) / ((1 + discount_rate) ** t)
             for t in model.T
@@ -87,19 +91,19 @@ def _profit_maximization(
     model.objective = pyo.Objective(rule=objective_rule, sense=pyo.maximize)
 
     # Constraints
-    def production_constraint_rule(model):
-        return model.production == current_productivity * (model.capital ** capital_elasticity) * (model.labor ** (1 - capital_elasticity))
-    model.production_constraint = pyo.Constraint(rule=production_constraint_rule)
+    def production_constraint_rule(model, t):
+        return model.production[t] == current_productivity * (model.capital[t] ** capital_elasticity) * (model.labor[t] ** (1 - capital_elasticity))
+    model.production_constraint = pyo.Constraint(model.T, rule=production_constraint_rule)
 
-    def budget_constraint_rule(model):
-        return (wage * model.labor + (model.capital - current_capital) * capital_price <= budget * 1.0000001) #allow 0.0001% slack
-    model.budget_constraint = pyo.Constraint(rule=budget_constraint_rule)
+    def budget_constraint_rule(model,t):
+        return (wage * model.labor[t] + model.debt_payment[t] <= budget * 1.0000001) #allow 0.0001% slack
+    model.budget_constraint = pyo.Constraint(model.T, rule=budget_constraint_rule)
 
     def inventory_balance_rule(model, t):
         if t == 0:
-            return model.inventory[t] == current_inventory + model.production - model.sales[t]
+            return model.inventory[t] == current_inventory + model.production[t] - model.sales[t]
         else:
-            return model.inventory[t] == model.inventory[t-1] + model.production - model.sales[t]
+            return model.inventory[t] == model.inventory[t-1] + model.production[t] - model.sales[t]
     model.inventory_balance = pyo.Constraint(model.T, rule=inventory_balance_rule)
 
     def sales_constraint_demand_rule(model, t):
@@ -107,8 +111,23 @@ def _profit_maximization(
     model.sales_constraint_demand = pyo.Constraint(model.T, rule=sales_constraint_demand_rule)
 
     def sales_constraint_inventory_rule(model, t):
-        return model.sales[t] <= model.inventory[t] + model.production
+        return model.sales[t] <= model.inventory[t] + model.production[t]
     model.sales_constraint_inventory = pyo.Constraint(model.T, rule=sales_constraint_inventory_rule)
+
+    def debt_capital_rule(model, t):
+      if t == 0:
+          return model.debt[t] == current_debt + (model.capital[t] - current_capital) * capital_price
+      else:
+          return model.debt[t] == model.debt[t-1] + (model.capital[t]- model.capital[t-1]) * capital_price - model.debt_payment[t-1]
+    model.debt_capital = pyo.Constraint(model.T, rule=debt_capital_rule)
+
+    def debt_payment_rule(model, t):
+        if t == 0:
+            return model.debt_payment[t] == 0
+        else:
+            return model.debt_payment[t] == (model.debt[t-1] * interest_rate) + (model.debt[t-1] - model.debt[t])
+
+    model.debt_payment_constraint = pyo.Constraint(model.T, rule=debt_payment_rule)
 
     # Solve the model
     solver = SolverFactory('ipopt')
@@ -129,22 +148,18 @@ def _profit_maximization(
     results = solver.solve(model, tee=False)
 
 
-
-    if results.solver.termination_condition == pyo.TerminationCondition.optimal:
-        total_cost = pyo.value(wage * model.labor + (model.capital - current_capital) * capital_price)
-        if total_cost > budget * 1.0000001:  # Allow for 0.0001% violation due to numerical issues
-            print(f"WARNING: Budget constraint violated. Total cost: {total_cost}, Budget: {budget}")
-
-    # Check if the solver found an optimal solution
+   # Check if the solver found an optimal solution
     if (results.solver.status == pyo.SolverStatus.ok and
         results.solver.termination_condition == pyo.TerminationCondition.optimal):
         unrounded_results = {
-            'optimal_labor': pyo.value(model.labor),
-            'optimal_capital': pyo.value(model.capital),
-            'optimal_production': pyo.value(model.production),
+            'optimal_labor': pyo.value(model.labor[t] for t in model.T),
+            'optimal_capital': pyo.value(model.capital[t] for t in model.T),
+            'optimal_production': pyo.value(model.production[t] for t in model.T),
             'optimal_price': expected_price[0],
             'optimal_sales': [pyo.value(model.sales[t]) for t in model.T],
-            'optimal_inventory': [pyo.value(model.inventory[t]) for t in model.T]
+            'optimal_inventory': [pyo.value(model.inventory[t]) for t in model.T],
+            'optimal_debt': [pyo.value(model.debt[t]) for t in model.T],
+            'optimal_debt_payment': [pyo.value(model.debt_payment[t]) for t in model.T],
         }
         return round_results(unrounded_results)
     else:

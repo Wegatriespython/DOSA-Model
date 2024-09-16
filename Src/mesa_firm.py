@@ -13,6 +13,7 @@ class Firm(Agent):
         self.total_working_hours = 0
         self.prices = []
         self.desireds = []
+        self.debt = 0
         self.total_labor_units = 0
         self.historic_labor_prices= []
         self.per_worker_income = 0
@@ -52,6 +53,8 @@ class Firm(Agent):
         self.investment_demand = 0
         self.expected_demand = 0
         self.expected_price = 0
+        self.productivity += self.labor_productivity
+        self.labor_productivity = 0
         self.get_total_labor_units()
         self.pay_wages()
         self.update_average_price()
@@ -143,7 +146,8 @@ class Firm(Agent):
             self.budget,
             self.wage * self.max_working_hours,
             self.expectations[3], #Capital Supply,
-            self.expectations[4] #Labor Supply
+            self.expectations[4], #Labor Supply,
+            self.debt
              )
 
         if result is None:
@@ -272,6 +276,9 @@ class Firm(Agent):
             self.fire_worker(worker)
         if employees_total > 0:
             self.wage = wage_total/employees_total
+            self.labor_productivity = skill_total/employees_total
+            print("skill total", skill_total)
+            #this would be cumilative over periods. The correct way would be a static effect which grows only if labor_productivity rises over time.:
 
 
 
@@ -391,6 +398,7 @@ class Firm1(Firm):
         self.expected_price = self.price
         self.productivity = model.config.INITIAL_PRODUCTIVITY
         self.carbon_intensity = 1
+        self.labor_productivity = 0
         self.preference_mode = self.model.config.PREFERNCE_MODE_CAPITAL
 
     def step(self):
@@ -413,6 +421,7 @@ class Firm2(Firm):
         self.capital_inventory = 0  # Separate inventory for capital goods
         self.firm_type = 'consumption'
         self.capital_resale_price = 0
+        self.labor_productivity = 0
         self.capital_elasticity = model.config.CAPITAL_ELASTICITY_FIRM2
         self.investment_demand = model.config.FIRM2_INITIAL_INVESTMENT_DEMAND
         self.capital = model.config.FIRM2_INITIAL_CAPITAL

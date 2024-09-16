@@ -12,7 +12,7 @@ class Config:
         self.INITIAL_PRICE = 1
         self.INITIAL_WAGE = 0.0625 # 1/16
         self.DEPRECIATION_RATE = 0.00
-        self.INITIAL_SKILLS = .1
+        self.INITIAL_SKILLS = 0
         self.DISCOUNT_RATE = 0.05
         self.INITIAL_SAVINGS = 2
         self.MIN_CONSUMPTION = 1
@@ -24,7 +24,7 @@ class Config:
         self.TOTAL_FACTOR_PRODUCTIVITY = 1.0
         self.CAPITAL_ELASTICITY_FIRM2 = 0.5
         self.CAPITAL_ELASTICITY_FIRM1 = 0.1
-        self.SKILL_GROWTH_RATE = 0.01
+        self.SKILL_GROWTH_RATE = 0.001
         self.SKILL_DECAY_RATE = 0.005
         # Firm1 specific parameters
         self.FIRM1_INITIAL_CAPITAL = 20

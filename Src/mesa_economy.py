@@ -54,9 +54,7 @@ class EconomyModel(Model):
 
     def step(self):
         # Clear previous transactions
-        self.labor_transactions.clear()
-        self.capital_transactions.clear()
-        self.consumption_transactions.clear()
+
 
 
         # Execute the step
@@ -73,6 +71,10 @@ class EconomyModel(Model):
                 if isinstance(agent, Firm2):
                     agent.adjust_investment_demand()
 
+
+        self.labor_transactions.clear()
+        self.capital_transactions.clear()
+        self.consumption_transactions.clear()
         # Execute markets
         self.execute_labor_market()
         self.execute_capital_market()
@@ -183,6 +185,7 @@ class EconomyModel(Model):
         avg_seller_price = sum(s[1] for s in sellers) / len(sellers) if sellers else 0
         avg_buyer_max = sum(b[3] for b in buyers)/ len(buyers) if buyers else 0
         avg_seller_min = sum(s[3] for s in sellers)/ len(sellers) if sellers else 0
+
         self.pre_consumption_transactions = np.array([buyer_demand, seller_inventory, avg_buyer_price, avg_seller_price, avg_buyer_max, avg_seller_min])
 
 

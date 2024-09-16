@@ -1,40 +1,33 @@
 from math import nan
 import numpy as np
-from statsmodels.tsa.statespace.sarimax import SARIMAX
-from statsmodels.tsa.arima.model import ARIMA
-from statsmodels.tsa.holtwinters import ExponentialSmoothing
 
-from pmdarima import auto_arima
-from statsmodels.tsa.api import VAR
 
 def get_market_demand(self, market_type):
-#grab the actual demand and prices if transactions occured, else grab the pre transactions
-  if self.model.step_count < 1:
-    return 0
-  if market_type == 'capital':
-    demand = self.model.pre_capital_transactions[0]
-    price = (self.model.pre_capital_transactions[2]+self.model.pre_capital_transactions[3])/2
-    demand = demand
-    if demand is None or price is None:
-      return 0, 0
-    return demand, price
-  elif market_type == 'consumption':
+    if self.model.step_count < 1:
+        return 30, 1
 
-    demand = self.model.pre_consumption_transactions[0]
-    price = (self.model.pre_consumption_transactions[2]+self.model.pre_consumption_transactions[3])/2
+    match market_type:
+        case 'capital' | 'consumption' | 'labor':
+            pre_transactions = getattr(self.model, f"pre_{market_type}_transactions")
+            transactions = getattr(self.model, f"{market_type}_transactions")
+        case _:
+            raise ValueError(f"Invalid market type: {market_type}")
 
-    demand = demand
-    if demand is None or price is None:
-      return 0, 0
-    return demand, price
-  else :
-    demand = self.model.pre_labor_transactions[0]
-    price  = (self.model.pre_labor_transactions[2] + self.model.pre_labor_transactions[3]) / 2
+    latent_demand = pre_transactions[0]
+    latent_price = (pre_transactions[2] + pre_transactions[3]) / 2  # Avg of buyer and seller price
 
-    demand = demand
-    if demand is None or price is None:
-      return 0, 0
-    return demand, price
+    if len(transactions)>2:
+        demand_realised = sum(t[2] for t in transactions)
+        price_realised = sum(t[3] for t in transactions)/ len(transactions) if transactions else 0
+    else:
+        demand_realised, price_realised = latent_demand, latent_price
+
+    volume_latent = latent_demand * latent_price
+    volume_realised = demand_realised * price_realised
+
+
+    return ((latent_demand+ demand_realised)/2, (latent_price+ price_realised)/2)
+
 
 def get_supply(self, market_type):
   all_supply = 0
@@ -88,7 +81,7 @@ def expect_price_ar(historic_prices, current_price, periods=6, alpha=0.3):
     """
     if len(historic_prices) > 5:
         historic_mean = np.mean(historic_prices)
-        last_price = historic_prices[-1]
+        last_price = current_price if current_price <0.1 else historic_prices[-1]
 
         expected_prices = []
         for _ in range(periods):
@@ -100,7 +93,8 @@ def expect_price_ar(historic_prices, current_price, periods=6, alpha=0.3):
 
         expected_price = np.array(expected_prices)
     else:
-        expected_price = np.array([current_price] * periods)
+        historic_mean = np.mean(historic_prices)
+        expected_price = np.array([historic_mean] * periods)
 
     return np.maximum(expected_price, 0)  # Ensure non-negative prices
 def expect_demand(demand, periods=6):

@@ -15,9 +15,12 @@ class Worker(Agent):
         self.worker_expectations = []
         self.skillscarbon = 1
         self.consumption_check = 0
+        self.desired_price = self.model.config.INITIAL_PRICE
+        self.desired_wage = self.model.config.MINIMUM_WAGE
+        self.dissatistifaction = 0
         self.wage_history1 = []
         self.price_history1 = []
-        self.dissatistifaction = 0
+        self.avg_price = 0
         self.wage = model.config.MINIMUM_WAGE
         self.income = 0
         self.savings = self.model.config.INITIAL_SAVINGS
@@ -39,46 +42,65 @@ class Worker(Agent):
         self.mode = 'decentralized'
 
     def step(self):
-
-        self.update_utilty()
+        self.worker_expectations.clear()
         self.update_expectations()
+        self.update_utilty()
+        self.update_strategy()
         self.update_skills()
+
+    def update_expectations(self):
+      if self.model.step_count < 1:
+        wage = np.full(self.model.config.TIME_HORIZON,self.expected_wage)
+        prices = np.full(self.model.config.TIME_HORIZON, self.expected_price)
+        self.worker_expectations = [wage, prices]
+        self.avg_price = self.expected_price
+      else:
+        quantity, mkt_wages= get_market_demand(self, 'labor')
+        demand, price = get_market_demand(self, 'consumption')
+        if mkt_wages != 0:
+          self.wage_history1.append(mkt_wages)
+        if price != 0:
+          self.price_history1.append(price)
+
+        if len(self.prices) > 0 :
+          self.prices = [p for p in self.prices if not np.isnan(p)]
+          self.avg_price = np.mean(self.prices)
+        else:
+          self.avg_price = 0
+
+        wage = expect_price_ar(self.wage_history1, self.expected_wage, self.model.config.TIME_HORIZON)
+        prices = expect_price_ar(self.price_history1, self.expected_price, self.model.config.TIME_HORIZON)
+
+        self.worker_expectations = [wage, prices]
+
     def update_utilty(self):
 
 
-        if self.model.step_count > 1:
-
-          quantity, mkt_wages= get_market_demand(self, 'labor')
-          demand, price = get_market_demand(self, 'consumption')
-          self.wage_history1.append(mkt_wages)
-          self.price_history1.append(price)
-
-          wage = expect_price_ar(self.wage_history1, mkt_wages, self.model.config.TIME_HORIZON)
-          prices = expect_price_ar(self.price_history1, price, self.model.config.TIME_HORIZON)
-
-          self.worker_expectations = [wage[0], prices[0]]
-
-          results = maximize_utility(self.savings, wage, prices,0.95, self.model.config.TIME_HORIZON, alpha=0.9, max_working_hours=16)
+          results = maximize_utility(self.savings, self.worker_expectations[0], self.worker_expectations[1],0.95, self.model.config.TIME_HORIZON, alpha=0.9, max_working_hours=16)
           self.desired_consumption, self.working_hours, self.leisure, self.desired_savings = [arr[0] for arr in results]
 
           self.optimals = [self.desired_consumption, self.working_hours, self.desired_savings]
+          if self.desired_consumption >100:
+            print("desired_consumption", self.desired_consumption,"prices", prices, "wage", wage, "savings", self.savings)
+            breakpoint()
 
 
 
-    def update_expectations(self):
+    def update_strategy(self):
 
-      if self.model.step_count > 1:
-        if len(self.prices) > 0 :
-          self.prices = [p for p in self.prices if not np.isnan(p)]
-          avg_price = np.mean(self.prices)
-        else:
-          avg_price = 0
+        max_price = self.get_max_consumption_price()
 
-        self.expected_price = update_worker_price_expectation(self.worker_expectations[1],self.expected_price,avg_price,self.consumption,self.desired_consumption,self.get_max_consumption_price())
+        desired_price = update_worker_price_expectation(self.worker_expectations[0][1],self.desired_price,self.avg_price,self.consumption,self.desired_consumption,max_price)
+
+        self.desired_price = desired_price
 
 
+        self.desired_wage = update_worker_wage_expectation(self.worker_expectations[0][0],self.desired_wage,self.wage,self.working_hours, self.optimals[1], self.get_min_wage())
 
-        self.expected_wage = update_worker_wage_expectation(self.worker_expectations[0],self.expected_wage,self.wage,self.working_hours, self.optimals[1], self.get_min_wage())
+        if self.wage < self.expected_wage:
+          #Quit when wage is 20% below expected wage
+          self.quit(self.working_hours)
+
         self.consumption = 0
         self.consumption_check = 0
         self.price = 0
@@ -89,9 +111,9 @@ class Worker(Agent):
 
     def update_skills(self):
         if self.total_working_hours > 0:
-            self.skills *= (1 + self.model.config.SKILL_GROWTH_RATE)
+            self.skills += self.model.config.SKILL_GROWTH_RATE
         else:
-            self.skills *= (1 - self.model.config.SKILL_DECAY_RATE)
+            self.skills -= self.model.config.SKILL_DECAY_RATE if self.skills > 0 else 0
 
     def get_hired(self, employer, wage, hours):
         self.employers[employer] = {'hours': hours, 'wage': wage}
@@ -111,16 +133,14 @@ class Worker(Agent):
             self.total_working_hours = max(0, self.total_working_hours)
             del self.employers[employer]
             self.update_average_wage()
-    def quit(self):
 
+    def quit(self, hours_to_quit):
         # Sort employers by hours worked, in descending order
         sorted_employers = sorted(self.employers.items(), key=lambda x: x[1]['hours'], reverse=True)
-
+        quits = 0
         for employer, details in sorted_employers:
-            if self.total_working_hours <= self.working_hours:
+            if quits >= hours_to_quit:
                 break
-
-            hours_to_quit = min(details['hours'], self.total_working_hours - self.working_hours)
 
             if hours_to_quit == details['hours']:
                 # Quit the job entirely
@@ -128,11 +148,6 @@ class Worker(Agent):
             else:
                 # Reduce hours for this job
                 self.employers[employer]['hours'] -= hours_to_quit
-                self.total_working_hours -= hours_to_quit
-
-            if self.total_working_hours <= self.working_hours:
-                break
-
             self.update_average_wage()
 
     def update_average_wage(self):
@@ -157,13 +172,8 @@ class Worker(Agent):
         self.savings = max(0, self.savings) #prevent negative savings
 
     def get_max_consumption_price(self):
+      return self.savings/(self.model.config.TIME_HORIZON) + (self.wage * 16) if self.wage > 0 else  self.savings/(self.model.config.TIME_HORIZON) + self.worker_expectations[0][0] * 16
 
-        amt = self.savings/(self.model.config.TIME_HORIZON) + (self.wage * 16)
-
-        if amt < self.savings:
-          return amt
-        else:
-          return self.savings # Willing to pay up to 10% more than expected
 
     def get_paid(self, wage):
         self.savings += wage
@@ -174,5 +184,5 @@ class Worker(Agent):
         elif self.working_hours > self.total_working_hours:
             return self.working_hours - self.total_working_hours
         else :
-          self.quit()
+          self.quit(self.total_working_hours - self.working_hours)
           return 0
