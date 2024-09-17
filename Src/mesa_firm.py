@@ -66,7 +66,7 @@ class Firm(Agent):
     def update_expectations(self):
 
         if self.model.step_count < 1:
-            self.expected_demand= np.full(self.model.config.TIME_HORIZON ,6)
+            self.expected_demand= np.full(self.model.config.TIME_HORIZON ,30)
             self.expected_price = np.full(self.model.config.TIME_HORIZON,1)
             self.expectations =[np.mean(self.expected_demand), np.mean(self.expected_price), 3, 5, 96, 0.0625]
             self.desireds = [self.wage, self.price, self.model.config.INITIAL_RELATIVE_PRICE_CAPITAL]
@@ -146,26 +146,33 @@ class Firm(Agent):
             self.budget,
             self.wage * self.max_working_hours,
             self.expectations[3], #Capital Supply,
-            self.expectations[4], #Labor Supply,
-            self.debt
-             )
+            self.expectations[4],
+            self.debt,
+            self.carbon_intensity,
+            0.8,
+            0.001#Labor Supply,
+            )
 
         if result is None:
             print("Optimization failed")
             return
 
 
-        optimal_labor = round(result['optimal_labor'], 1)
-        optimal_capital = round(result['optimal_capital'], 1)
-        optimal_production = round(result['optimal_production'],1)
-        Trajectory_inventory = result['optimal_inventory'],1
-        optimal_inventory = round(round(Trajectory_inventory[0][0],1),1)
+        optimal_labor = result['optimal_labor']
+        optimal_capital = result['optimal_capital']
+        optimal_production = result['optimal_production']
+        optimal_inventory = result['optimal_inventory']
         optimal_sales = result['optimal_sales']
-        optimal_sales = round(np.mean(optimal_sales),1)
+        optimal_debt = result['optimal_debt']
+        optimal_debt_payment = result['optimal_debt_payment']
+        optimal_profit_per_period = result['profits_per_period']
+        optimal_carbon_intensity = result['optimal_carbon_intensity']
+        optimal_emissions = result['optimal_emissions']
 
-
-        self.optimals = [optimal_labor, optimal_capital, optimal_production, optimal_inventory, optimal_sales]
-        print("Optimal values:", self.optimals)
+        self.optimals = [optimal_labor, optimal_capital, optimal_production, optimal_inventory, optimal_sales, optimal_debt, optimal_debt_payment, optimal_profit_per_period]
+        print(f"Optimal values: {self.optimals}")
+        print(f"Debt taken {optimal_debt}, debt repaid {optimal_debt_payment}, optimal carbon intensity {optimal_carbon_intensity}, optimal_emissions{optimal_emissions}" )
+        breakpoint()
         self.optimals_cache.append(self.optimals)
         # Keep only the last 5 values
         if len(self.optimals_cache) > 5:
@@ -279,10 +286,6 @@ class Firm(Agent):
             self.labor_productivity = skill_total/employees_total
             print("skill total", skill_total)
             #this would be cumilative over periods. The correct way would be a static effect which grows only if labor_productivity rises over time.:
-
-
-
-
         return self.wage
 
 
@@ -429,6 +432,7 @@ class Firm2(Firm):
         self.inventory = model.config.FIRM2_INITIAL_INVENTORY
         self.historic_demand = [model.config.FIRM2_INITIAL_DEMAND]
         self.budget = 5
+        self.carbon_intensity = 1
         self.historic_sales = [model.config.INITIAL_SALES]
         self.price = self.model.config.INITIAL_PRICE
         self.historic_inventory = [self.inventory]

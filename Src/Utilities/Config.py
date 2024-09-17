@@ -6,12 +6,12 @@ class Config:
         #
 
         self.MAX_WORKING_HOURS = 16
-        self.TIME_HORIZON = 6
+        self.TIME_HORIZON = 25
         self.INITIAL_SALES = 1
         self.INITIAL_PRODUCTIVITY = 1
         self.INITIAL_PRICE = 1
         self.INITIAL_WAGE = 0.0625 # 1/16
-        self.DEPRECIATION_RATE = 0.00
+        self.DEPRECIATION_RATE = 0.05
         self.INITIAL_SKILLS = 0
         self.DISCOUNT_RATE = 0.05
         self.INITIAL_SAVINGS = 2
@@ -40,7 +40,7 @@ class Config:
         # Firm2 specific parameters
         self.FIRM2_INITIAL_CAPITAL = 6
         self.FIRM2_INITIAL_INVENTORY = 2
-        self.FIRM2_INITIAL_DEMAND = 6
+        self.FIRM2_INITIAL_DEMAND = 30
         self.FIRM2_INITIAL_INVESTMENT_DEMAND = 1
         self.FIRM2_INITIAL_DESIRED_CAPITAL = 5
         self.FIRM2_MACHINE_OUTPUT_PER_PERIOD = 10

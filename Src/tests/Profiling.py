@@ -1,3 +1,7 @@
+import os,sys
+src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+
+sys.path.insert(0, src_path)
 from mesa_economy import EconomyModel
 import cProfile
 import pstats

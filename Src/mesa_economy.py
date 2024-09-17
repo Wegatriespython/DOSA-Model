@@ -4,7 +4,6 @@ from Utilities.Config import Config
 from mesa_worker import Worker
 from mesa_firm import Firm1, Firm2
 from Utilities.mesa_market_matching import market_matching
-from Utilities.Accounting_System import GlobalAccountingSystem
 from Utilities.economy_data_collector import EconomyDataCollector
 import numpy as np
 
@@ -18,7 +17,6 @@ class EconomyModel(Model):
         self.schedule = RandomActivationByType(self)
         self.config = Config()
         self.step_count = 0
-        self.global_accounting = GlobalAccountingSystem()
         self.mode = mode
         self.data_collector = EconomyDataCollector(self)
 
@@ -44,13 +42,13 @@ class EconomyModel(Model):
         for i in range(self.num_firm2):
             firm = Firm2(self.num_workers + i, self)
             self.schedule.add(firm)
-            self.global_accounting.register_firm(firm)
+
 
         # Create Firm1 instances
         for i in range(self.num_firm1):
             firm = Firm1(self.num_workers + self.num_firm2 + i, self)
             self.schedule.add(firm)
-            self.global_accounting.register_firm(firm)
+
 
     def step(self):
         # Clear previous transactions
