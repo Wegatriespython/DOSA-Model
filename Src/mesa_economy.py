@@ -138,7 +138,7 @@ class EconomyModel(Model):
         for firm in self.schedule.agents:
             match firm:
                 case Firm1() if firm.inventory > 0:
-                    sellers.append((min(firm.inventory,firm.optimals[4]), firm.desireds[1], firm, firm.zero_profit_conditions[1], firm.productivity, firm.carbon_intensity))
+                    sellers.append((min(firm.inventory,firm.optimals['sales']), firm.desireds[1], firm, firm.zero_profit_conditions[1], firm.productivity, firm.carbon_intensity))
                 case Firm2() if firm.capital_inventory > 0:
                     sellers.append((firm.capital_inventory,firm.capital_resale_price, firm, 0.1, firm.productivity, firm.carbon_intensity))
         buyer_demand = sum(b[0] for b in buyers)  if buyers else 0
@@ -165,7 +165,7 @@ class EconomyModel(Model):
                   for worker in self.schedule.agents
                   if isinstance(worker, Worker) and worker.savings > 0]
 
-        sellers = [(min(firm.inventory, firm.optimals[4]), firm.desireds[1], firm, firm.zero_profit_conditions[1], firm.quality, firm.carbon_intensity)
+        sellers = [(min(firm.inventory, firm.optimals['sales']), firm.desireds[1], firm, firm.zero_profit_conditions[1], firm.quality, firm.carbon_intensity)
                    for firm in self.schedule.agents
 
                    if isinstance(firm, Firm2) and firm.inventory > 0]

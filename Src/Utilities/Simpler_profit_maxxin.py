@@ -53,14 +53,14 @@ def _profit_maximization(
 
     # Sets
     model.T = pyo.RangeSet(0, expected_periods - 1)
-    max_labor = 30 + current_labor
-    max_capital = 30 + current_capital
+    max_labor = labor_supply/16 + current_labor
+    max_capital = capital_supply + current_capital
 
 
     guess_capital = (current_capital + max_capital)/2
     guess_labor = (current_labor + max_labor)/2
 
-    interest_rate = 0.01
+    interest_rate = 1/discount_rate - 1
 
     # Scaling factors
     scale_capital = max(1, guess_capital)
@@ -81,6 +81,7 @@ def _profit_maximization(
     model.investment = pyo.Var(model.T, domain=pyo.NonNegativeReals)
     model.carbon_intensity = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=current_carbon_intensity)
     model.emissions = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=0)
+    model.carbon_tax_payment = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=0)
 
 
     # Objective
@@ -90,15 +91,19 @@ def _profit_maximization(
              - wage * model.labor[t] / scale_labor
              - model.debt_payment[t]
              - depreciation_rate * expected_price[t] * model.inventory[t] / scale_price
+             - model.carbon_tax_payment[t] / scale_price  # Use scale_price instead of scale_demand
             ) / ((1 + discount_rate) ** t)
             for t in model.T
         )
-        carbon_tax = sum(model.emissions[t] * carbon_tax_rate / scale_demand for t in model.T)
-        obj_value -= carbon_tax
         return obj_value
     model.objective = pyo.Objective(rule=objective_rule, sense=pyo.maximize)
 
     # Constraints
+    def carbon_tax_payment_rule(model, t):
+        return model.carbon_tax_payment[t] == model.emissions[t] * carbon_tax_rate
+    model.carbon_tax_payment_constraint = pyo.Constraint(model.T, rule=carbon_tax_payment_rule)
+
+
     def production_constraint_rule(model, t):
         return model.production[t] == current_productivity * (model.capital[t] ** capital_elasticity) * (model.labor[t] ** (1 - capital_elasticity))
     model.production_constraint = pyo.Constraint(model.T, rule=production_constraint_rule)
@@ -116,15 +121,11 @@ def _profit_maximization(
     model.carbon_intensity_evolution = pyo.Constraint(model.T, rule=carbon_intensity_evolution_rule)
 
     def cash_flow_rule(model, t):
-        # Beginning cash
         cash_beginning = budget if t == 0 else model.cash[t-1]
-        # Total cash available in t
         cash_available = cash_beginning + model.net_borrowing[t]
-        # Expenses in t
         capital_expenditure = model.investment[t] * capital_price
-
-        expenses = wage * model.labor[t] + model.debt_payment[t] + capital_expenditure
-        # Ensure that cash available covers expenses
+        expenses = (wage * model.labor[t] + model.debt_payment[t] +
+                    capital_expenditure + model.carbon_tax_payment[t])
         return cash_available >= expenses
     model.cash_flow_constraint = pyo.Constraint(model.T, rule=cash_flow_rule)
 
@@ -133,7 +134,7 @@ def _profit_maximization(
         cash_beginning = budget if t == 0 else model.cash[t-1]
         # Expenses in t
         capital_expenditure = model.investment[t] * capital_price
-        expenses = wage * model.labor[t] + model.debt_payment[t] + capital_expenditure
+        expenses = wage * model.labor[t] + model.debt_payment[t] + capital_expenditure + model.carbon_tax_payment[t]
         # Revenue in t
         revenue = model.sales[t] * expected_price[t]
         # Cash balance at end of t
@@ -166,7 +167,6 @@ def _profit_maximization(
             available_inventory = model.inventory[t-1] + model.production[t]
         return model.sales[t] <= available_inventory
     model.sales_constraint_inventory = pyo.Constraint(model.T, rule=sales_constraint_inventory_rule)
-
 
 
     def debt_evolution_rule(model, t):
@@ -234,6 +234,7 @@ def _profit_maximization(
             'optimal_capital': [pyo.value(model.capital[t]) for t in model.T],
             'optimal_production': [pyo.value(model.production[t]) for t in model.T],
             'optimal_price': expected_price[0],
+            'optimal_investment': [pyo.value(model.investment[t]) for t in model.T],
             'profits_per_period': profits_per_period,
             'objective': pyo.value(model.objective),
             'optimal_sales': [pyo.value(model.sales[t]) for t in model.T],
@@ -241,7 +242,8 @@ def _profit_maximization(
             'optimal_debt': [pyo.value(model.debt[t]) for t in model.T],
             'optimal_debt_payment': [pyo.value(model.debt_payment[t]) for t in model.T],
             'optimal_carbon_intensity': [pyo.value(model.carbon_intensity[t]) for t in model.T],
-            'optimal_emissions': [pyo.value(model.emissions[t]) for t in model.T]
+            'optimal_emissions': [pyo.value(model.emissions[t]) for t in model.T],
+            'optimal_carbon_tax_payments': [pyo.value(model.carbon_tax_payment[t]) for t in model.T]
         }
         return round_results(unrounded_results)
     else:
@@ -252,7 +254,7 @@ def round_results(results):
     rounded = {}
     for key, value in results.items():
         if isinstance(value, list):
-            rounded[key] = [round(v) for v in value]
+            rounded[key] = [round(v,2) for v in value]
         else:
-            rounded[key] = round(value)
+            rounded[key] = round(value, 2)
     return rounded

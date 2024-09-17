@@ -11,7 +11,7 @@ class Config:
         self.INITIAL_PRODUCTIVITY = 1
         self.INITIAL_PRICE = 1
         self.INITIAL_WAGE = 0.0625 # 1/16
-        self.DEPRECIATION_RATE = 0.05
+        self.DEPRECIATION_RATE = 0
         self.INITIAL_SKILLS = 0
         self.DISCOUNT_RATE = 0.05
         self.INITIAL_SAVINGS = 2

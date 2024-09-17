@@ -1,11 +1,11 @@
 import numpy as np
-def get_max_wage(total_working_hours, productivity, capital, capital_elasticity, price, total_labor_units, optimals, minimum_wage):
+def get_max_wage(total_working_hours, productivity, capital, capital_elasticity, price, total_labor_units, labor, minimum_wage):
     if total_working_hours < 16:
         production_capacity = calculate_production_capacity(productivity, capital, capital_elasticity, 1)
         revenue_per_hour = (production_capacity * price) / 16
         max_wage = revenue_per_hour
     else:
-        labor_demand = optimals[0]
+        labor_demand = labor
         new_units = labor_demand
 
         new_production_capacity = calculate_production_capacity(productivity, capital, capital_elasticity, new_units)
@@ -35,11 +35,11 @@ def get_min_sale_price(firm_type, workers, productivity, capital, capital_elasti
             return 1.5
         return max(labor_cost / total_output,1.5)
 
-def get_max_capital_price(investment_demand, optimals, price, capital_elasticity, time_horizon, discount_rate):
+def get_max_capital_price(investment_demand, optimal_production, optimal_capital, price, capital_elasticity, time_horizon, discount_rate):
 
-    optimal_production = optimals[2]
+
     optimal_price = price
-    optimal_capital = optimals[1]
+
 
     total_revenue = sum([optimal_production * optimal_price * (1 - discount_rate)**i for i in range(time_horizon)])
 

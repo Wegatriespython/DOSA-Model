@@ -22,7 +22,7 @@ class Firm(Agent):
         self.historic_demand = []
         self.historic_price = []
         self.histiric_sales = []
-        self.optimals = []
+        self.optimals = {}
         self.optimals_cache = []
         self.expectations = []
         self.expectations_cache = []
@@ -125,7 +125,11 @@ class Firm(Agent):
             'budget': self.budget,
             'wage': self.wage * self.max_working_hours, # Per unit wage
             'capital_supply': self.expectations[3],
-            'labor_supply': self.expectations[4]
+            'labor_supply': self.expectations[4],
+            'debt': self.debt,
+            'carbon_intensity': self.carbon_intensity,
+            'new capital carbon intensity': 1,
+            'carbon_tax_rate': 0
         })
 
         self.per_worker_income = self.wage * self.max_working_hours
@@ -149,8 +153,8 @@ class Firm(Agent):
             self.expectations[4],
             self.debt,
             self.carbon_intensity,
-            0.8,
-            0.001#Labor Supply,
+            1,
+            0#Labor Supply,
             )
 
         if result is None:
@@ -162,31 +166,38 @@ class Firm(Agent):
         optimal_capital = result['optimal_capital']
         optimal_production = result['optimal_production']
         optimal_inventory = result['optimal_inventory']
+        optimal_investment = result['optimal_investment']
         optimal_sales = result['optimal_sales']
         optimal_debt = result['optimal_debt']
         optimal_debt_payment = result['optimal_debt_payment']
         optimal_profit_per_period = result['profits_per_period']
         optimal_carbon_intensity = result['optimal_carbon_intensity']
         optimal_emissions = result['optimal_emissions']
+        optimal_carbon_tax_payments = result['optimal_carbon_tax_payments']
 
-        self.optimals = [optimal_labor, optimal_capital, optimal_production, optimal_inventory, optimal_sales, optimal_debt, optimal_debt_payment, optimal_profit_per_period]
+        self.optimals = {
+            'labor': optimal_labor[0],
+            'capital': optimal_capital[0],
+            'production': optimal_production[0],
+            'inventory': optimal_inventory[0],
+            'sales': optimal_sales[0],
+            'debt': optimal_debt[0],
+            'debt_payment': optimal_debt_payment[0],
+            'profit_per_period': optimal_profit_per_period[0],
+            'investment': optimal_investment[0]
+        }
         print(f"Optimal values: {self.optimals}")
-        print(f"Debt taken {optimal_debt}, debt repaid {optimal_debt_payment}, optimal carbon intensity {optimal_carbon_intensity}, optimal_emissions{optimal_emissions}" )
-        breakpoint()
-        self.optimals_cache.append(self.optimals)
-        # Keep only the last 5 values
-        if len(self.optimals_cache) > 5:
-            self.optimals_cache = self.optimals_cache[-5:]
 
-        # Calculate the mean of the available optimal values
-        self.optimals = np.mean(self.optimals_cache, axis=0)
+
+
+
         return optimal_labor, optimal_capital, optimal_production
 
     def adjust_labor(self):
         if self.inventory > self.model.config.INVENTORY_THRESHOLD:
             self.labor_demand = 0
             return self.labor_demand
-        optimal_labor = self.optimals[0]
+        optimal_labor = self.optimals['labor']
 
         self.labor_demand = max(0, optimal_labor - self.get_total_labor_units()) * self.max_working_hours  # Convert to hours
 
@@ -198,19 +209,19 @@ class Firm(Agent):
             if self.inventory > self.model.config.INVENTORY_THRESHOLD:
                 self.investment_demand = 0
                 return self.investment_demand
-            optimal_capital = self.optimals[1]
-            self.investment_demand = max(0, optimal_capital - self.capital)
-            if optimal_capital < self.capital:
+            optimal_capital = self.optimals["capital"]
+            self.investment_demand = self.optimals["investment"]
+            """if optimal_capital < self.capital:
                 self.capital_inventory = 0
 
                 self.capital_resale_price = self.model.data_collector.get_average_capital_price(self.model)
-                self.captial_min_price = 0.1
+                self.captial_min_price = 0.1"""
             return self.investment_demand
     def adjust_production(self):
         if self.inventory > self.model.config.INVENTORY_THRESHOLD:
             self.production = 0
             return self.production
-        optimal_production = self.optimals[2]
+        optimal_production = self.optimals['production']
         self.production =  min(optimal_production, calculate_production_capacity(self.productivity, self.capital, self.capital_elasticity, self.get_total_labor_units()))
 
         self.inventory += max(0, self.production)
@@ -334,10 +345,19 @@ class Firm(Agent):
         if isinstance(self, Firm2):
             self.capital += quantity
             self.investment_demand -= quantity
-
             budget_change = quantity * price
+            optimal_debt = self.optimals['debt']
+            if optimal_debt - self.debt  <= 0:
+              #if not taking debt, purely finance out of budget.
+              self.budget -= budget_change
+            else:
+              if optimal_debt<= budget_change:
+                self.budget -= budget_change - optimal_debt
+                self.debt += optimal_debt
+              else:
+                self.debt += budget_change
 
-            self.budget -= budget_change
+
 
     def sell_goods(self, quantity, price):
         inventory_change = self.inventory - quantity
@@ -353,13 +373,13 @@ class Firm(Agent):
         self.desireds = [self.wage, self.price, self.model.config.INITIAL_RELATIVE_PRICE_CAPITAL]
         return
       if self.firm_type == 'consumption':
-            desired_price = get_desired_price(self.expectations[1], self.desireds[1],self.price,self.sales, self.optimals[4],  self.zero_profit_conditions[1], self.optimals[3], self.inventory)
+            desired_price = get_desired_price(self.expectations[1], self.desireds[1],self.price,self.sales, self.optimals['sales'],  self.zero_profit_conditions[1], self.optimals['inventory'], self.inventory)
 
             desired_capital_price = get_desired_capital_price(self)
       else:
-            desired_price = get_desired_price(self.expectations[1], self.desireds[1],self.price,self.sales, self.optimals[4],  self.zero_profit_conditions[1], self.optimals[3], self.inventory)
+            desired_price = get_desired_price(self.expectations[1], self.desireds[1],self.price,self.sales, self.optimals['sales'],  self.zero_profit_conditions[1], self.optimals['inventory'], self.inventory)
             desired_capital_price = 0
-      desired_wage = get_desired_wage(self.expectations[5],self.desireds[0],self.wage, self.optimals[0], self.get_total_labor_units(), self.zero_profit_conditions[0], self.model.config.MINIMUM_WAGE)
+      desired_wage = get_desired_wage(self.expectations[5],self.desireds[0],self.wage, self.optimals['labor'], self.get_total_labor_units(), self.zero_profit_conditions[0], self.model.config.MINIMUM_WAGE)
 
       self.desireds = [desired_wage, desired_price, desired_capital_price]
 
@@ -369,13 +389,13 @@ class Firm(Agent):
 
     def get_zero_profit_conditions(self):
 
-      max_wage = get_max_wage(self.total_working_hours, self.productivity, self.capital, self.capital_elasticity, self.price, self.get_total_labor_units(), self.optimals, self.model.config.MINIMUM_WAGE)
+      max_wage = get_max_wage(self.total_working_hours, self.productivity, self.capital, self.capital_elasticity, self.price, self.get_total_labor_units(),self.optimals['labor'],self.model.config.MINIMUM_WAGE)
       min_sale_price = get_min_sale_price(self.firm_type, self.workers, self.productivity, self.capital, self.capital_elasticity, self.get_total_labor_units(), self.inventory)
 
       if min_sale_price < 0.5:
         breakpoint()
 
-      max_capital_price = get_max_capital_price(self.investment_demand, self.optimals, self.price, self.capital_elasticity, self.model.config.TIME_HORIZON, self.model.config.DISCOUNT_RATE)
+      max_capital_price = get_max_capital_price(self.investment_demand, self.optimals['production'],self.optimals['capital'], self.price, self.capital_elasticity, self.model.config.TIME_HORIZON, self.model.config.DISCOUNT_RATE)
       self.zero_profit_conditions = [max_wage, min_sale_price, max_capital_price]
       self.zero_profit_conditions_cache.append(self.zero_profit_conditions)
       return self.zero_profit_conditions
