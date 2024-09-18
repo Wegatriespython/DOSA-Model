@@ -6,7 +6,7 @@ from functools import lru_cache
 # Global variable to store the last solution for warm start
 last_solution = None
 
-@lru_cache(maxsize=2056)
+@lru_cache(maxsize=256)
 def memoized_profit_maximization(
     current_capital, current_labor, current_price, current_productivity,
     expected_demand, expected_price, capital_price, capital_elasticity,
@@ -254,7 +254,7 @@ def round_results(results):
     rounded = {}
     for key, value in results.items():
         if isinstance(value, list):
-            rounded[key] = [round(v,2) for v in value]
+            rounded[key] = [round(v) for v in value]
         else:
-            rounded[key] = round(value, 2)
+            rounded[key] = round(value)
     return rounded

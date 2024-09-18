@@ -12,6 +12,7 @@ class Worker(Agent):
         self.total_working_hours = 0
         self.preference_mode = self.model.config.PREFERNCE_MODE_LABOR
         self.max_working_hours = 16
+        self.time_horizon = self.model.config.TIME_HORIZON - self.model.step_count
         self.worker_expectations = []
         self.skillscarbon = 1
         self.consumption_check = 0
@@ -50,8 +51,8 @@ class Worker(Agent):
 
     def update_expectations(self):
       if self.model.step_count < 1:
-        wage = np.full(self.model.config.TIME_HORIZON,self.expected_wage)
-        prices = np.full(self.model.config.TIME_HORIZON, self.expected_price)
+        wage = np.full(self.time_horizon,self.expected_wage)
+        prices = np.full(self.time_horizon, self.expected_price)
         self.worker_expectations = [wage, prices]
         self.avg_price = self.expected_price
       else:
@@ -68,15 +69,15 @@ class Worker(Agent):
         else:
           self.avg_price = 0
 
-        wage = expect_price_ar(self.wage_history1, self.expected_wage, self.model.config.TIME_HORIZON)
-        prices = expect_price_ar(self.price_history1, self.expected_price, self.model.config.TIME_HORIZON)
+        wage = expect_price_ar(self.wage_history1, self.expected_wage, self.time_horizon)
+        prices = expect_price_ar(self.price_history1, self.expected_price, self.time_horizon)
 
         self.worker_expectations = [wage, prices]
 
     def update_utilty(self):
 
 
-          results = maximize_utility(self.savings, self.worker_expectations[0], self.worker_expectations[1],0.95, self.model.config.TIME_HORIZON, alpha=0.9, max_working_hours=16)
+          results = maximize_utility(round(self.savings,2), self.worker_expectations[0], self.worker_expectations[1],0.95, self.time_horizon, alpha=0.9, max_working_hours=16)
           self.desired_consumption, self.working_hours, self.leisure, self.desired_savings = [arr[0] for arr in results]
 
           self.optimals = [self.desired_consumption, self.working_hours, self.desired_savings]
@@ -117,42 +118,60 @@ class Worker(Agent):
 
     def get_hired(self, employer, wage, hours):
         self.employers[employer] = {'hours': hours, 'wage': wage}
+        if hours<0:
+          print("hours", hours)
+          breakpoint()
         self.total_working_hours += hours
         self.update_average_wage()
 
     def update_hours(self, employer, hours):
+        if hours < 0:
+            print("hours", hours)
+            breakpoint()
         if employer in self.employers:
-            self.employers[employer]['hours'] += hours
-            self.total_working_hours += hours
-            self.total_working_hours = self.total_working_hours
+            old_hours = self.employers[employer]['hours']
+            self.employers[employer]['hours'] = hours
+            self.total_working_hours += hours - old_hours
             self.update_average_wage()
 
-    def get_fired(self, employer):
+    def get_fired(self, employer, layoff=False):
         if employer in self.employers:
             self.total_working_hours -= self.employers[employer]['hours']
             self.total_working_hours = max(0, self.total_working_hours)
+            if not layoff:
+              # When the worker quits the employer needs to be updated. If the worker is laid off, the employer is already updated
+              employer.remove_worker(self)
             del self.employers[employer]
             self.update_average_wage()
 
     def quit(self, hours_to_quit):
         # Sort employers by hours worked, in descending order
         sorted_employers = sorted(self.employers.items(), key=lambda x: x[1]['hours'], reverse=True)
-        quits = 0
+
         for employer, details in sorted_employers:
-            if quits >= hours_to_quit:
+            if hours_to_quit <= 0:
                 break
 
-            if hours_to_quit == details['hours']:
-                # Quit the job entirely
-                self.get_fired(employer)
-            else:
-                # Reduce hours for this job
-                self.employers[employer]['hours'] -= hours_to_quit
-            self.update_average_wage()
+            match hours_to_quit, details['hours']:
+                case x, y if x >= y:
+                    self.get_fired(employer)
+                    hours_to_quit -= y
+                case x, y if x < y:
+                    self.update_hours(employer, y - x)
+                    hours_to_quit = 0
+
+        self.update_average_wage()
+
 
     def update_average_wage(self):
         if self.total_working_hours > 0:
                 self.wage = sum(emp['wage'] * emp['hours'] for emp in self.employers.values()) / self.total_working_hours
+                if self.wage < 0:
+                  print("Worker attributes:")
+                  for attr, value in self.__dict__.items():
+                      print(f"{attr}: {value}")
+                  breakpoint()
+
                 self.wage_history.append(self.wage)
                 self.income = sum(emp['wage'] * emp['hours'] for emp in self.employers.values())
         else:
@@ -172,17 +191,23 @@ class Worker(Agent):
         self.savings = max(0, self.savings) #prevent negative savings
 
     def get_max_consumption_price(self):
-      return self.savings/(self.model.config.TIME_HORIZON) + (self.wage * 16) if self.wage > 0 else  self.savings/(self.model.config.TIME_HORIZON) + self.worker_expectations[0][0] * 16
+      return self.savings/(self.time_horizon) + (self.wage * 16) if self.wage > 0 else  self.savings/(self.time_horizon) + self.worker_expectations[0][0] * 16
 
 
     def get_paid(self, wage):
         self.savings += wage
 
     def available_hours(self):
+
         if self.total_working_hours >= self.max_working_hours:
+          if (self.total_working_hours- self.max_working_hours) > 1:
+            print("Worker attributes:")
+            for attr, value in self.__dict__.items():
+                print(f"{attr}: {value}")
+            breakpoint()
             return 0
         elif self.working_hours > self.total_working_hours:
             return self.working_hours - self.total_working_hours
-        else :
+        else:
           self.quit(self.total_working_hours - self.working_hours)
           return 0

@@ -24,9 +24,10 @@ def get_market_demand(self, market_type):
 
     volume_latent = latent_demand * latent_price
     volume_realised = demand_realised * price_realised
+    demand = round((latent_demand + demand_realised)/2,1)
+    price = round((latent_price + price_realised)/2,2)
 
-
-    return ((latent_demand+ demand_realised)/2, (latent_price+ price_realised)/2)
+    return demand, price
 
 
 def get_supply(self, market_type):
@@ -38,7 +39,7 @@ def get_supply(self, market_type):
     all_supply = self.model.pre_capital_transactions[1]
   if market_type == 'consumption':
     all_supply = self.model.pre_consumption_transactions[1]
-  return all_supply
+  return round(all_supply,1)
 
 
 
@@ -64,9 +65,10 @@ def expect_demand_ar(historic_demand, current_demand, periods=6, alpha=0.3):
         return np.full(periods, current_demand)
     else:
         historic_mean = np.mean(historic_demand)
+        historic_mean = round(historic_mean,1)
         expected = np.full(periods, historic_mean)
         for i in range(1, min(len(historic_demand), periods) + 1):
-            expected[-i] = alpha * historic_demand[-i] + (1 - alpha) * expected[-i]
+            expected[-i] =round(alpha * historic_demand[-i] + (1 - alpha) * expected[-i],1)
         return expected
 
 def expect_price_ar(historic_prices, current_price, periods=6, alpha=0.3):
@@ -81,6 +83,7 @@ def expect_price_ar(historic_prices, current_price, periods=6, alpha=0.3):
     """
     if len(historic_prices) > 5:
         historic_mean = np.mean(historic_prices)
+        historic_mean = round(historic_mean,2)
         last_price = current_price if current_price <0.1 else historic_prices[-1]
 
         expected_prices = []
@@ -94,6 +97,7 @@ def expect_price_ar(historic_prices, current_price, periods=6, alpha=0.3):
         expected_price = np.array(expected_prices)
     else:
         historic_mean = np.mean(historic_prices)
+        historic_mean = round(historic_mean,2)
         expected_price = np.array([historic_mean] * periods)
 
     return np.maximum(expected_price, 0)  # Ensure non-negative prices
