@@ -100,7 +100,7 @@ class EconomyModel(Model):
                   for firm in self.schedule.agents
                   if isinstance(firm, (Firm1, Firm2)) and firm.labor_demand > 0]
 
-        sellers = [(worker.available_hours(), worker.expected_wage, worker, worker.get_min_wage(), worker.skills, worker.skillscarbon)
+        sellers = [(worker.available_hours(), worker.desired_wage, worker, worker.get_min_wage(), worker.skills, worker.skillscarbon)
                    for worker in self.schedule.agents
                    if isinstance(worker, Worker) and worker.available_hours() > 0]
 
@@ -161,7 +161,7 @@ class EconomyModel(Model):
 
     def execute_consumption_market(self):
         #print("Executing consumption market")
-        buyers = [(worker.desired_consumption, worker.expected_price, worker, worker.get_max_consumption_price(), worker.preference_mode)
+        buyers = [(worker.desired_consumption, worker.desired_price, worker, worker.get_max_consumption_price(), worker.preference_mode)
                   for worker in self.schedule.agents
                   if isinstance(worker, Worker) and worker.savings > 0]
 

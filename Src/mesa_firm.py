@@ -155,7 +155,7 @@ class Firm(Agent):
             round(self.total_labor_units,2),
             round(self.price,2),
             self.productivity,
-            self.expected_demand,
+            self.expected_demand * (self.market_share if self.market_share !=0 else 1),
             self.expected_price,
             self.expectations[2],  # Updated
             self.capital_elasticity,

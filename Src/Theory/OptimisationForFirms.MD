@@ -5,7 +5,7 @@
 Maximize the discounted sum of profits over T periods:
 
 $$
-\max_{L_t, K_t, Q_t, I_t, S_t} \sum_{t=0}^{T-1} \frac{1}{(1+r)^t} (P_t S_t - w L_t - p_K (K_t - K_{t-1}) - \delta P_t I_t)
+\max_{L_t, K_t, Q_t, I_t, S_t} \sum_{t=0}^{T-1} \frac{1}{(1+r)^t} (S_t - w L_t - p_K (K_t - \delta K_{t-1}))
 $$
 
 Where:
