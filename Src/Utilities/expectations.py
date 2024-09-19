@@ -8,7 +8,7 @@ def get_market_demand(self, market_type):
             case 'capital':
                 return 6, 3
             case 'consumption':
-                return 8, 1
+                return 30, 1
 
     match market_type:
         case 'capital' | 'consumption' | 'labor':
@@ -40,7 +40,13 @@ def get_supply(self, market_type):
   all_supply = 0
   match market_type, self.model.step_count:
     case _,0:
-      all_supply = 6
+      match market_type:
+        case 'labor':
+          all_supply = 300
+        case 'capital':
+          all_supply = 6
+        case 'consumption':
+          all_supply = 25
     case 'labor':
       all_supply = self.model.pre_labor_transactions[1]
     case 'capital':

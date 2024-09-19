@@ -62,7 +62,7 @@ class Firm(Agent):
           if self.market_share > .5:
             print("sales_avg", sales_avg)
             print("market share" , self.market_share)
-            breakpoint()
+
         self.sales = 0
         self.production = 0
         self.labor_demand = 0
@@ -95,7 +95,6 @@ class Firm(Agent):
         expected_capital_supply = get_supply(self, "capital")
         expected_labor_supply = get_supply(self, "labor")
         print("expected_labor_supply", expected_labor_supply)
-        breakpoint()
 
         self.expected_price, self.expected_demand = get_expectations(demand, self.historic_demand,  price ,self.historic_price,(self.time_horizon))
 
@@ -200,7 +199,8 @@ class Firm(Agent):
         }
         print(f"Optimal values: {self.optimals}")
 
-
+        print("Optimal labor:", self.optimals['labor'])
+        breakpoint()
 
 
         return optimal_labor, optimal_capital, optimal_production

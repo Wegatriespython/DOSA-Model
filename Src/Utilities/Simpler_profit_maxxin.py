@@ -40,7 +40,7 @@ def profit_maximization(
     if result is not None:
         last_solution = (result['optimal_labor'], result['optimal_capital'])
         rounded_result = round_results(result)
-        print(result)
+
                 # Perform cost minimization
         """params = {
             'current_price': current_price,
