@@ -12,7 +12,7 @@ class Worker(Agent):
         self.total_working_hours = 0
         self.preference_mode = self.model.config.PREFERNCE_MODE_LABOR
         self.max_working_hours = 16
-        self.time_horizon = self.model.config.TIME_HORIZON - self.model.step_count
+        self.time_horizon = self.model.config.TIME_HORIZON
         self.worker_expectations = []
         self.skillscarbon = 1
         self.consumption_check = 0
@@ -43,6 +43,7 @@ class Worker(Agent):
         self.mode = 'decentralized'
 
     def step(self):
+        self.time_horizon = self.model.config.TIME_HORIZON - self.model.step_count
         self.worker_expectations.clear()
         self.update_expectations()
         self.update_utilty()

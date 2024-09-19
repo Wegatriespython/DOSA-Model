@@ -1,10 +1,14 @@
-from math import nan
+from math import isnan, nan
 import numpy as np
 
 
 def get_market_demand(self, market_type):
     if self.model.step_count < 1:
-        return 30, 1
+        match market_type:
+            case 'capital':
+                return 6, 3
+            case 'consumption':
+                return 8, 1
 
     match market_type:
         case 'capital' | 'consumption' | 'labor':
@@ -16,30 +20,35 @@ def get_market_demand(self, market_type):
     latent_demand = pre_transactions[0]
     latent_price = (pre_transactions[2] + pre_transactions[3]) / 2  # Avg of buyer and seller price
 
-    if len(transactions)>2:
+    if len(transactions)>2 and market_type == 'consumption': # Irregular demand in captial markets causing issues.
         demand_realised = sum(t[2] for t in transactions)
         price_realised = sum(t[3] for t in transactions)/ len(transactions) if transactions else 0
     else:
         demand_realised, price_realised = latent_demand, latent_price
 
-    volume_latent = latent_demand * latent_price
-    volume_realised = demand_realised * price_realised
-    demand = round((latent_demand + demand_realised)/2,1)
+
+    demand = round((latent_demand + demand_realised)/2,2)
     price = round((latent_price + price_realised)/2,2)
+    if isnan(demand) or isnan(price):
+      print('Error', latent_demand, latent_price, demand_realised, price_realised)
+      breakpoint()
 
     return demand, price
 
 
 def get_supply(self, market_type):
   all_supply = 0
-  if market_type == 'labor':
-    all_supply = self.model.pre_labor_transactions[1]
-  if market_type == 'capital':
+  match market_type, self.model.step_count:
+    case _,0:
+      all_supply = 6
+    case 'labor':
+      all_supply = self.model.pre_labor_transactions[1]
+    case 'capital':
+      all_supply = self.model.pre_capital_transactions[1]
+    case 'consumption':
+      all_supply = self.model.pre_consumption_transactions[1]
 
-    all_supply = self.model.pre_capital_transactions[1]
-  if market_type == 'consumption':
-    all_supply = self.model.pre_consumption_transactions[1]
-  return round(all_supply,1)
+  return round(all_supply,2)
 
 
 

@@ -80,16 +80,9 @@ class Firm(Agent):
 
 
     def update_expectations(self):
-
-        if self.model.step_count < 1:
-            self.expected_demand= np.full(self.time_horizon ,30)
-            self.expected_price = np.full(self.time_horizon,1)
-            self.expectations =[np.mean(self.expected_demand), np.mean(self.expected_price), 3, 5, 96, 0.0625]
-            self.desireds = [self.wage, self.price, self.model.config.INITIAL_RELATIVE_PRICE_CAPITAL]
-
-            return
         price_capital = 0
         demand, price =  get_market_demand(self, self.firm_type)
+
         if self.firm_type == 'consumption':
           capital_demand, price_capital = get_market_demand(self, 'capital')
           print("capital price", np.mean(price_capital))
@@ -101,6 +94,8 @@ class Firm(Agent):
         self.historic_labor_prices.append(wage)
         expected_capital_supply = get_supply(self, "capital")
         expected_labor_supply = get_supply(self, "labor")
+        print("expected_labor_supply", expected_labor_supply)
+        breakpoint()
 
         self.expected_price, self.expected_demand = get_expectations(demand, self.historic_demand,  price ,self.historic_price,(self.time_horizon))
 
@@ -130,7 +125,7 @@ class Firm(Agent):
             'current labor': round(self.total_labor_units,2),
             'current price': round(self.price,2),
             'productivity': self.productivity,
-            'expected demand': self.expected_demand * self.market_share,
+            'expected demand': self.expected_demand * (self.market_share if self.market_share !=0 else 1),
             'expected price': self.expected_price,
             'expectated capital price': self.expectations[2],
             'capital elasticity': self.capital_elasticity,
@@ -145,7 +140,8 @@ class Firm(Agent):
             'debt': self.debt,
             'carbon intensity': self.carbon_intensity,
             'new capital carbon intensity': 1,
-            'carbon_tax_rate': 0
+            'carbon_tax_rate': 0,
+            'holding_costs': self.model.config.HOLDING_COST
         })
 
         self.per_worker_income = self.wage * self.max_working_hours
@@ -170,8 +166,8 @@ class Firm(Agent):
             self.debt,
             self.carbon_intensity,
             1,
-            0#Labor Supply,
-            )
+            0,#Labor Supply,
+            self.model.config.HOLDING_COST)
 
         if result is None:
             print("Optimization failed")
@@ -279,7 +275,6 @@ class Firm(Agent):
         if len(self.prices) > 0 :
           self.prices = [p for p in self.prices if not np.isnan(p)]
           average_price = np.mean(self.prices)
-
           self.price = average_price
         else :
           # no transactions have been made

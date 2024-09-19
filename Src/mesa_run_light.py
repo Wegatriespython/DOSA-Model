@@ -9,13 +9,13 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def run_model(steps, timeout=300):  # 5 minutes timeout
-    model = EconomyModel(num_workers=30, num_firm1=0, num_firm2=5, mode= 'decentralised')
+    model = EconomyModel(num_workers=15, num_firm1=1, num_firm2=2, mode= 'decentralised')
     for i in range(steps):
         model.step()
     return model
 
 # Run the model
-model = run_model(25)  # Run for 100 steps
+model = run_model(51)  # Run for 100 steps
 
 if model:
     logging.info("Model completed successfully. Starting analysis...")

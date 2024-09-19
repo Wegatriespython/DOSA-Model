@@ -6,12 +6,13 @@ class Config:
         #
 
         self.MAX_WORKING_HOURS = 16
-        self.TIME_HORIZON = 25
+        self.TIME_HORIZON = 51 # One more than the model's number of steps to prevent array out of bounds errors
+        self.HOLDING_COST = 0
         self.INITIAL_SALES = 1
         self.INITIAL_PRODUCTIVITY = 1
         self.INITIAL_PRICE = 1
         self.INITIAL_WAGE = 0.0625 # 1/16
-        self.DEPRECIATION_RATE = 0
+        self.DEPRECIATION_RATE = 0.01
         self.INITIAL_SKILLS = 0
         self.DISCOUNT_RATE = 0.05
         self.INITIAL_SAVINGS = 2
@@ -23,13 +24,13 @@ class Config:
         self.INITIAL_CONSUMPTION = 1
         self.TOTAL_FACTOR_PRODUCTIVITY = 1.0
         self.CAPITAL_ELASTICITY_FIRM2 = 0.5
-        self.CAPITAL_ELASTICITY_FIRM1 = 0.1
-        self.SKILL_GROWTH_RATE = 0.001
-        self.SKILL_DECAY_RATE = 0.005
+        self.CAPITAL_ELASTICITY_FIRM1 = 0
+        self.SKILL_GROWTH_RATE = 0
+        self.SKILL_DECAY_RATE = 0
         # Firm1 specific parameters
-        self.FIRM1_INITIAL_CAPITAL = 20
-        self.FIRM1_INITIAL_INVENTORY = 5
-        self.FIRM1_INITIAL_DEMAND = 3
+        self.FIRM1_INITIAL_CAPITAL = 0
+        self.FIRM1_INITIAL_INVENTORY = 1
+        self.FIRM1_INITIAL_DEMAND = 2
         self.FIRM1_INITIAL_RD_INVESTMENT = 0
         self.FIRM1_RD_INVESTMENT_RATE = 0
         self.INNOVATION_ATTEMPT_PROBABILITY = 0.1  # Probability of a successful innovation attempt

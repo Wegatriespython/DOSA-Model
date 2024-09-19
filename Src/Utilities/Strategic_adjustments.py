@@ -32,8 +32,8 @@ def get_min_sale_price(firm_type, workers, productivity, capital, capital_elasti
         labor_cost = total_working_hours * average_wage
         total_output = calculate_production_capacity(productivity, capital, capital_elasticity, total_labor_units) + inventory
         if total_output <= 0 or labor_cost <= 0.001:
-            return 1.5
-        return max(labor_cost / total_output,1.5)
+            return 0.5
+        return max(labor_cost / total_output,0.5)
 
 def get_max_capital_price(investment_demand, optimal_production, optimal_capital, price, capital_elasticity, time_horizon, discount_rate):
 

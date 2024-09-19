@@ -35,12 +35,13 @@ def profit_maximization(
 
     # Objective
     def objective_rule(model):
-        obj_value = sum(
+        scaling_factor = 1
+        obj_value = scaling_factor*sum(
             (expected_price[t] * model.sales[t] / scale_price
              - wage * model.labor / scale_labor
              - (model.capital - current_capital) * capital_price / scale_capital * (1 if t == 0 else 0)
              - depreciation_rate * expected_price[t] * model.inventory[t] / scale_price
-            ) / ((1 + discount_rate) ** t)
+            ) * pyo.exp(t * pyo.log(1- discount_rate))
             for t in model.T
         )
         return obj_value
@@ -104,8 +105,11 @@ def profit_maximization(
             'optimal_production': pyo.value(model.production),
             'optimal_price': expected_price[0],
             'optimal_sales': [pyo.value(model.sales[t]) for t in model.T],
-            'optimal_inventory': [pyo.value(model.inventory[t]) for t in model.T]
+            'optimal_inventory': [pyo.value(model.inventory[t]) for t in model.T],
+            'objective': pyo.value(model.objective),
         }
+        print(round_results(unrounded_results))
+        breakpoint()
         return round_results(unrounded_results)
     else:
         print(f"Solver status: {results.solver.status}")

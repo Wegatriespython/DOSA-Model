@@ -81,6 +81,7 @@ class EconomyModel(Model):
         # Adjust production and prices
         for agent in self.schedule.agents:
             if isinstance(agent, Firm1):
+                print("Firm 1 budget is ", agent.budget)
                 agent.adjust_production()
                 agent.nash_improvements()
             elif isinstance(agent, Firm2):
@@ -132,13 +133,13 @@ class EconomyModel(Model):
         buyers = [(firm.investment_demand, firm.desireds[2], firm, firm.zero_profit_conditions[2], firm.preference_mode)
                   for firm in self.schedule.agents
                   if isinstance(firm, Firm2) and firm.investment_demand > 0]
-        print(buyers)
+
 
         sellers = []
         for firm in self.schedule.agents:
             match firm:
                 case Firm1() if firm.inventory > 0:
-                    sellers.append((min(firm.inventory,firm.optimals['sales']), firm.desireds[1], firm, firm.zero_profit_conditions[1], firm.productivity, firm.carbon_intensity))
+                    sellers.append((firm.inventory, firm.desireds[1], firm, firm.zero_profit_conditions[1], firm.productivity, firm.carbon_intensity))
                 case Firm2() if firm.capital_inventory > 0:
                     sellers.append((firm.capital_inventory,firm.capital_resale_price, firm, 0.1, firm.productivity, firm.carbon_intensity))
         buyer_demand = sum(b[0] for b in buyers)  if buyers else 0
@@ -148,6 +149,7 @@ class EconomyModel(Model):
         avg_buyer_max = sum(b[3] for b in buyers)/ len(buyers) if buyers else 0
         avg_seller_min = sum(s[3] for s in sellers)/ len(sellers) if sellers else 0
         self.pre_capital_transactions = np.array([buyer_demand, seller_inventory, avg_buyer_price, avg_seller_price, avg_buyer_max, avg_seller_min])
+        print(f"Buyer Demand: {buyer_demand} Seller Inventory: {seller_inventory} Avg Buyer Price: {avg_buyer_price} Avg Seller Price: {avg_seller_price} Avg Buyer Max: {avg_buyer_max} Avg Seller Min: {avg_seller_min}")
 
         transactions = market_matching(buyers, sellers)
         self.capital_transactions = transactions
@@ -155,7 +157,7 @@ class EconomyModel(Model):
         self.capital_transactions_history.append(captial_transactions_history)
         for buyer, seller, quantity, price in transactions:
             buyer.buy_capital(quantity, price)
-            seller.sell_goods(quantity, price)
+            seller.sell_capital_goods(buyer, quantity, price)
             # Remove global_accounting.record_capital_transaction
 
 
@@ -200,4 +202,4 @@ class EconomyModel(Model):
           print(f"Seller Inventory: {seller_inventory} Sold: {consumption_transactions_history[1]}")
         for buyer, seller, quantity, price in transactions:
             buyer.consume(quantity, price)
-            seller.sell_goods(quantity, price)
+            seller.sell_consumption_goods(quantity, price)

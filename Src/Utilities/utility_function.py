@@ -44,7 +44,7 @@ def _maximize_utility(savings, wages, prices, discount_factor, periods, alpha, m
     model.discount_factor = pyo.Param(initialize=discount_factor)
     model.alpha = pyo.Param(initialize=alpha)
     model.max_working_hours = pyo.Param(initialize=max_working_hours)
-    min_consumtion = 0.1
+    min_consumtion = 0.5
     decay_rate = 0.9
     # Constraints
     @model.Constraint(model.T)
@@ -59,6 +59,19 @@ def _maximize_utility(savings, wages, prices, discount_factor, periods, alpha, m
         else:
             return (model.prices[t] * model.consumption[t] + model.savings[t] ==
                     model.wages[t] * model.working_hours[t] + model.savings[t-1])
+
+    #@model.Constraint(model.T)
+
+    #def savings_evolution(model,t):
+        #if t == 0:
+            #return model.savings[t] == model.initial_savings
+            #else:
+            #return model.savings[t] == model.savings[t-1] + model.wages[t] * model.working_hours[t] - model.prices[t] * model.consumption[t]
+
+    @model.Constraint(model.T)
+    def consumption_constraint(model, t):
+      return model.consumption[t] >= min_consumtion * discount_factor**t
+
 
     @model.Constraint()
     def terminal_savings_constraint(model):
@@ -106,11 +119,13 @@ def _maximize_utility(savings, wages, prices, discount_factor, periods, alpha, m
 
             return optimal_consumption, optimal_working_hours, optimal_leisure, optimal_savings
         else:
+            breakpoint()
             print(f"Solver status: {results.solver.status}")
             print(f"Termination condition: {results.solver.termination_condition}")
             return ([1] * periods, [13] * periods,
                     [0] * periods, [0] * periods)  # Default values if optimization fails
     except Exception as e:
+        breakpoint()
         print(f"An error occurred during optimization: {str(e)}")
         return ([1] * periods, [13] * periods,
                 [0] * periods, [0] * periods)  # Default values if optimization fails
