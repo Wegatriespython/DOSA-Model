@@ -42,7 +42,7 @@ def profit_maximization(
         rounded_result = round_results(result)
 
                 # Perform cost minimization
-        """params = {
+        params = {
             'current_price': current_price,
             'wage': wage,
             'capital_price': capital_price,
@@ -50,14 +50,13 @@ def profit_maximization(
             'holding_costs': holding_costs,
             'carbon_tax_rate': carbon_tax_rate,
             'expected_periods': expected_periods
-        }"""
-        #zero_profit_result = cost_minimization(rounded_result, params)
-        #print(zero_profit_result)
+        }
+        zero_profit_result = cost_minimization(rounded_result, params)
+        zero_profit_result = round_results(zero_profit_result)
 
+        return rounded_result, zero_profit_result
 
-        return rounded_result
-
-    return result
+    return None, None
 
 def _profit_maximization(
         current_capital, current_labor, current_price, current_productivity,
@@ -70,7 +69,7 @@ def _profit_maximization(
     # Sets
     model.T = pyo.RangeSet(0, expected_periods - 1)
     max_labor = labor_supply/16 + current_labor
-    max_capital = current_capital
+    max_capital = current_capital + 1e-6
     #(capital_supply if capital_supply > 0 else current_capital) + current_capital
     #double current capital when capital supllies are not available
 

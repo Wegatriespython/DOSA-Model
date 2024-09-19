@@ -21,8 +21,7 @@ class Firm(Agent):
         self.per_worker_income = 0
         self.market_share = 0
         self.market_share_history = []
-        self.zero_profit_conditions = []
-        self.zero_profit_conditions_cache = []
+        self.zero_profit_conditions = {}
         self.historic_demand = []
         self.historic_price = []
         self.optimals = {}
@@ -117,8 +116,10 @@ class Firm(Agent):
         average_capital_price = self.model.data_collector.get_average_capital_price(self.model)
 
         if self.budget <= 0:
-
-            return # Skip production if budget is negative
+            print(self.model.step_count)
+            print("Firm", self.unique_id, self.optimals)
+            breakpoint()
+            return
         print("Calling profit_maximization with parameters:", {
             'current capital': round(self.capital,2),
             'current labor': round(self.total_labor_units,2),
@@ -145,7 +146,7 @@ class Firm(Agent):
 
         self.per_worker_income = self.wage * self.max_working_hours
 
-        result = profit_maximization(
+        result, zero_profits = profit_maximization(
             round(self.capital,2),
             round(self.total_labor_units,2),
             round(self.price,2),
@@ -170,6 +171,7 @@ class Firm(Agent):
 
         if result is None:
             print("Optimization failed")
+            breakpoint()
             return
 
 
@@ -186,6 +188,15 @@ class Firm(Agent):
         optimal_emissions = result['optimal_emissions']
         optimal_carbon_tax_payments = result['optimal_carbon_tax_payments']
 
+        zero_profit_wage = zero_profits['wage'][0] if zero_profits is not None else self.wage
+        zero_profit_price = zero_profits['price'][0] if zero_profits is not None else self.price
+        zero_profit_capital_price = zero_profits['capital_price'][0] if zero_profits is not None else self.expectations[2]
+
+        self.zero_profit_conditions = {
+            'wage': zero_profit_wage,
+            'price': zero_profit_price,
+            'capital_price': zero_profit_capital_price}
+
         self.optimals = {
             'labor': optimal_labor[0],
             'capital': optimal_capital[0],
@@ -199,8 +210,6 @@ class Firm(Agent):
         }
         print(f"Optimal values: {self.optimals}")
 
-        print("Optimal labor:", self.optimals['labor'])
-        breakpoint()
 
 
         return optimal_labor, optimal_capital, optimal_production
@@ -412,35 +421,23 @@ class Firm(Agent):
 
       if self.model.step_count < 2:
         self.desireds = [self.wage, self.price, self.model.config.INITIAL_RELATIVE_PRICE_CAPITAL]
+
         return
+
       if self.firm_type == 'consumption':
-            desired_price = get_desired_price(self.expectations[1], self.desireds[1],self.price,self.sales, self.optimals['sales'],  self.zero_profit_conditions[1], self.optimals['inventory'], self.inventory)
+            desired_price = get_desired_price(self.expectations[1], self.desireds[1],self.price,self.sales, self.optimals['sales'],  self.zero_profit_conditions['price'], self.optimals['inventory'], self.inventory)
 
             desired_capital_price = get_desired_capital_price(self)
       else:
-            desired_price = get_desired_price(self.expectations[1], self.desireds[1],self.price,self.sales, self.optimals['sales'],  self.zero_profit_conditions[1], self.optimals['inventory'], self.inventory)
+            desired_price = get_desired_price(self.expectations[1], self.desireds[1],self.price,self.sales, self.optimals['sales'],  self.zero_profit_conditions['price'], self.optimals['inventory'], self.inventory)
             desired_capital_price = 0
-      desired_wage = get_desired_wage(self.expectations[5],self.desireds[0],self.wage, self.optimals['labor'], self.get_total_labor_units(), self.zero_profit_conditions[0], self.model.config.MINIMUM_WAGE)
+      desired_wage = get_desired_wage(self.expectations[5],self.desireds[0],self.wage, self.optimals['labor'], self.get_total_labor_units(), self.zero_profit_conditions['wage'], self.model.config.MINIMUM_WAGE)
 
       self.desireds = [desired_wage, desired_price, desired_capital_price]
 
 
 
       return self.desireds
-
-    def get_zero_profit_conditions(self):
-
-      max_wage = get_max_wage(self.total_working_hours, self.productivity, self.capital, self.capital_elasticity, self.price, self.get_total_labor_units(),self.optimals['labor'],self.model.config.MINIMUM_WAGE)
-      min_sale_price = get_min_sale_price(self.firm_type, self.workers, self.productivity, self.capital, self.capital_elasticity, self.get_total_labor_units(), self.inventory)
-
-      if min_sale_price < 0.5:
-        breakpoint()
-
-      max_capital_price = get_max_capital_price(self.investment_demand, self.optimals['production'],self.optimals['capital'], self.price, self.capital_elasticity, self.time_horizon, self.model.config.DISCOUNT_RATE)
-      self.zero_profit_conditions = [max_wage, min_sale_price, max_capital_price]
-      self.zero_profit_conditions_cache.append(self.zero_profit_conditions)
-      return self.zero_profit_conditions
-
 
 
 class Firm1(Firm):
@@ -452,7 +449,7 @@ class Firm1(Firm):
         self.capital = model.config.FIRM1_INITIAL_CAPITAL
         self.inventory = model.config.FIRM1_INITIAL_INVENTORY
         self.historic_demand = [model.config.FIRM1_INITIAL_DEMAND]
-        self.budget = self.capital
+        self.budget = 10
         self.historic_sales = [model.config.INITIAL_SALES]
         self.historic_inventory = [self.inventory]
         self.expected_demand = [model.config.FIRM1_INITIAL_DEMAND] *self.time_horizon

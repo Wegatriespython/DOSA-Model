@@ -64,8 +64,8 @@ class EconomyModel(Model):
                 agent.update_firm_state()
                 agent.update_expectations()
                 agent.make_production_decision()
-                agent.get_zero_profit_conditions()
                 agent.adjust_labor()
+                agent.nash_improvements()
                 if isinstance(agent, Firm2):
                     agent.adjust_investment_demand()
 
@@ -96,7 +96,7 @@ class EconomyModel(Model):
 
     def execute_labor_market(self):
 
-        buyers = [(firm.labor_demand, firm.desireds[0], firm, firm.zero_profit_conditions[0], firm.preference_mode
+        buyers = [(firm.labor_demand, firm.desireds[0], firm, firm.zero_profit_conditions['wage'], firm.preference_mode
         )
                   for firm in self.schedule.agents
                   if isinstance(firm, (Firm1, Firm2)) and firm.labor_demand > 0]
@@ -130,7 +130,7 @@ class EconomyModel(Model):
 
     def execute_capital_market(self):
 
-        buyers = [(firm.investment_demand, firm.desireds[2], firm, firm.zero_profit_conditions[2], firm.preference_mode)
+        buyers = [(firm.investment_demand, firm.desireds[2], firm, firm.zero_profit_conditions['capital_price'], firm.preference_mode)
                   for firm in self.schedule.agents
                   if isinstance(firm, Firm2) and firm.investment_demand > 0]
 
@@ -139,7 +139,7 @@ class EconomyModel(Model):
         for firm in self.schedule.agents:
             match firm:
                 case Firm1() if firm.inventory > 0:
-                    sellers.append((firm.inventory, firm.desireds[1], firm, firm.zero_profit_conditions[1], firm.productivity, firm.carbon_intensity))
+                    sellers.append((firm.inventory, firm.desireds[1], firm, firm.zero_profit_conditions['price'], firm.productivity, firm.carbon_intensity))
                 case Firm2() if firm.capital_inventory > 0:
                     sellers.append((firm.capital_inventory,firm.capital_resale_price, firm, 0.1, firm.productivity, firm.carbon_intensity))
         buyer_demand = sum(b[0] for b in buyers)  if buyers else 0
@@ -167,7 +167,7 @@ class EconomyModel(Model):
                   for worker in self.schedule.agents
                   if isinstance(worker, Worker) and worker.savings > 0]
 
-        sellers = [(min(firm.inventory, firm.optimals['sales']), firm.desireds[1], firm, firm.zero_profit_conditions[1], firm.quality, firm.carbon_intensity)
+        sellers = [(min(firm.inventory, firm.optimals['sales']), firm.desireds[1], firm, firm.zero_profit_conditions['price'], firm.quality, firm.carbon_intensity)
                    for firm in self.schedule.agents
 
                    if isinstance(firm, Firm2) and firm.inventory > 0]
