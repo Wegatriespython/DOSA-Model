@@ -49,7 +49,8 @@ def profit_maximization(
             'depreciation_rate': depreciation_rate,
             'holding_costs': holding_costs,
             'carbon_tax_rate': carbon_tax_rate,
-            'expected_periods': expected_periods
+            'expected_periods': expected_periods,
+            'inventory': current_inventory
         }
         zero_profit_result = cost_minimization(rounded_result, params)
         zero_profit_result = round_results(zero_profit_result)

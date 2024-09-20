@@ -5,7 +5,8 @@ def cost_minimization(profit_max_result, params):
     model = pyo.ConcreteModel()
 
     # Sets
-    model.T = pyo.RangeSet(0, params['expected_periods'] - 1)
+    model.T = pyo.RangeSet(0,1)
+
 
     # Variables
     model.price = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=params['current_price'],
@@ -21,7 +22,7 @@ def cost_minimization(profit_max_result, params):
     model.sales = profit_max_result['optimal_sales']
     model.capital = profit_max_result['optimal_capital']
     model.labor = profit_max_result['optimal_labor']
-    model.inventory = profit_max_result['optimal_inventory']
+    model.inventory = params['inventory']
     model.emissions = profit_max_result['optimal_emissions']
 
     # Objective: Minimize total costs
