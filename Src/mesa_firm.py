@@ -1,7 +1,7 @@
 from mesa import Agent
 import numpy as np
 from Utilities.Simpler_profit_maxxin import profit_maximization
-from Utilities.expectations import expect_demand, expect_price, get_market_demand, get_expectations,get_supply, expect_price_ar
+from Utilities.expectations import expect_demand, expect_demand_ar, expect_price, get_market_demand, get_expectations,get_supply, expect_price_ar
 from Utilities.Strategic_adjustments import get_max_wage, get_min_sale_price, get_max_capital_price,calculate_production_capacity, get_desired_wage, get_desired_capital_price, get_desired_price
 import logging
 from math import isnan, nan
@@ -13,6 +13,9 @@ class Firm(Agent):
         self.workers = {}  # Dictionary to store workers and their working hours
         self.total_working_hours = 0
         self.prices = []
+        self.historic_labor_supply = []
+        self.historic_capital_prices = []
+        self.historic_capital_supply = []
         self.desireds = []
         self.sales_same_period =0
         self.debt = 0
@@ -91,24 +94,31 @@ class Firm(Agent):
         price_capital = 0
         demand, price =  get_market_demand(self, self.firm_type)
 
-        if self.firm_type == 'consumption':
-          capital_demand, price_capital = get_market_demand(self, 'capital')
-          print("capital price", np.mean(price_capital))
+
+        capital_demand, price_capital = get_market_demand(self, 'capital')
+        self.historic_capital_prices.append(price_capital)
+        expected_capital_price = expect_price_ar(self.historic_capital_prices, price_capital, self.time_horizon)
+        print("capital price", np.mean(price_capital))
 
         self.historic_demand.append(demand)
         self.historic_price.append(price)
 
         labor_demand, wage = get_market_demand(self,'labor')
         self.historic_labor_prices.append(wage)
-        expected_capital_supply = get_supply(self, "capital")
-        expected_labor_supply = get_supply(self, "labor")
-        print("expected_labor_supply", expected_labor_supply)
+        capital_supply = get_supply(self, "capital")
+        labor_supply = get_supply(self, "labor")
+        self.historic_labor_supply.append(labor_supply)
+        self.historic_capital_supply.append(capital_supply)
+
+
+        expected_capital_supply = expect_demand_ar(self.historic_capital_supply, capital_supply, self.time_horizon)
+        expected_labor_supply = expect_demand_ar(self.historic_labor_supply, labor_supply, self.time_horizon)
 
         self.expected_price, self.expected_demand = get_expectations(demand, self.historic_demand,  price ,self.historic_price,(self.time_horizon))
 
 
         expected_wages = expect_price_ar(self.historic_labor_prices, wage, self.time_horizon)
-        self.expectations = [self.expected_demand[0], self.expected_price[0], price_capital, expected_capital_supply, expected_labor_supply, expected_wages[0]]
+        self.expectations = [self.expected_demand[0], self.expected_price[0], expected_capital_price[0], expected_capital_supply[0], expected_labor_supply[0], expected_wages[0]]
         self.expectations_cache.append(self.expectations)
         return
 
@@ -169,13 +179,13 @@ class Firm(Agent):
             (self.time_horizon),
             self.model.config.DISCOUNT_RATE,
             round(self.budget,2),
-            round(self.wage * self.max_working_hours,2),
+            round(self.expectations[5] * self.max_working_hours,2),
             self.expectations[3], #Capital Supply,
-            self.expectations[4],
+            self.expectations[4], #Labor Supply,
             self.debt,
             self.carbon_intensity,
-            1,
-            0,#Labor Supply,
+            1, #new capital carbon intensity
+            0,#carbon tax rate
             self.model.config.HOLDING_COST)
 
         if result is None:
@@ -184,9 +194,13 @@ class Firm(Agent):
             return
 
         if zero_profit_conditions is not None:
-          zero_profit_wage = zero_profit_conditions['wage'][0]
-          zero_profit_price = zero_profit_conditions['price'][0]
-          zero_profit_capital_price = zero_profit_conditions['capital_price'][0]
+          zero_profit_wages = zero_profit_conditions['wage']
+          zero_profit_wage = zero_profit_wages[0]
+          zero_profit_prices = zero_profit_conditions['price']
+          zero_profit_price = zero_profit_prices[0]
+          zero_profit_capital_prices = zero_profit_conditions['capital_price']
+          print("Zero profit capital prices", zero_profit_capital_prices)
+          zero_profit_capital_price = zero_profit_capital_prices[0]
 
         else :
           zero_profit_wage = self.wage

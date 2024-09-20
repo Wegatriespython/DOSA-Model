@@ -1,6 +1,7 @@
 import pyomo.environ as pyo
 from pyomo.opt import SolverFactory
-
+import numpy as np
+from pyomo.util.infeasible import log_infeasible_constraints
 """
 Big idea, cost minimisation needs to provide the zero profit conditions for the firm. Ideally firms operating with this as the lower margin are sustainable without failure. There is one issue however which is that firms are not likely to face their zero profit conditions in all three markets at once, wheras our model evaluates the three jointly.For example, firms could potentially be price setters in x =< 3 markets. In that case they need the zero profit conditions for only x not for all three. For example if the labor market is under oversupply then they can be wage setters and thus have far more wiggle room for consumtion prices and capital prices.
 
@@ -13,14 +14,37 @@ Match Scenario:
    Actuals   = x_a*L_a,y_a*Q_a,z_a*K_a
 
 """
+def fake_result(params, profit_max_result):
 
+  current_price = params['current_price']
+  periods = params['periods']
+  capital_price = params['capital_price']
+  wage = params['wage']
 
-
+  price = np.full(periods, current_price)
+  wage = np.full(periods, wage)
+  capital_price = np.full(periods, capital_price)
+  result = {
+    'price': price,
+    'wage': wage,
+    'capital_price': capital_price
+  }
+  return result
 def cost_minimization(profit_max_result, params):
+
+  sales = profit_max_result['optimal_sales']
+
+  if np.mean(sales) != 0:
+    return _cost_minimization(profit_max_result, params)
+  else:
+    result = fake_result(params, profit_max_result)
+    return result, False
+
+def _cost_minimization(profit_max_result, params):
     model = pyo.ConcreteModel()
 
     # Sets
-    model.T = pyo.RangeSet(0,1)
+    model.T = pyo.RangeSet(0, params['periods'] - 1)
 
 
     # Variables
@@ -66,14 +90,15 @@ def cost_minimization(profit_max_result, params):
     solver.options['max_iter'] = 10000
     solver.options['tol'] = 1e-6
     results = solver.solve(model, tee=False)
-
+    log_infeasible_constraints(model)
     if (results.solver.status == pyo.SolverStatus.ok and
         results.solver.termination_condition == pyo.TerminationCondition.optimal):
         return {
             'price': [pyo.value(model.price[t]) for t in model.T],
             'wage': [pyo.value(model.wage[t]) for t in model.T],
             'capital_price': [pyo.value(model.capital_price[t]) for t in model.T]
-        }
+        } , True
     else:
         print("Cost minimization solver failed to find an optimal solution.")
-        return None
+        results = fake_result(params, profit_max_result)
+        return results, False
