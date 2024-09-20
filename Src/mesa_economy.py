@@ -157,7 +157,7 @@ class EconomyModel(Model):
         self.capital_transactions_history.append(captial_transactions_history)
         for buyer, seller, quantity, price in transactions:
             buyer.buy_capital(quantity, price)
-            seller.sell_capital_goods(buyer, quantity, price)
+            seller.sell_goods(quantity, price)
             # Remove global_accounting.record_capital_transaction
 
 
@@ -202,4 +202,4 @@ class EconomyModel(Model):
           print(f"Seller Inventory: {seller_inventory} Sold: {consumption_transactions_history[1]}")
         for buyer, seller, quantity, price in transactions:
             buyer.consume(quantity, price)
-            seller.sell_consumption_goods(quantity, price)
+            seller.sell_goods(quantity, price)

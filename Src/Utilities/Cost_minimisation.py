@@ -1,6 +1,21 @@
 import pyomo.environ as pyo
 from pyomo.opt import SolverFactory
 
+"""
+Big idea, cost minimisation needs to provide the zero profit conditions for the firm. Ideally firms operating with this as the lower margin are sustainable without failure. There is one issue however which is that firms are not likely to face their zero profit conditions in all three markets at once, wheras our model evaluates the three jointly.For example, firms could potentially be price setters in x =< 3 markets. In that case they need the zero profit conditions for only x not for all three. For example if the labor market is under oversupply then they can be wage setters and thus have far more wiggle room for consumtion prices and capital prices.
+
+But its also possible that firms have heterogenous conditions where they don't uniformly have advantages.
+One possible solution is to let the cost minimisation solve for scenarios, or one free variable at a time and then have an all three case. So the firm would have a zero-profit-dictionary for price references for each case it could possibly encounter.
+Would that be exhaustive?
+
+Match Scenario:
+   Optimals  = x_o*L_o,y_o*Q_o,z_o*K_o
+   Actuals   = x_a*L_a,y_a*Q_a,z_a*K_a
+
+"""
+
+
+
 def cost_minimization(profit_max_result, params):
     model = pyo.ConcreteModel()
 
@@ -22,7 +37,7 @@ def cost_minimization(profit_max_result, params):
     model.sales = profit_max_result['optimal_sales']
     model.capital = profit_max_result['optimal_capital']
     model.labor = profit_max_result['optimal_labor']
-    model.inventory = params['inventory']
+    model.inventory = profit_max_result['optimal_inventory']
     model.emissions = profit_max_result['optimal_emissions']
 
     # Objective: Minimize total costs
