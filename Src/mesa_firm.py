@@ -4,6 +4,7 @@ from Utilities.Simpler_profit_maxxin import profit_maximization
 from Utilities.expectations import expect_demand, expect_price, get_market_demand, get_expectations,get_supply, expect_price_ar
 from Utilities.Strategic_adjustments import get_max_wage, get_min_sale_price, get_max_capital_price,calculate_production_capacity, get_desired_wage, get_desired_capital_price, get_desired_price
 import logging
+from math import isnan, nan
 
 logging.basicConfig(level=logging.INFO)
 class Firm(Agent):
@@ -55,9 +56,17 @@ class Firm(Agent):
         self.sales_same_period = 0
         sales_avg = np.mean(self.historic_sales[-5:])
         market_share = sales_avg / self.optimals['sales'] if self.optimals else 1
-        self.market_share_history.append(self.market_share)
+
+        match market_share:
+          case float('inf')|float('-inf'):
+              market_share = 1  # or some other appropriate default value
+          case x if np.isnan(market_share):
+            market_share = 0
+          case _:
+            self.market_share_history.append(self.market_share)
+
         if self.model.step_count > 5:
-          self.market_share = market_share
+          self.market_share = np.mean(self.market_share_history[-min(len(self.market_share_history),5):])
           if self.market_share > .5:
             print("sales_avg", sales_avg)
             print("market share" , self.market_share)
@@ -125,7 +134,7 @@ class Firm(Agent):
             'current labor': round(self.total_labor_units,2),
             'current price': round(self.price,2),
             'productivity': self.productivity,
-            'expected demand': self.expected_demand * (self.market_share if self.market_share !=0 else 1),
+            'expected demand': self.expected_demand * (self.market_share if self.market_share !=0 else  1),
             'expected price': self.expected_price,
             'expectated capital price': self.expectations[2],
             'capital elasticity': self.capital_elasticity,
@@ -146,7 +155,7 @@ class Firm(Agent):
 
         self.per_worker_income = self.wage * self.max_working_hours
 
-        result, zero_profits = profit_maximization(
+        result, zero_profit_conditions = profit_maximization(
             round(self.capital,2),
             round(self.total_labor_units,2),
             round(self.price,2),
@@ -174,6 +183,15 @@ class Firm(Agent):
             breakpoint()
             return
 
+        if zero_profit_conditions is not None:
+          zero_profit_wage = zero_profit_conditions['wage'][0]
+          zero_profit_price = zero_profit_conditions['price'][0]
+          zero_profit_capital_price = zero_profit_conditions['capital_price'][0]
+
+        else :
+          zero_profit_wage = self.wage
+          zero_profit_price = self.price
+          zero_profit_capital_price = self.expectations[2]
 
         optimal_labor = result['optimal_labor']
         optimal_capital = result['optimal_capital']
@@ -188,9 +206,6 @@ class Firm(Agent):
         optimal_emissions = result['optimal_emissions']
         optimal_carbon_tax_payments = result['optimal_carbon_tax_payments']
 
-        zero_profit_wage = zero_profits['wage'][0] if zero_profits is not None else self.wage
-        zero_profit_price = zero_profits['price'][0] if zero_profits is not None else self.price
-        zero_profit_capital_price = zero_profits['capital_price'][0] if zero_profits is not None else self.expectations[2]
 
         self.zero_profit_conditions = {
             'wage': zero_profit_wage,

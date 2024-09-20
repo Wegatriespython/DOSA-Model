@@ -105,7 +105,7 @@ class EconomyModel(Model):
                    for worker in self.schedule.agents
                    if isinstance(worker, Worker) and worker.available_hours() > 0]
 
-        transactions = market_matching(buyers, sellers)
+        print("buyers", buyers, "sellers", sellers)
         #("Labor Market Transaction", transactions)
         buyer_demand = sum(b[0] for b in buyers) if buyers else 0
         seller_inventory = sum(s[0] for s in sellers) if sellers else 0
@@ -114,6 +114,8 @@ class EconomyModel(Model):
         avg_buyer_max = sum(b[3] for b in buyers)/ len(buyers) if buyers else 0
         avg_seller_min = sum(s[3] for s in sellers)/ len(sellers) if sellers else 0
         self.pre_labor_transactions = np.array([buyer_demand, seller_inventory, avg_buyer_price, avg_seller_price,avg_buyer_max, avg_seller_min])
+        print(self.pre_labor_transactions)
+        transactions = market_matching(buyers, sellers)
         self.labor_transactions = transactions
         labor_transactions_history = np.array([len(transactions), sum(t[2] for t in transactions), sum(t[3] for t in transactions)])
         self.labor_transactions_history.append(labor_transactions_history)

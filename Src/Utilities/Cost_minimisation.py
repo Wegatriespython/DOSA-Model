@@ -58,7 +58,7 @@ def cost_minimization(profit_max_result, params):
                   params['capital_price'] * params['depreciation_rate'] * model.capital[t] +
                   params['holding_costs'] * model.inventory[t] +
                   params['carbon_tax_rate'] * model.emissions[t])
-        return revenue == costs
+        return revenue <= costs
     model.zero_profit = pyo.Constraint(model.T, rule=zero_profit_rule)
 
     # Solve the model

@@ -53,10 +53,10 @@ def profit_maximization(
             'expected_periods': expected_periods,
             'inventory': current_inventory
         }
-        #zero_profit_result = cost_minimization(rounded_result, params)
-        #zero_profit_result = round_results(zero_profit_result)
-        #zero_profit_result
-        return rounded_result
+        zero_profit_result = cost_minimization(rounded_result, params)
+        zero_profit_result = round_results(zero_profit_result)
+
+        return rounded_result, zero_profit_result
 
     return None, None
 
@@ -89,21 +89,21 @@ def _profit_maximization(
     scale_demand = max(1, max(expected_demand))
 
     # Variables with scaling and lower bounds
-    model.labor = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=max(0, guess_labor))
-    model.capital = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=max(0, current_capital))
-    model.production = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize = 0)
+    model.labor = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=max(0, guess_labor), bounds=(0, max_labor))
+    model.capital = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=max(0, current_capital), bounds=(0, max_capital))
+    model.production = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=max(0, expected_demand[0]))
     model.inventory = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=max(0, current_inventory))
-    model.sales = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=0)
-    model.cash = pyo.Var(model.T, domain=pyo.Reals, initialize=max(1e-6, budget))
-    model.investment = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize = max(0, current_capital))
+    model.sales = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=max(0, expected_demand[0]))
+    model.cash = pyo.Var(model.T, domain=pyo.Reals, initialize=max(0, budget))
+    model.investment = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize = max(1e-6, current_capital), bounds =(0,max_capital))
     model.carbon_intensity = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=max(0, current_carbon_intensity))
-    model.emissions = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=0, bounds = (0,0))
+    model.emissions = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=0)
    # Real Constraints
-    model.carbon_tax_payment = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=0, bounds =(0,0))
-    model.net_borrowing = pyo.Var(model.T, domain = pyo.NonNegativeReals, initialize =0, bounds = (0,0))
-    model.interest_payment = pyo.Var(model.T, domain= pyo.NonNegativeReals, initialize =0, bounds =(0,0))
-    model.debt = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=0, bounds =(0,0))
-    model.debt_payment = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=0, bounds = (0,0))
+    model.carbon_tax_payment = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=0)
+    model.net_borrowing = pyo.Var(model.T, domain = pyo.NonNegativeReals, initialize =0)
+    model.interest_payment = pyo.Var(model.T, domain= pyo.NonNegativeReals, initialize =0)
+    model.debt = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=current_debt)
+    model.debt_payment = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=0)
 
     # Objective
     def objective_rule(model, t):
@@ -120,25 +120,46 @@ def _profit_maximization(
 
     model.objective = pyo.Objective(rule=objective_rule, sense=pyo.maximize)
 
-
+    # Constraints
+    def carbon_tax_payment_rule(model, t):
+        return model.carbon_tax_payment[t] == model.emissions[t] * carbon_tax_rate
+    model.carbon_tax_payment_constraint = pyo.Constraint(model.T, rule=carbon_tax_payment_rule)
 
     def production_constraint_rule(model, t):
-        epsilon = 1e-6
-        return model.production[t] == current_productivity * (model.capital[t] + epsilon ** capital_elasticity) * (model.labor[t]+ epsilon ** (1 - capital_elasticity))
+        episilon = 1e-6
+        return model.production[t] == current_productivity * ((model.capital[t] + episilon) ** capital_elasticity) * ((model.labor[t]+ episilon)** (1 - capital_elasticity))
     model.production_constraint = pyo.Constraint(model.T, rule=production_constraint_rule)
 
+    def emissions_constraint_rule(model, t):
+        return model.emissions[t] == model.carbon_intensity[t] * model.production[t]
+    model.emissions_constraint = pyo.Constraint(model.T, rule=emissions_constraint_rule)
+
+    def carbon_intensity_evolution_rule(model, t):
+        epsilon = 1e-6
+        if t == 0:
+            return model.carbon_intensity[t] == ((1 - depreciation_rate) * current_capital * current_carbon_intensity +
+                                                 model.investment[t] * new_capital_carbon_intensity) / (model.capital[t] + epsilon)
+        else:
+            return model.carbon_intensity[t] == ((1 - depreciation_rate) * model.capital[t-1] * model.carbon_intensity[t-1] +
+                                                 model.investment[t] * new_capital_carbon_intensity) / (model.capital[t] + epsilon)
+    model.carbon_intensity_evolution = pyo.Constraint(model.T, rule=carbon_intensity_evolution_rule)
 
     def cash_balance_constraint(model, t):
-        if t == 0: # removed holding costs for t = 0
-            return model.cash[t] == budget + expected_price[t] * model.sales[t] - (
-                wage * model.labor[t] + capital_price * model.investment[t]
-                 )
+        if t == 0:
+            return model.cash[t] == budget + model.net_borrowing[t] + expected_price[t] * model.sales[t] - (
+                wage * model.labor[t] + capital_price * model.investment[t] +
+                holding_costs * current_inventory + model.debt_payment[t]+
+                model.carbon_tax_payment[t])
         else:
-            return model.cash[t] == model.cash[t-1] + expected_price[t] * model.sales[t] - (
-                wage * model.labor[t] + capital_price * model.investment[t])
+            return model.cash[t] == model.cash[t-1] + model.net_borrowing[t] + expected_price[t] * model.sales[t] - (
+                wage * model.labor[t] + capital_price * model.investment[t] +
+                holding_costs * model.inventory[t-1] + model.debt_payment[t] +
+                model.carbon_tax_payment[t])
     model.cash_balance_constraint = pyo.Constraint(model.T, rule=cash_balance_constraint)
 
-
+    def productive_borrowing_constraint(model, t):
+        return model.net_borrowing[t] <= model.investment[t] #Borrowing can only be used for investment
+    model.productive_borrowing_constraint = pyo.Constraint(model.T, rule=productive_borrowing_constraint)
 
 
     def inventory_balance_rule(model, t):
@@ -150,9 +171,9 @@ def _profit_maximization(
 
     def capital_constraint_rule(model, t):
         if t == 0:
-            return model.capital[t] ==  current_capital + model.investment[t]
+            return model.capital[t] == (1 - depreciation_rate) * current_capital + model.investment[t]
         else:
-            return model.capital[t] == model.capital[t-1] + model.investment[t]
+            return model.capital[t] == (1 - depreciation_rate) * model.capital[t-1] + model.investment[t]
     model.capital_constraint = pyo.Constraint(model.T, rule=capital_constraint_rule)
 
 
@@ -165,61 +186,43 @@ def _profit_maximization(
             available_inventory = current_inventory + model.production[t]
         else:
             available_inventory = model.inventory[t-1] + model.production[t]
-        return model.sales[t] <= available_inventory
+        return model.sales[t] <= available_inventory + 1e-6
     model.sales_constraint_inventory = pyo.Constraint(model.T, rule=sales_constraint_inventory_rule)
 
-  # Constraints
-    """def carbon_tax_payment_rule(model, t):
-        return model.carbon_tax_payment[t] == model.emissions[t] * carbon_tax_rate
-    model.carbon_tax_payment_constraint = pyo.Constraint(model.T, rule=carbon_tax_payment_rule)"""
-    """def emissions_constraint_rule(model, t):
-        return model.emissions[t] == model.carbon_intensity[t] * model.production[t]
-    model.emissions_constraint = pyo.Constraint(model.T, rule=emissions_constraint_rule)
-    def carbon_intensity_evolution_rule(model, t):
-        if t == 0:
-            return model.carbon_intensity[t] == ((1 - depreciation_rate) * current_capital * current_carbon_intensity +
-                                                model.investment[t] * new_capital_carbon_intensity) / model.capital[t]
-        else:
-            return model.carbon_intensity[t] == ((1 - depreciation_rate) * model.capital[t-1] * model.carbon_intensity[t-1] +
-                                                model.investment[t] * new_capital_carbon_intensity) / model.capital[t]
-    model.carbon_intensity_evolution = pyo.Constraint(model.T, rule=carbon_intensity_evolution_rule)"""
-
-    """def debt_payment_rule(model, t):
+    def debt_payment_rule(model, t):
         previous_debt = current_debt if t == 0 else model.debt[t-1]
         model.interest_payment[t] = previous_debt * interest_rate
         # Ensure debt_payment[t] >= interest_payment[t]
         return model.debt_payment[t] >= model.interest_payment[t]
-    model.debt_payment_constraint = pyo.Constraint(model.T, rule=debt_payment_rule)"""
+    model.debt_payment_constraint = pyo.Constraint(model.T, rule=debt_payment_rule)
 
 
-    """def debt_evolution_rule(model, t):
+    def debt_evolution_rule(model, t):
         if t == 0:
             return model.debt[t] <= current_debt + model.net_borrowing[t] - (model.debt_payment[t] - model.interest_payment[t])
         else:
             return model.debt[t] <= model.debt[t-1] + model.net_borrowing[t] - (model.debt_payment[t] - model.interest_payment[t])
-    model.debt_evolution_constraint = pyo.Constraint(model.T, rule=debt_evolution_rule)"""
+    model.debt_evolution_constraint = pyo.Constraint(model.T, rule=debt_evolution_rule)
 
 
-    """def terminal_debt_rule(model,t):
+    def terminal_debt_rule(model,t):
         return model.debt[model.T.last()] <= current_debt
-    model.terminal_debt_constraint = pyo.Constraint(rule=terminal_debt_rule)"""
+    model.terminal_debt_constraint = pyo.Constraint(rule=terminal_debt_rule)
 
-    """def terminal_inventory_rule(model,t):
+    def terminal_inventory_rule(model,t):
         return model.inventory[model.T.last()] <= current_inventory
-    model.terminal_inventory_constraint = pyo.Constraint(rule=terminal_inventory_rule)"""
+    model.terminal_inventory_constraint = pyo.Constraint(rule=terminal_inventory_rule)
 
-    """def borrowing_limit_rule(model, t):
+    def borrowing_limit_rule(model, t):
         return model.net_borrowing[t] <= 10  #temporary disabling debt till model behavior is analysed wo debt
-    model.borrowing_limit_constraint = pyo.Constraint(model.T, rule=borrowing_limit_rule)"""
-    """def productive_borrowing_constraint(model, t):
-        return model.net_borrowing[t] <= model.investment[t] #Borrowing can only be used for investment
-    model.productive_borrowing_constraint = pyo.Constraint(model.T, rule=productive_borrowing_constraint)"""
+    model.borrowing_limit_constraint = pyo.Constraint(model.T, rule=borrowing_limit_rule)
+
 
 
     # Solve the model
     solver = SolverFactory('ipopt')
     solver.options['max_iter'] = 10000
-    solver.options['tol'] = 1e-2  # Sets the convergence tolerance for the optimization algorithm
+    solver.options['tol'] = 1e-5  # Sets the convergence tolerance for the optimization algorithm
     solver.options['halt_on_ampl_error'] = 'yes'
     solver.options['linear_solver'] = linear_solver
 
@@ -228,7 +231,7 @@ def _profit_maximization(
 
     solver.options['mu_strategy'] = 'adaptive'
     solver.options['print_level'] = 5  # Increase print level for more information
-    #log_infeasible_constraints(model)
+
 
     solver.options['linear_scaling_on_demand'] = 'yes'  # Perform linear scaling only when needed
 
