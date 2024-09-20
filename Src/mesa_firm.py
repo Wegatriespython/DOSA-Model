@@ -1,6 +1,6 @@
 from mesa import Agent
 import numpy as np
-from Utilities.Simpler_profit_maxxin import profit_maximization
+from Utilities.pyJulia_profit import profit_maximization
 from Utilities.expectations import expect_demand, expect_demand_ar, expect_price, get_market_demand, get_expectations,get_supply, expect_price_ar
 from Utilities.Strategic_adjustments import get_max_wage, get_min_sale_price, get_max_capital_price,calculate_production_capacity, get_desired_wage, get_desired_capital_price, get_desired_price
 import logging
@@ -134,10 +134,10 @@ class Firm(Agent):
 
         average_capital_price = self.model.data_collector.get_average_capital_price(self.model)
 
-        if self.budget <= 0:
+        if self.budget < 0:
             print(self.model.step_count)
             print("Firm", self.unique_id, self.optimals)
-            breakpoint()
+            self.model.schedule.remove(self)
             return
         print("Calling profit_maximization with parameters:", {
             'current capital': round(self.capital,2),
@@ -165,7 +165,7 @@ class Firm(Agent):
 
         self.per_worker_income = self.wage * self.max_working_hours
 
-        result, zero_profit_conditions = profit_maximization(
+        result = profit_maximization(
             round(self.capital,2),
             round(self.total_labor_units,2),
             round(self.price,2),
@@ -193,19 +193,19 @@ class Firm(Agent):
             breakpoint()
             return
 
-        if zero_profit_conditions is not None:
+        """if zero_profit_conditions is not None:
           zero_profit_wages = zero_profit_conditions['wage']
           zero_profit_wage = zero_profit_wages[0]
           zero_profit_prices = zero_profit_conditions['price']
           zero_profit_price = zero_profit_prices[0]
           zero_profit_capital_prices = zero_profit_conditions['capital_price']
           print("Zero profit capital prices", zero_profit_capital_prices)
-          zero_profit_capital_price = zero_profit_capital_prices[0]
+          zero_profit_capital_price = zero_profit_capital_prices[0]"""
 
-        else :
-          zero_profit_wage = self.wage
-          zero_profit_price = self.price
-          zero_profit_capital_price = self.expectations[2]
+
+        zero_profit_wage = self.wage
+        zero_profit_price = self.price
+        zero_profit_capital_price = self.expectations[2]
 
         optimal_labor = result['optimal_labor']
         optimal_capital = result['optimal_capital']
@@ -213,12 +213,12 @@ class Firm(Agent):
         optimal_inventory = result['optimal_inventory']
         optimal_investment = result['optimal_investment']
         optimal_sales = result['optimal_sales']
-        optimal_debt = result['optimal_debt']
-        optimal_debt_payment = result['optimal_debt_payment']
-        optimal_profit_per_period = result['profits_per_period']
-        optimal_carbon_intensity = result['optimal_carbon_intensity']
-        optimal_emissions = result['optimal_emissions']
-        optimal_carbon_tax_payments = result['optimal_carbon_tax_payments']
+        #optimal_debt = result['optimal_debt']
+        #optimal_debt_payment = result['optimal_debt_payment']
+        #optimal_profit_per_period = result['profits_per_period']
+        #optimal_carbon_intensity = result['optimal_carbon_intensity']
+        #optimal_emissions = result['optimal_emissions']
+        #optimal_carbon_tax_payments = result['optimal_carbon_tax_payments']
 
 
         self.zero_profit_conditions = {
@@ -232,9 +232,9 @@ class Firm(Agent):
             'production': optimal_production[0],
             'inventory': optimal_inventory[0],
             'sales': optimal_sales[0],
-            'debt': optimal_debt[0],
-            'debt_payment': optimal_debt_payment[0],
-            'profit_per_period': optimal_profit_per_period[0],
+            #'debt': optimal_debt[0],
+            #'debt_payment': optimal_debt_payment[0],
+            #'profit_per_period': optimal_profit_per_period[0],
             'investment': optimal_investment[0]
         }
         print(f"Optimal values: {self.optimals}")
@@ -422,16 +422,16 @@ class Firm(Agent):
             self.capital += quantity
             self.investment_demand -= quantity
             budget_change = quantity * price
-            optimal_debt = self.optimals['debt']
-            if optimal_debt - self.debt  <= 0:
+            #optimal_debt = self.optimals['debt']
+           # if optimal_debt - self.debt  <= 0:
               #if not taking debt, purely finance out of budget.
-              self.budget -= budget_change
-            else:
-              if optimal_debt<= budget_change:
-                self.budget -= budget_change - optimal_debt
-                self.debt += optimal_debt
-              else:
-                self.debt += budget_change
+            self.budget -= budget_change
+            #else:
+              #if optimal_debt<= budget_change:
+                #self.budget -= budget_change - optimal_debt
+                #self.debt += optimal_debt
+                #else:
+                #self.debt += budget_change
 
 
 
