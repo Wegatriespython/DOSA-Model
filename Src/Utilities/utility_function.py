@@ -7,13 +7,19 @@ from functools import lru_cache
 last_solution = None
 
 @lru_cache(maxsize=2056)
-def memoized_maximize_utility(savings, wages, prices, discount_factor, periods, alpha, max_working_hours, linear_solver):
-    return _maximize_utility(savings, wages, prices, discount_factor, periods, alpha, max_working_hours, linear_solver)
+def memoized_maximize_utility(savings, wages, prices, discount_rate, periods, alpha, max_working_hours, linear_solver):
+    return _maximize_utility(savings, wages, prices, discount_rate, periods, alpha, max_working_hours, linear_solver)
 
-def maximize_utility(savings, wages, prices, discount_factor=0.95, periods=20, alpha=0.9, max_working_hours=16, linear_solver='ma57'):
+def maximize_utility(Utility_params, linear_solver='ma57'):
     global last_solution
-
-    result = memoized_maximize_utility(savings, tuple(wages), tuple(prices), discount_factor, periods, alpha, max_working_hours, linear_solver)
+    savings = Utility_params['savings']
+    wages = Utility_params['wage']
+    prices = Utility_params['price']
+    discount_rate = Utility_params['discount_rate']
+    periods = Utility_params['time_horizon']
+    alpha = Utility_params['alpha']
+    max_working_hours = Utility_params['max_working_hours']
+    result = memoized_maximize_utility(savings, tuple(wages), tuple(prices), discount_rate, periods, alpha, max_working_hours, linear_solver)
 
     if result is not None:
         last_solution = result  # Update last_solution for warm start
@@ -22,7 +28,7 @@ def maximize_utility(savings, wages, prices, discount_factor=0.95, periods=20, a
 
     return result
 
-def _maximize_utility(savings, wages, prices, discount_factor, periods, alpha, max_working_hours, linear_solver):
+def _maximize_utility(savings, wages, prices, discount_rate, periods, alpha, max_working_hours, linear_solver):
     global last_solution
 
     model = pyo.ConcreteModel()
@@ -41,7 +47,7 @@ def _maximize_utility(savings, wages, prices, discount_factor, periods, alpha, m
     model.initial_savings = pyo.Param(initialize=savings)
     model.wages = pyo.Param(model.T, initialize=dict(enumerate(wages)))
     model.prices = pyo.Param(model.T, initialize=dict(enumerate(prices)))
-    model.discount_factor = pyo.Param(initialize=discount_factor)
+    model.discount_rate = pyo.Param(initialize=discount_rate)
     model.alpha = pyo.Param(initialize=alpha)
     model.max_working_hours = pyo.Param(initialize=max_working_hours)
     min_consumtion = 0.5
@@ -51,26 +57,17 @@ def _maximize_utility(savings, wages, prices, discount_factor, periods, alpha, m
     def time_constraint(model, t):
         return model.leisure[t] + model.working_hours[t] == model.max_working_hours
 
+
     @model.Constraint(model.T)
-    def budget_constraint(model, t):
+    def savings_evolution(model,t):
         if t == 0:
-            return (model.prices[t] * model.consumption[t] + model.savings[t] ==
-                    model.wages[t] * model.working_hours[t] + model.initial_savings)
+            return model.savings[t] == model.initial_savings + model.wages[t] * model.working_hours[t] - model.prices[t] * model.consumption[t]
         else:
-            return (model.prices[t] * model.consumption[t] + model.savings[t] ==
-                    model.wages[t] * model.working_hours[t] + model.savings[t-1])
-
-    #@model.Constraint(model.T)
-
-    #def savings_evolution(model,t):
-        #if t == 0:
-            #return model.savings[t] == model.initial_savings
-            #else:
-            #return model.savings[t] == model.savings[t-1] + model.wages[t] * model.working_hours[t] - model.prices[t] * model.consumption[t]
+            return model.savings[t] == model.savings[t-1] + model.wages[t] * model.working_hours[t] - model.prices[t] * model.consumption[t]
 
     @model.Constraint(model.T)
     def consumption_constraint(model, t):
-      return model.consumption[t] >= min_consumtion * discount_factor**t
+      return model.consumption[t] >= min_consumtion * decay_rate**t
 
 
     @model.Constraint()
@@ -81,11 +78,13 @@ def _maximize_utility(savings, wages, prices, discount_factor, periods, alpha, m
     @model.Objective(sense=pyo.maximize)
     def objective_rule(model):
         epsilon = 1e-6
-        utility = sum(model.discount_factor**t * (pyo.log(model.consumption[t]+epsilon) * model.alpha +
-                                               pyo.log(model.leisure[t]+epsilon) * (1-model.alpha))
-                   for t in model.T)
-
+        utility = sum((
+            (((model.consumption[t] + epsilon)** (model.alpha)) *
+             (model.leisure[t] + epsilon) ** (1 - model.alpha))) * (1/(1+model.discount_rate)**t)
+            for t in model.T
+        )
         return utility
+
 
     # Solve the model
     solver = SolverFactory('ipopt')
@@ -119,13 +118,13 @@ def _maximize_utility(savings, wages, prices, discount_factor, periods, alpha, m
 
             return optimal_consumption, optimal_working_hours, optimal_leisure, optimal_savings
         else:
-            breakpoint()
+
             print(f"Solver status: {results.solver.status}")
             print(f"Termination condition: {results.solver.termination_condition}")
-            return ([1] * periods, [13] * periods,
+            return ([0] * periods, [13] * periods,
                     [0] * periods, [0] * periods)  # Default values if optimization fails
     except Exception as e:
-        breakpoint()
+
         print(f"An error occurred during optimization: {str(e)}")
         return ([1] * periods, [13] * periods,
                 [0] * periods, [0] * periods)  # Default values if optimization fails

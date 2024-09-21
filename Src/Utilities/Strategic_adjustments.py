@@ -74,7 +74,7 @@ def get_desired_price(expected_price, desired_price, real_price, actual_sales, d
     adjustment_factor = sales_deviation - inventory_deviation
 
     # Cap the adjustment factor to be between -1 and 1
-    adjustment_factor = max(-1.0, min(adjustment_factor, 1.0)) + np.random.uniform(-0.05, 0.05)
+    adjustment_factor = max(-1.0, min(adjustment_factor, 1.0)) + np.random.uniform(-0.05, 0.15)
 
     # Scaling factor controls the magnitude of adjustment
     scaling_factor = 0.05
@@ -110,58 +110,80 @@ def get_desired_wage(expected_wage, desired_wage, real_wage, optimal_labor, actu
 
 
 ## Needs major fix. Something causes workers to adjust prices down randomly causing issues.
-def update_worker_price_expectation(latent_price, desired_price, real_price, desired_consumption, consumption, max_price):
-    real_price = max(real_price, latent_price)
-    max_price = max(max_price, desired_price, latent_price)
+def update_worker_price_expectation(price_decision_data):
+    # Extract data
+    expected_price = price_decision_data['expected_price']
+    real_price = price_decision_data['real_price']
+    desired_price = price_decision_data['desired_price']
+    desired_consumption = price_decision_data['desired_consumption']
+    consumption = price_decision_data['consumption']
+    max_price = price_decision_data['max_price']
+
+
+    real_price = max(real_price, expected_price)
+    max_price = max(max_price, desired_price, expected_price)
     desired_price = min(desired_price, max_price)
 
+
+    # Compute consumption ratio
     consumption_ratio = consumption / desired_consumption if desired_consumption > 0 else 1.0
 
+    # Deviations
     consumption_deviation = consumption_ratio - 1.0  # Negative if consuming less than desired
-
-    price_gap = real_price - desired_price # Negative if overbidding
-
-    price_gap_ratio = price_gap / real_price if real_price > 0 else 0.0
+    price_gap = real_price - desired_price
+    price_gap_ratio = price_gap / real_price if real_price > 0 else 0.0  # Positive if underbidding
 
     # Initialize adjustment factor
-
     adjustment_factor = 0.0
 
-    match consumption_ratio, price_gap_ratio:
+    # If consuming less than desired
+    if consumption_ratio < 1.0:
+        # Need to increase desired_price to get more supply
+        # Even if price_gap is small, we need to adjust desired_price upwards
+        adjustment_factor += (1.0 - consumption_ratio)
+        # Optionally, add more weight if price_gap is small
+        if abs(price_gap_ratio) < 0.05:
+            # Price gap is less than 5%, increase adjustment
+            adjustment_factor += (0.20 - abs(price_gap_ratio)) * 20  # Weight can be adjusted
 
-      case x, y if x < 1.0 and y < 0.05:
+    else:
+        # Consuming desired amount or more
+        if desired_price > real_price:
+            # Can lower desired_price to save money
+            price_gap = desired_price - real_price
+            price_gap_ratio = price_gap / desired_price if desired_price > 0 else 0.0
+            adjustment_factor -= price_gap_ratio
+        else:
+            # Desired_price is less than or equal to real_price; maintain or slightly increase
+            adjustment_factor += 0.0  # No change needed
 
-        adjustment_factor += (1.0 - x) + (0.2 - abs(y)) * 100
-
-      case x, y if x < 1.0:
-
-        adjustment_factor += (1.0 - x)
-
-      case x, y if x >= 1.0 and y<0:
-
-        adjustment_factor -= (desired_price - real_price)/desired_price if desired_price > 0 else 0.0
-
-      case _:
-        adjustment_factor = np.random.uniform(-0.05, 0.05)
-
-
-
-    scaling_factor = 0.5
+    # Cap adjustment_factor between -1 and 1
     adjustment_factor = max(-1.0, min(adjustment_factor, 1.0))
 
+    # Scaling factor controls the magnitude of adjustment
+    scaling_factor = 0.5  # Increased from 0.05 to allow for larger adjustments
+
+    # Adjust the desired price based on the adjustment factor
     desired_price += desired_price * adjustment_factor * scaling_factor
 
-    smoothed_price = desired_price * 0.9 + real_price * 0.1
+    # Smooth the price to avoid abrupt changes
+    smoothed_price = desired_price * 0.9 + real_price * 0.1 # Slightly favor desired_price more
 
+    # Ensure the smoothed price does not exceed the maximum price
     smoothed_price = min(smoothed_price, max_price)
 
     return smoothed_price
 
 
 
+def update_worker_wage_expectation(wage_decision_data):
 
-
-def update_worker_wage_expectation(expected_wage,desired_wage,real_wage, working_hours, desired_working_hours, min_wage):
+  real_wage = wage_decision_data['real_wage']
+  desired_wage = wage_decision_data['desired_wage']
+  expected_wage = wage_decision_data['expected_wage']
+  working_hours = wage_decision_data['working_hours']
+  desired_working_hours = wage_decision_data['optimal_working_hours']
+  min_wage = wage_decision_data['min_wage']
 
   real_wage = max(real_wage, min_wage)
   desired_wage = max(desired_wage, min_wage)

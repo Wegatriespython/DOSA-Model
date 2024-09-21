@@ -1,6 +1,6 @@
 from mesa import Agent
 import numpy as np
-from Utilities.pyJulia_profit import profit_maximization
+from Utilities.Simpler_profit_maxxin import profit_maximization
 from Utilities.expectations import expect_demand, expect_demand_ar, expect_price, get_market_demand, get_expectations,get_supply, expect_price_ar
 from Utilities.Strategic_adjustments import get_max_wage, get_min_sale_price, get_max_capital_price,calculate_production_capacity, get_desired_wage, get_desired_capital_price, get_desired_price
 import logging
@@ -19,7 +19,6 @@ class Firm(Agent):
         self.desireds = []
         self.sales_same_period =0
         self.debt = 0
-        self.time_horizon = self.model.config.TIME_HORIZON - self.model.step_count
         self.total_labor_units = 0
         self.historic_labor_prices= []
         self.per_worker_income = 0
@@ -78,16 +77,15 @@ class Firm(Agent):
         self.production = 0
         self.labor_demand = 0
         self.investment_demand = 0
-        self.expected_demand = np.full(self.time_horizon, 0)
-        self.expected_price = np.full(self.time_horizon, 0)
+        self.expected_demand = np.full(self.model.time_horizon, 0)
+        self.expected_price = np.full(self.model.time_horizon, 0)
         self.productivity += round(self.labor_productivity,2)
         self.labor_productivity = 0
         self.get_total_labor_units()
         self.pay_wages()
         self.update_average_price()
         self.prices = []
-        if self.budget < self.wage:
-            self.model.schedule.remove(self)
+
 
 
     def update_expectations(self):
@@ -97,7 +95,7 @@ class Firm(Agent):
 
         capital_demand, price_capital = get_market_demand(self, 'capital')
         self.historic_capital_prices.append(price_capital)
-        expected_capital_price = expect_price_ar(self.historic_capital_prices, price_capital, self.time_horizon)
+        expected_capital_price = expect_price_ar(self.historic_capital_prices, price_capital, self.model.time_horizon)
         print("capital price", np.mean(price_capital))
 
         self.historic_demand.append(demand)
@@ -111,13 +109,13 @@ class Firm(Agent):
         self.historic_capital_supply.append(capital_supply)
 
 
-        expected_capital_supply = expect_demand_ar(self.historic_capital_supply, capital_supply, self.time_horizon)
-        expected_labor_supply = expect_demand_ar(self.historic_labor_supply, labor_supply, self.time_horizon)
+        expected_capital_supply = expect_demand_ar(self.historic_capital_supply, capital_supply, self.model.time_horizon)
+        expected_labor_supply = expect_demand_ar(self.historic_labor_supply, labor_supply, self.model.time_horizon)
 
-        self.expected_price, self.expected_demand = get_expectations(demand, self.historic_demand,  price ,self.historic_price,(self.time_horizon))
+        self.expected_price, self.expected_demand = get_expectations(demand, self.historic_demand,  price ,self.historic_price,(self.model.time_horizon))
 
 
-        expected_wages = expect_price_ar(self.historic_labor_prices, wage, self.time_horizon)
+        expected_wages = expect_price_ar(self.historic_labor_prices, wage, self.model.time_horizon)
         self.expectations = [self.expected_demand[0], self.expected_price[0], expected_capital_price[0], expected_capital_supply[0], expected_labor_supply[0], expected_wages[0]]
         self.expectations_cache.append(self.expectations)
         return
@@ -135,59 +133,42 @@ class Firm(Agent):
         average_capital_price = self.model.data_collector.get_average_capital_price(self.model)
 
         if self.budget < 0:
+            print("Declaring Bankruptcy")
             print(self.model.step_count)
             print("Firm", self.unique_id, self.optimals)
             self.model.schedule.remove(self)
+            breakpoint()
             return
-        print("Calling profit_maximization with parameters:", {
-            'current capital': round(self.capital,2),
-            'current labor': round(self.total_labor_units,2),
-            'current price': round(self.price,2),
+
+
+        Profit_max_params = {
+            'current_capital': round(self.capital,2),
+            'current_labor': round(self.total_labor_units,2),
+            'current_price': round(self.price,2),
             'productivity': self.productivity,
-            'expected demand': self.expected_demand * (self.market_share if self.market_share !=0 else  1),
-            'expected price': self.expected_price,
-            'expectated capital price': self.expectations[2],
-            'capital elasticity': self.capital_elasticity,
+            'expected_demand': self.expected_demand/5,
+            'expected_price': self.expected_price,
+            'capital_price': self.expectations[2],
+            'capital_elasticity': self.capital_elasticity,
             'inventory': round(self.inventory,2),
-            'depreciation rate': self.model.config.DEPRECIATION_RATE,
-            'time horizon': (self.time_horizon),
-            'discount rate': self.model.config.DISCOUNT_RATE,
+            'depreciation_rate': self.model.config.DEPRECIATION_RATE,
+            'time_horizon': (self.model.time_horizon),
+            'discount_rate': self.model.config.DISCOUNT_RATE,
             'budget': round(self.budget,2),
             'wage': round(self.wage * self.max_working_hours,2),
-            'expected capital supply': self.expectations[3],
-            'expected labor supply': self.expectations[4],
+            'expected_capital_supply': self.expectations[3],
+            'expected_labor_supply': self.expectations[4],
             'debt': self.debt,
-            'carbon intensity': self.carbon_intensity,
-            'new capital carbon intensity': 1,
+            'carbon_intensity': self.carbon_intensity,
+            'new_capital_carbon_intensity': 1,
             'carbon_tax_rate': 0,
             'holding_costs': self.model.config.HOLDING_COST
-        })
-
+        }
+        print("Calling profit_maximization with parameters:" , Profit_max_params)
         self.per_worker_income = self.wage * self.max_working_hours
 
-        result = profit_maximization(
-            round(self.capital,2),
-            round(self.total_labor_units,2),
-            round(self.price,2),
-            self.productivity,
-            self.expected_demand * (self.market_share if self.market_share !=0 else 1),
-            self.expected_price,
-            self.expectations[2],  # Updated
-            self.capital_elasticity,
-            round(self.inventory,2),
-            self.model.config.DEPRECIATION_RATE,
-            (self.time_horizon),
-            self.model.config.DISCOUNT_RATE,
-            round(self.budget,2),
-            round(self.expectations[5] * self.max_working_hours,2),
-            self.expectations[3], #Capital Supply,
-            self.expectations[4], #Labor Supply,
-            self.debt,
-            self.carbon_intensity,
-            1, #new capital carbon intensity
-            0,#carbon tax rate
-            self.model.config.HOLDING_COST)
-
+        result = profit_maximization(Profit_max_params)
+        #print(result)
         if result is None:
             print("Optimization failed")
             breakpoint()
@@ -203,9 +184,9 @@ class Firm(Agent):
           zero_profit_capital_price = zero_profit_capital_prices[0]"""
 
 
-        zero_profit_wage = self.wage
+        """zero_profit_wage = self.wage
         zero_profit_price = self.price
-        zero_profit_capital_price = self.expectations[2]
+        zero_profit_capital_price = self.expectations[2]"""
 
         optimal_labor = result['optimal_labor']
         optimal_capital = result['optimal_capital']
@@ -213,18 +194,18 @@ class Firm(Agent):
         optimal_inventory = result['optimal_inventory']
         optimal_investment = result['optimal_investment']
         optimal_sales = result['optimal_sales']
-        #optimal_debt = result['optimal_debt']
-        #optimal_debt_payment = result['optimal_debt_payment']
-        #optimal_profit_per_period = result['profits_per_period']
-        #optimal_carbon_intensity = result['optimal_carbon_intensity']
-        #optimal_emissions = result['optimal_emissions']
-        #optimal_carbon_tax_payments = result['optimal_carbon_tax_payments']
+        optimal_debt = result['optimal_debt']
+        optimal_interest_payment = result['optimal_interest_payment']
+        optimal_debt_payment = result['optimal_debt_payment']
+        optimal_carbon_intensity = result['optimal_carbon_intensity']
+        optimal_emissions = result['optimal_emissions']
+        optimal_carbon_tax_payments = result['optimal_carbon_tax_payment']
 
 
-        self.zero_profit_conditions = {
+        """self.zero_profit_conditions = {
             'wage': zero_profit_wage,
             'price': zero_profit_price,
-            'capital_price': zero_profit_capital_price}
+            'capital_price': zero_profit_capital_price}"""
 
         self.optimals = {
             'labor': optimal_labor[0],
@@ -232,12 +213,12 @@ class Firm(Agent):
             'production': optimal_production[0],
             'inventory': optimal_inventory[0],
             'sales': optimal_sales[0],
-            #'debt': optimal_debt[0],
-            #'debt_payment': optimal_debt_payment[0],
-            #'profit_per_period': optimal_profit_per_period[0],
+            'debt': optimal_debt[0],
+            'debt_payment': optimal_debt_payment[0],
             'investment': optimal_investment[0]
         }
         print(f"Optimal values: {self.optimals}")
+
 
 
 
@@ -356,9 +337,6 @@ class Firm(Agent):
             #this would be cumilative over periods. The correct way would be a static effect which grows only if labor_productivity rises over time.:
         return self.wage
 
-
-
-
     def layoff_employees(self, units_to_fire):
         hours_to_fire = units_to_fire * self.max_working_hours
         hours_fired = 0
@@ -378,6 +356,8 @@ class Firm(Agent):
                 break
         for worker in fire_list:
             self.fire_worker(worker)
+        #calculate new average wage
+        self.calculate_average_wage()
 
     def fire_worker(self, worker):
         if worker in self.workers:
@@ -467,6 +447,21 @@ class Firm(Agent):
 
 
       return self.desireds
+    def get_zero_profit_conditions(self):
+
+      max_wage = get_max_wage(self.total_working_hours, self.productivity, self.capital, self.capital_elasticity, self.price, self.get_total_labor_units(),self.optimals['labor'],self.model.config.MINIMUM_WAGE)
+      min_sale_price = get_min_sale_price(self.firm_type, self.workers, self.productivity, self.capital, self.capital_elasticity, self.get_total_labor_units(), self.inventory)
+
+      if min_sale_price < 0.5:
+        breakpoint()
+
+      max_capital_price = get_max_capital_price(self.investment_demand, self.optimals['production'],self.optimals['capital'], self.price, self.capital_elasticity, self.model.time_horizon, self.model.config.DISCOUNT_RATE)
+      self.zero_profit_conditions = {
+      'wage':max_wage,
+      'price': min_sale_price,
+      'capital_price': max_capital_price}
+
+      return self.zero_profit_conditions
 
 
 class Firm1(Firm):
@@ -481,8 +476,8 @@ class Firm1(Firm):
         self.budget = 10
         self.historic_sales = [model.config.INITIAL_SALES]
         self.historic_inventory = [self.inventory]
-        self.expected_demand = [model.config.FIRM1_INITIAL_DEMAND] *self.time_horizon
-        self.expected_price = [self.price] * self.time_horizon
+        self.expected_demand = [model.config.FIRM1_INITIAL_DEMAND] *self.model.time_horizon
+        self.expected_price = [self.price] * self.model.time_horizon
         self.productivity = model.config.INITIAL_PRODUCTIVITY
         self.carbon_intensity = 1
         self.labor_productivity = 0
@@ -520,8 +515,8 @@ class Firm2(Firm):
         self.historic_sales = [model.config.INITIAL_SALES]
         self.price = self.model.config.INITIAL_PRICE
         self.historic_inventory = [self.inventory]
-        self.expected_demand = [model.config.FIRM2_INITIAL_DEMAND]*self.time_horizon
-        self.expected_price = [self.price]*self.time_horizon
+        self.expected_demand = [model.config.FIRM2_INITIAL_DEMAND]*self.model.time_horizon
+        self.expected_price = [self.price]*self.model.time_horizon
         self.quality = 1
         self.carbon_intensity = 1
         self.preference_mode = self.model.config.PREFERNCE_MODE_CONSUMPTION

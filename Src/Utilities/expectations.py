@@ -1,6 +1,6 @@
 from math import isnan, nan
 import numpy as np
-
+from scipy import stats
 
 def get_market_demand(self, market_type):
     if self.model.step_count < 1:
@@ -9,6 +9,8 @@ def get_market_demand(self, market_type):
                 return 6, 3
             case 'consumption':
                 return 30, 1
+            case 'labor':
+                return  300, 0.0625
 
     match market_type:
         case 'capital' | 'consumption' | 'labor':
@@ -59,8 +61,8 @@ def get_supply(self, market_type):
 
 
 def get_expectations(demand, historic_demand, price, historic_price, periods):
-   expected_prices = expect_price_ar(historic_price, price, periods)
-   expected_demand = expect_demand_ar(historic_demand, demand, periods)
+   expected_prices = expect_price_trend(historic_price, price, periods)
+   expected_demand = expect_demand_trend(historic_demand, demand, periods)
 
 
    return expected_prices, expected_demand
@@ -127,3 +129,49 @@ def expect_price(price, periods=6):
       return np.full(periods, np.mean(price[-5:]))
   else:
     return np.full(periods, np.mean(price))
+
+def expect_demand_trend(historic_demand, current_demand, periods=6):
+    """
+    Trend-based demand expectation model using linear regression.
+
+    :param historic_demand: List of historical demand
+    :param current_demand: Current demand
+    :param periods: Number of future periods to forecast
+    :return: Array of expected demand
+    """
+    if len(historic_demand) < 5:
+        return np.full(periods, current_demand)
+    else:
+        x = np.arange(len(historic_demand))
+        y = np.array(historic_demand)
+
+        slope, intercept, _, _, _ = stats.linregress(x, y)
+
+        last_x = len(historic_demand) - 1
+        future_x = np.arange(last_x + 1, last_x + periods + 1)
+        expected_demand = slope * future_x + intercept
+
+        return np.round(np.maximum(expected_demand, 0), 1)  # Ensure non-negative demand
+
+def expect_price_trend(historic_prices, current_price, periods=6):
+    """
+    Trend-based price expectation model using linear regression.
+
+    :param historic_prices: List of historical prices
+    :param current_price: Current price
+    :param periods: Number of future periods to forecast
+    :return: Array of expected prices for the specified number of periods
+    """
+    if len(historic_prices) < 5:
+        return np.full(periods, current_price)
+    else:
+        x = np.arange(len(historic_prices))
+        y = np.array(historic_prices)
+
+        slope, intercept, _, _, _ = stats.linregress(x, y)
+
+        last_x = len(historic_prices) - 1
+        future_x = np.arange(last_x + 1, last_x + periods + 1)
+        expected_prices = slope * future_x + intercept
+
+        return np.round(np.maximum(expected_prices, 0), 2)  # Ensure non-negative prices

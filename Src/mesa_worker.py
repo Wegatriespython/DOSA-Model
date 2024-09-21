@@ -1,8 +1,9 @@
+from sys import breakpointhook
 from mesa import Agent
 import numpy as np
 from Utilities.Config import Config
 from Utilities.utility_function import maximize_utility
-from Utilities.expectations import  get_market_demand, expect_price_ar
+from Utilities.expectations import  expect_price_trend, get_market_demand, expect_price_ar
 from Utilities.Strategic_adjustments import update_worker_price_expectation, update_worker_wage_expectation
 
 class Worker(Agent):
@@ -12,7 +13,6 @@ class Worker(Agent):
         self.total_working_hours = 0
         self.preference_mode = self.model.config.PREFERNCE_MODE_LABOR
         self.max_working_hours = 16
-        self.time_horizon = self.model.config.TIME_HORIZON
         self.worker_expectations = []
         self.skillscarbon = 1
         self.consumption_check = 0
@@ -43,7 +43,6 @@ class Worker(Agent):
         self.mode = 'decentralized'
 
     def step(self):
-        self.time_horizon = self.model.config.TIME_HORIZON - self.model.step_count
         self.worker_expectations.clear()
         self.update_expectations()
         self.update_utilty()
@@ -52,56 +51,100 @@ class Worker(Agent):
 
     def update_expectations(self):
       if self.model.step_count < 1:
-        wage = np.full(self.time_horizon,self.expected_wage)
-        prices = np.full(self.time_horizon, self.expected_price)
+        wage = np.full(self.model.time_horizon,self.expected_wage)
+        prices = np.full(self.model.time_horizon, self.expected_price)
         self.worker_expectations = [wage, prices]
+
         self.avg_price = self.expected_price
       else:
         quantity, mkt_wages= get_market_demand(self, 'labor')
-        demand, price = get_market_demand(self, 'consumption')
-        if mkt_wages != 0:
+        demand, mkt_price = get_market_demand(self, 'consumption')
+        if np.mean(mkt_wages) > self.model.config.MINIMUM_WAGE:
           self.wage_history1.append(mkt_wages)
-        if price != 0:
-          self.price_history1.append(price)
+          self.price_history1.append(mkt_price)
+          if len(self.wage_history1)>10:
+            self.wage_history1.pop(0)
+          if len(self.price_history1)>10:
+            self.price_history1.pop(0)
 
         if len(self.prices) > 0 :
           self.prices = [p for p in self.prices if not np.isnan(p)]
           self.avg_price = np.mean(self.prices)
+          self.price_history1.append(self.avg_price)
+          if len(self.price_history1)>10:
+            self.price_history1.pop(0)
         else:
           self.avg_price = 0
 
-        wage = expect_price_ar(self.wage_history1, self.expected_wage, self.time_horizon)
-        prices = expect_price_ar(self.price_history1, self.expected_price, self.time_horizon)
+
+        if self.wage > self.model.config.MINIMUM_WAGE and not np.isnan(self.wage):
+          wage = self.wage
+        else :
+          wage = max(np.mean(mkt_wages), self.model.config.MINIMUM_WAGE)
+        if self.avg_price != 0 and not np.isnan(self.avg_price):
+          price = self.avg_price
+        else:
+          price = mkt_price
+
+
+        wage = expect_price_trend(self.wage_history1, wage, self.model.time_horizon)
+        prices = expect_price_trend(self.price_history1, price, self.model.time_horizon)
 
         self.worker_expectations = [wage, prices]
+        print(self.worker_expectations)
 
     def update_utilty(self):
 
-
-          results = maximize_utility(round(self.savings,2), self.worker_expectations[0], self.worker_expectations[1],0.95, self.time_horizon, alpha=0.9, max_working_hours=16)
+          Utility_params ={
+            'savings' : round(self.savings,2),
+            'wage': self.worker_expectations[0],
+            'price': self.worker_expectations[1],
+            'discount_rate': self.model.config.DISCOUNT_RATE,
+            'time_horizon': self.model.time_horizon,
+            'alpha': 0.9,
+            'max_working_hours': 16
+          }
+          #print(Utility_params)
+          results = maximize_utility(Utility_params)
           self.desired_consumption, self.working_hours, self.leisure, self.desired_savings = [arr[0] for arr in results]
 
           self.optimals = [self.desired_consumption, self.working_hours, self.desired_savings]
-          if self.desired_consumption >100:
-            print("desired_consumption", self.desired_consumption,"prices", prices, "wage", wage, "savings", self.savings)
-            breakpoint()
+          print(self.optimals)
+
 
 
 
     def update_strategy(self):
 
         max_price = self.get_max_consumption_price()
+        price_decision_data = {
+         'expected_price': self.worker_expectations[1][0],
+         'desired_price': self.desired_price,
+         'real_price': self.avg_price,
+         'consumption': self.consumption,
+         'desired_consumption': self.desired_consumption,
+         'max_price': max_price
+          }
 
-        desired_price = update_worker_price_expectation(self.worker_expectations[0][1],self.desired_price,self.avg_price,self.consumption,self.desired_consumption,max_price)
+
+        desired_price = update_worker_price_expectation(price_decision_data)
 
         self.desired_price = desired_price
 
 
-        self.desired_wage = update_worker_wage_expectation(self.worker_expectations[0][0],self.desired_wage,self.wage,self.working_hours, self.optimals[1], self.get_min_wage())
+        wage_decision_data = {
+          'expected_wage': self.worker_expectations[0][1],
+          'desired_wage': self.desired_wage,
+          'real_wage': self.wage,
+          'working_hours': self.working_hours,
+          'optimal_working_hours': self.optimals[1],
+          'min_wage': self.get_min_wage()
+        }
 
-        if self.wage < self.expected_wage:
-          #Quit when wage is 20% below expected wage
-          self.quit(self.working_hours)
+
+        desired_wage = update_worker_wage_expectation(wage_decision_data)
+
+        self.desired_wage = desired_wage
 
         self.consumption = 0
         self.consumption_check = 0
@@ -192,7 +235,11 @@ class Worker(Agent):
         self.savings = max(0, self.savings) #prevent negative savings
 
     def get_max_consumption_price(self):
-      return self.savings/(self.time_horizon) + (self.wage * 16) if self.wage > 0 else  self.savings/(self.time_horizon) + self.worker_expectations[0][0] * 16
+       max = self.savings/(self.model.time_horizon) + (self.wage * self.working_hours) if self.wage > 0 else  self.savings/(self.model.time_horizon)
+       if max < self.savings:
+         return max
+       else:
+         return self.savings
 
 
     def get_paid(self, wage):

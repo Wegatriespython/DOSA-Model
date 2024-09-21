@@ -7,7 +7,8 @@ class Config:
 
         self.MAX_WORKING_HOURS = 16
         self.TIME_HORIZON = 51 # One more than the model's number of steps to prevent array out of bounds errors
-        self.HOLDING_COST = 0
+        self.PLANNING_HORIZON = 10
+        self.HOLDING_COST = 0.1
         self.INITIAL_SALES = 1
         self.INITIAL_PRODUCTIVITY = 1
         self.INITIAL_PRICE = 1
@@ -46,8 +47,8 @@ class Config:
         self.FIRM2_INITIAL_DESIRED_CAPITAL = 5
         self.FIRM2_MACHINE_OUTPUT_PER_PERIOD = 10
         self.INVENTORY_THRESHOLD = 20
-        self.PREFERNCE_MODE_CONSUMPTION = 1
-        self.PREFERNCE_MODE_CAPITAL = 1
+        self.PREFERNCE_MODE_CONSUMPTION = 0
+        self.PREFERNCE_MODE_CAPITAL = 0
         self.PREFERNCE_MODE_LABOR = 0
         # Simulation parameters
         self.INITIAL_WORKERS = 10

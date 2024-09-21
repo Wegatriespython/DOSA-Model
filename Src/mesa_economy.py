@@ -27,6 +27,7 @@ class EconomyModel(Model):
         self.labor_transactions_history = []
         self.capital_transactions = []
         self.capital_transactions_history = []
+        self.time_horizon = self.config.PLANNING_HORIZON
         self.consumption_transactions = []
         self.consumption_transactions_history = []
         self.create_agents()
@@ -53,8 +54,6 @@ class EconomyModel(Model):
     def step(self):
         # Clear previous transactions
 
-
-
         # Execute the step
         self.schedule.step()
 
@@ -66,6 +65,8 @@ class EconomyModel(Model):
                 agent.make_production_decision()
                 agent.adjust_labor()
                 agent.nash_improvements()
+                # First time for wage
+                agent.get_zero_profit_conditions()
                 if isinstance(agent, Firm2):
                     agent.adjust_investment_demand()
 
@@ -75,8 +76,11 @@ class EconomyModel(Model):
         self.consumption_transactions.clear()
         # Execute markets
         self.execute_labor_market()
+        # re-calculate zero-profit conditions for capital
         self.execute_capital_market()
+        # re-calculate zero-profit conditions for consumption
         self.execute_consumption_market()
+
 
         # Adjust production and prices
         for agent in self.schedule.agents:
@@ -92,6 +96,8 @@ class EconomyModel(Model):
         self.data_collector.datacollector.collect(self)
         print(f"Step {self.step_count} completed")
         self.step_count += 1
+        if self.config.TIME_HORIZON - self.step_count <= self.config.PLANNING_HORIZON:
+          self.time_horizon = self.config.TIME_HORIZON - self.step_count
 
 
     def execute_labor_market(self):
@@ -105,7 +111,7 @@ class EconomyModel(Model):
                    for worker in self.schedule.agents
                    if isinstance(worker, Worker) and worker.available_hours() > 0]
 
-        print("buyers", buyers, "sellers", sellers)
+        #print("buyers", buyers, "sellers", sellers)
         #("Labor Market Transaction", transactions)
         buyer_demand = sum(b[0] for b in buyers) if buyers else 0
         seller_inventory = sum(s[0] for s in sellers) if sellers else 0
@@ -151,7 +157,7 @@ class EconomyModel(Model):
         avg_buyer_max = sum(b[3] for b in buyers)/ len(buyers) if buyers else 0
         avg_seller_min = sum(s[3] for s in sellers)/ len(sellers) if sellers else 0
         self.pre_capital_transactions = np.array([buyer_demand, seller_inventory, avg_buyer_price, avg_seller_price, avg_buyer_max, avg_seller_min])
-        print(f"Buyer Demand: {buyer_demand} Seller Inventory: {seller_inventory} Avg Buyer Price: {avg_buyer_price} Avg Seller Price: {avg_seller_price} Avg Buyer Max: {avg_buyer_max} Avg Seller Min: {avg_seller_min}")
+
 
         transactions = market_matching(buyers, sellers)
         self.capital_transactions = transactions
@@ -179,7 +185,7 @@ class EconomyModel(Model):
             max_inventory = max(sellers, key=lambda x: x[0])[0]
             #print("Min price, max inventory", min_price, max_inventory)
         #print("Sellers", sellers)
-
+        print("Buyers", buyers)
 
         buyer_demand = sum(b[0] for b in buyers) if buyers else 0
         seller_inventory = sum(s[0] for s in sellers) if sellers else 0
@@ -189,8 +195,8 @@ class EconomyModel(Model):
         avg_seller_min = sum(s[3] for s in sellers)/ len(sellers) if sellers else 0
 
         self.pre_consumption_transactions = np.array([buyer_demand, seller_inventory, avg_buyer_price, avg_seller_price, avg_buyer_max, avg_seller_min])
-
-
+        print(f"Buyer Demand: {buyer_demand} Seller Inventory: {seller_inventory} Avg Buyer Price: {avg_buyer_price} Avg Seller Price: {avg_seller_price} Avg Buyer Max: {avg_buyer_max} Avg Seller Min: {avg_seller_min}")
+        breakpoint()
         transactions = market_matching(buyers, sellers)
 
         self.consumption_transactions = transactions

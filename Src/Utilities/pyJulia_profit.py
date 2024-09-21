@@ -17,7 +17,7 @@ def profit_maximization(
     # Convert numpy arrays to Julia arrays
     expected_demand = Main.Array(expected_demand)
     expected_price = Main.Array(expected_price)
-
+    print("wage input", wage)
     # Call the Julia function
     result, zero_profit_conditions = Main.profit_maximization(
         current_capital, current_labor, current_price, current_productivity,

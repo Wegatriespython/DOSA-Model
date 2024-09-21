@@ -8,35 +8,13 @@ from pyomo.util.infeasible import log_infeasible_constraints
 # Global variable to store the last solution for warm start
 last_solution = None
 
-@lru_cache(maxsize=256)
-def memoized_profit_maximization(
-    current_capital, current_labor, current_price, current_productivity,
-    expected_demand, expected_price, capital_price, capital_elasticity,
-    current_inventory, depreciation_rate, expected_periods, discount_rate,
-    budget, wage,capital_supply,labor_supply,current_debt, current_carbon_intensity,new_capital_carbon_intensity,carbon_tax_rate, holding_costs, linear_solver):
-    return _profit_maximization(
-      current_capital, current_labor, current_price, current_productivity,
-              expected_demand, expected_price, capital_price, capital_elasticity,
-              current_inventory, depreciation_rate, expected_periods, discount_rate,
-              budget, wage,capital_supply, labor_supply, current_debt, current_carbon_intensity,new_capital_carbon_intensity,carbon_tax_rate,holding_costs, linear_solver)
 
-def profit_maximization(
-    current_capital, current_labor, current_price, current_productivity,
-    expected_demand, expected_price, capital_price, capital_elasticity,
-    current_inventory, depreciation_rate, expected_periods, discount_rate,
-    budget, wage,capital_supply,labor_supply, current_debt, current_carbon_intensity, new_capital_carbon_intensity,carbon_tax_rate, holding_costs,  linear_solver='ma57'):
+
+def profit_maximization(Profit_max_params, linear_solver='ma57'):
 
     global last_solution
 
-    # Convert numpy arrays to tuples for hashing
-    expected_demand_tuple = tuple(expected_demand)
-    expected_price_tuple = tuple(expected_price)
-
-    result = memoized_profit_maximization(
-        current_capital, current_labor, current_price, current_productivity,
-        expected_demand_tuple, expected_price_tuple, capital_price, capital_elasticity,
-        current_inventory, depreciation_rate, expected_periods, discount_rate,
-        budget, wage,capital_supply,labor_supply, current_debt,current_carbon_intensity,new_capital_carbon_intensity,carbon_tax_rate,holding_costs, linear_solver)
+    result = _profit_maximization(Profit_max_params, linear_solver)
 
     if result is not None:
         last_solution = (result['optimal_labor'], result['optimal_capital'])
@@ -44,14 +22,14 @@ def profit_maximization(
 
                 # Perform cost minimization
         params = {
-            'current_price': current_price,
-            'wage': wage,
-            'capital_price': capital_price,
-            'depreciation_rate': depreciation_rate,
-            'holding_costs': holding_costs,
-            'carbon_tax_rate': carbon_tax_rate,
-            'periods': expected_periods,
-            'inventory': current_inventory
+            'current_price': Profit_max_params['current_price'],
+            'wage': Profit_max_params['wage'],
+            'capital_price': Profit_max_params['capital_price'],
+            'depreciation_rate': Profit_max_params['depreciation_rate'],
+            'holding_costs': Profit_max_params['holding_costs'],
+            'carbon_tax_rate': Profit_max_params['carbon_tax_rate'],
+            'periods': Profit_max_params['time_horizon'],
+            'inventory': Profit_max_params['inventory'],
         }
 
         zero_profit_result, check = cost_minimization(rounded_result, params)
@@ -59,15 +37,35 @@ def profit_maximization(
           zero_profit_result = round_results(zero_profit_result)
 
 
-        return rounded_result, zero_profit_result
+        return rounded_result
 
-    return None, None
+    return None
 
-def _profit_maximization(
-        current_capital, current_labor, current_price, current_productivity,
-        expected_demand, expected_price, capital_price, capital_elasticity,
-        current_inventory, depreciation_rate, expected_periods, discount_rate,
-        budget, wage,capital_supply, labor_supply, current_debt, current_carbon_intensity, new_capital_carbon_intensity, carbon_tax_rate, holding_costs, linear_solver):
+def _profit_maximization(Profit_max_params, linear_solver):
+
+  # Unpack parameters
+    current_capital = Profit_max_params['current_capital']
+    current_labor = Profit_max_params['current_labor']
+    current_price = Profit_max_params['current_price']
+    current_productivity = Profit_max_params['productivity']
+    expected_demand = Profit_max_params['expected_demand']
+    expected_price = Profit_max_params['expected_price']
+    capital_price = Profit_max_params['capital_price']
+    capital_elasticity = Profit_max_params['capital_elasticity']
+    current_inventory = Profit_max_params['inventory']
+    depreciation_rate = Profit_max_params['depreciation_rate']
+    expected_periods = Profit_max_params['time_horizon']
+    discount_rate = Profit_max_params['discount_rate']
+    budget = Profit_max_params['budget']
+    wage = Profit_max_params['wage']
+    capital_supply = Profit_max_params['expected_capital_supply']
+    labor_supply = Profit_max_params['expected_labor_supply']
+    holding_costs = Profit_max_params['holding_costs']
+    carbon_tax_rate = Profit_max_params['carbon_tax_rate']
+    new_capital_carbon_intensity = Profit_max_params['new_capital_carbon_intensity']
+    current_carbon_intensity = Profit_max_params['carbon_intensity']
+    current_debt = Profit_max_params['debt']
+
 
     model = pyo.ConcreteModel()
 
@@ -116,7 +114,7 @@ def _profit_maximization(
             (wage * model.labor[t]/scale_labor  +
               depreciation_rate * model.capital[t]/scale_capital +
               (capital_price * model.investment[t])/scale_capital + model.interest_payment[t]/scale_price + model.carbon_tax_payment[t]/scale_price)
-            ) * pyo.exp(t * pyo.log(1-discount_rate))
+            ) * (1/(1 + discount_rate))**t
             for t in model.T
         )
       return obj_value
@@ -273,7 +271,7 @@ def _profit_maximization(
             'optimal_debt_payment': [pyo.value(model.debt_payment[t]) for t in model.T],
             'optimal_carbon_intensity': [pyo.value(model.carbon_intensity[t]) for t in model.T],
             'optimal_emissions': [pyo.value(model.emissions[t]) for t in model.T],
-            'optimal_carbon_tax_payments': [pyo.value(model.carbon_tax_payment[t]) for t in model.T],
+            'optimal_carbon_tax_payment': [pyo.value(model.carbon_tax_payment[t]) for t in model.T],
             'optimal_net_borrowing': [pyo.value(model.net_borrowing[t]) for t in model.T],
             'optimal_interest_payment': [pyo.value(model.interest_payment[t]) for t in model.T]
         }
