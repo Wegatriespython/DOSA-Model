@@ -44,6 +44,8 @@ class Worker(Agent):
 
     def step(self):
         self.worker_expectations.clear()
+        self.desired_consumption = 0
+        self.desired_savings = 0
         self.update_expectations()
         self.update_utilty()
         self.update_strategy()
@@ -88,10 +90,10 @@ class Worker(Agent):
 
 
         wage = expect_price_trend(self.wage_history1, wage, self.model.time_horizon)
-        prices = expect_price_trend(self.price_history1, price, self.model.time_horizon)
+        prices = expect_price_trend(self.price_history1, self.desired_price, self.model.time_horizon)
 
         self.worker_expectations = [wage, prices]
-        print(self.worker_expectations)
+
 
     def update_utilty(self):
 

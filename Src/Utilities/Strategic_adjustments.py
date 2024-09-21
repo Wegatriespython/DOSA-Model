@@ -57,24 +57,29 @@ def get_desired_capital_price(self):
     capital_price = self.price * 3
     return capital_price
 
-def get_desired_price(expected_price, desired_price, real_price, actual_sales, desired_sales, min_price, optimal_inventory, inventory):
+def get_desired_price(expected_price, desired_price, real_price, actual_sales, desired_sales, min_price, optimal_inventory, inventory, production_gap):
 
     real_price = max(real_price, min_price)
     desired_price = max(desired_price, min_price)
 
     # Ratios and deviations
-    sales_ratio = actual_sales / desired_sales if desired_sales > 0 else 1.0
-    inventory_ratio = inventory / optimal_inventory if optimal_inventory > 0 else 1.0
+    if production_gap<0:
+      production_gap = 0
+    sales_ratio = actual_sales / (desired_sales - production_gap) if desired_sales - production_gap > 0 else  1.0
+    inventory_ratio = inventory / (optimal_inventory - production_gap) if optimal_inventory - production_gap > 0 else 1.0
 
     # Deviations from the desired values
     sales_deviation = sales_ratio - 1.0         # Negative if sales < desired
     inventory_deviation = inventory_ratio - 1.0 # Positive if inventory > optimal
 
-    # Overall adjustment factor: negative when sales are low or inventory is high
-    adjustment_factor = sales_deviation - inventory_deviation
+    if abs(sales_deviation) < 0.2 and abs(inventory_deviation) < 0.2:
+      adjustment_factor = np.random.uniform(0.99, 1.10)
+    else :
+         # Overall adjustment factor: negative when sales are low or inventory is high
+         adjustment_factor = (sales_deviation - inventory_deviation)
 
     # Cap the adjustment factor to be between -1 and 1
-    adjustment_factor = max(-1.0, min(adjustment_factor, 1.0)) + np.random.uniform(-0.05, 0.15)
+    adjustment_factor = max(-1.0, min(adjustment_factor, 1.5)) + np.random.uniform(-0.05, 0.15)
 
     # Scaling factor controls the magnitude of adjustment
     scaling_factor = 0.05

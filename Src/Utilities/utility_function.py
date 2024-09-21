@@ -68,7 +68,10 @@ def _maximize_utility(savings, wages, prices, discount_rate, periods, alpha, max
     @model.Constraint(model.T)
     def consumption_constraint(model, t):
       return model.consumption[t] >= min_consumtion * decay_rate**t
+    @model.Constraint(model.T)
 
+    def consumption_constraint2(model, t):
+      return model.consumption[t] * model.prices[t] <= model.wages[t] * model.working_hours[t] + model.savings[t]
 
     @model.Constraint()
     def terminal_savings_constraint(model):

@@ -29,8 +29,8 @@ def get_market_demand(self, market_type):
         demand_realised, price_realised = latent_demand, latent_price
 
 
-    demand = round((latent_demand + demand_realised)/2,2)
-    price = round((latent_price + price_realised)/2,2)
+    demand = round(latent_demand ,2)
+    price = round(latent_price,2)
     if isnan(demand) or isnan(price):
       print('Error', latent_demand, latent_price, demand_realised, price_realised)
       breakpoint()

@@ -185,7 +185,7 @@ class EconomyModel(Model):
             max_inventory = max(sellers, key=lambda x: x[0])[0]
             #print("Min price, max inventory", min_price, max_inventory)
         #print("Sellers", sellers)
-        print("Buyers", buyers)
+
 
         buyer_demand = sum(b[0] for b in buyers) if buyers else 0
         seller_inventory = sum(s[0] for s in sellers) if sellers else 0
@@ -195,8 +195,7 @@ class EconomyModel(Model):
         avg_seller_min = sum(s[3] for s in sellers)/ len(sellers) if sellers else 0
 
         self.pre_consumption_transactions = np.array([buyer_demand, seller_inventory, avg_buyer_price, avg_seller_price, avg_buyer_max, avg_seller_min])
-        print(f"Buyer Demand: {buyer_demand} Seller Inventory: {seller_inventory} Avg Buyer Price: {avg_buyer_price} Avg Seller Price: {avg_seller_price} Avg Buyer Max: {avg_buyer_max} Avg Seller Min: {avg_seller_min}")
-        breakpoint()
+
         transactions = market_matching(buyers, sellers)
 
         self.consumption_transactions = transactions

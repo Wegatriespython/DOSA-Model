@@ -17,6 +17,7 @@ class Firm(Agent):
         self.historic_capital_prices = []
         self.historic_capital_supply = []
         self.desireds = []
+        self.production_gap =0
         self.sales_same_period =0
         self.debt = 0
         self.total_labor_units = 0
@@ -46,7 +47,7 @@ class Firm(Agent):
 
     def update_firm_state(self):
        #self.train_demand_predictor()
-
+        self.production_gap =0
         depreciation_amount = max(0, self.inventory * self.model.config.DEPRECIATION_RATE)
         self.inventory = max(0, self.inventory - depreciation_amount)
         if self.firm_type == 'consumption':
@@ -84,6 +85,8 @@ class Firm(Agent):
         self.get_total_labor_units()
         self.pay_wages()
         self.update_average_price()
+        ## Bugs in the employment and wage calculation, Sometimes firms get an inflated wage value with 0 employees.
+
         self.prices = []
 
 
@@ -140,13 +143,16 @@ class Firm(Agent):
             breakpoint()
             return
 
-
+        number_of_firms = sum(1 for agent in self.model.schedule.agents if isinstance(agent, (Firm2)))
+        if number_of_firms < 5:
+          print("One firm missing")
+          breakpoint()
         Profit_max_params = {
             'current_capital': round(self.capital,2),
             'current_labor': round(self.total_labor_units,2),
             'current_price': round(self.price,2),
             'productivity': self.productivity,
-            'expected_demand': self.expected_demand/5,
+            'expected_demand': self.expected_demand/number_of_firms,
             'expected_price': self.expected_price,
             'capital_price': self.expectations[2],
             'capital_elasticity': self.capital_elasticity,
@@ -254,6 +260,7 @@ class Firm(Agent):
             return self.production
         optimal_production = self.optimals['production']
         self.production =  min(optimal_production, calculate_production_capacity(self.productivity, self.capital, self.capital_elasticity, self.get_total_labor_units()))
+        self.production_gap = optimal_production - self.production
 
         self.inventory += max(0, self.production)
 
@@ -434,11 +441,11 @@ class Firm(Agent):
         return
 
       if self.firm_type == 'consumption':
-            desired_price = get_desired_price(self.expectations[1], self.desireds[1],self.price,self.sales, self.optimals['sales'],  self.zero_profit_conditions['price'], self.optimals['inventory'], self.inventory)
+            desired_price = get_desired_price(self.expectations[1], self.desireds[1],self.price,self.sales, self.optimals['sales'],  self.zero_profit_conditions['price'], self.optimals['inventory'], self.inventory, self.production_gap)
 
             desired_capital_price = get_desired_capital_price(self)
       else:
-            desired_price = get_desired_price(self.expectations[1], self.desireds[1],self.price,self.sales, self.optimals['sales'],  self.zero_profit_conditions['price'], self.optimals['inventory'], self.inventory)
+            desired_price = get_desired_price(self.expectations[1], self.desireds[1],self.price,self.sales, self.optimals['sales'],  self.zero_profit_conditions['price'], self.optimals['inventory'], self.inventory, self.production_gap)
             desired_capital_price = 0
       desired_wage = get_desired_wage(self.expectations[5],self.desireds[0],self.wage, self.optimals['labor'], self.get_total_labor_units(), self.zero_profit_conditions['wage'], self.model.config.MINIMUM_WAGE)
 
