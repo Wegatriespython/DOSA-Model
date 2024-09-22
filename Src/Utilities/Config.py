@@ -37,8 +37,8 @@ class Config:
         self.INNOVATION_ATTEMPT_PROBABILITY = 0.1  # Probability of a successful innovation attempt
         self.PRODUCTIVITY_INCREASE_PROBABILITY = 0.5  # Probability that a successful innovation increases productivity
         self.PRODUCTIVITY_INCREASE = 0.005  # Reduced from 0.1 to 0.05 for more gradual growth
-        self.INITIAL_RELATIVE_PRICE_CAPITAL = 3.0  # Initial price of capital goods relative to consumption goods
-        self.INITIAL_RELATIVE_PRICE_LABOR = 1.0  # Initial price of labor relative to consumption goods
+        self.INITIAL_RELATIVE_PRICE_CAPITAL = 3  # Initial price of capital goods relative to consumption goods
+        self.INITIAL_RELATIVE_PRICE_LABOR = 1  # Initial price of labor relative to consumption goods
         # Firm2 specific parameters
         self.FIRM2_INITIAL_CAPITAL = 6
         self.FIRM2_INITIAL_INVENTORY = 2

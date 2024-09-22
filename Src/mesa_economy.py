@@ -2,7 +2,7 @@ from mesa import Model
 from mesa.time import RandomActivationByType
 from Utilities.Config import Config
 from mesa_worker import Worker
-from mesa_firm import Firm1, Firm2
+from firm import Firm2, Firm1
 from Utilities.mesa_market_matching import market_matching
 from Utilities.economy_data_collector import EconomyDataCollector
 import numpy as np
@@ -60,11 +60,17 @@ class EconomyModel(Model):
         # Update firms
         for agent in self.schedule.agents:
             if isinstance(agent, (Firm1, Firm2)):
+
                 agent.update_firm_state()
+ 
                 agent.update_expectations()
-                agent.make_production_decision()
+
+                agent.make_production_decision() 
+
                 agent.adjust_labor()
+
                 agent.nash_improvements()
+
                 # First time for wage
                 agent.get_zero_profit_conditions()
                 if isinstance(agent, Firm2):
@@ -81,16 +87,13 @@ class EconomyModel(Model):
         # re-calculate zero-profit conditions for consumption
         self.execute_consumption_market()
 
-
         # Adjust production and prices
         for agent in self.schedule.agents:
-            if isinstance(agent, Firm1):
-                print("Firm 1 budget is ", agent.budget)
+            if isinstance(agent, (Firm1,Firm2)):
                 agent.adjust_production()
                 agent.nash_improvements()
-            elif isinstance(agent, Firm2):
-                agent.adjust_production()
-                agent.nash_improvements()
+                agent.pay_wages()
+                agent.calculate_profit()
 
         # Collect data
         self.data_collector.datacollector.collect(self)
@@ -102,7 +105,7 @@ class EconomyModel(Model):
 
     def execute_labor_market(self):
 
-        buyers = [(firm.labor_demand, firm.desireds[0], firm, firm.zero_profit_conditions['wage'], firm.preference_mode
+        buyers = [(firm.labor_demand, firm.desireds['wage'], firm, firm.zero_profit_conditions['wage'], firm.preference_mode
         )
                   for firm in self.schedule.agents
                   if isinstance(firm, (Firm1, Firm2)) and firm.labor_demand > 0]
@@ -138,7 +141,7 @@ class EconomyModel(Model):
 
     def execute_capital_market(self):
 
-        buyers = [(firm.investment_demand, firm.desireds[2], firm, firm.zero_profit_conditions['capital_price'], firm.preference_mode)
+        buyers = [(firm.investment_demand, firm.desireds['capital_price'], firm, firm.zero_profit_conditions['capital_price'], firm.preference_mode)
                   for firm in self.schedule.agents
                   if isinstance(firm, Firm2) and firm.investment_demand > 0]
 
@@ -147,7 +150,7 @@ class EconomyModel(Model):
         for firm in self.schedule.agents:
             match firm:
                 case Firm1() if firm.inventory > 0:
-                    sellers.append((firm.inventory, firm.desireds[1], firm, firm.zero_profit_conditions['price'], firm.productivity, firm.carbon_intensity))
+                    sellers.append((firm.inventory, firm.desireds['price'], firm, firm.zero_profit_conditions['price'], firm.productivity, firm.carbon_intensity))
                 case Firm2() if firm.capital_inventory > 0:
                     sellers.append((firm.capital_inventory,firm.capital_resale_price, firm, 0.1, firm.productivity, firm.carbon_intensity))
         buyer_demand = sum(b[0] for b in buyers)  if buyers else 0
@@ -175,7 +178,7 @@ class EconomyModel(Model):
                   for worker in self.schedule.agents
                   if isinstance(worker, Worker) and worker.savings > 0]
 
-        sellers = [(min(firm.inventory, firm.optimals['sales']), firm.desireds[1], firm, firm.zero_profit_conditions['price'], firm.quality, firm.carbon_intensity)
+        sellers = [(min(firm.inventory, firm.optimals['sales']), firm.desireds['price'], firm, firm.zero_profit_conditions['price'], firm.quality, firm.carbon_intensity)
                    for firm in self.schedule.agents
 
                    if isinstance(firm, Firm2) and firm.inventory > 0]

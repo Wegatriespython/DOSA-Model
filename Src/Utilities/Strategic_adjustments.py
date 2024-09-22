@@ -216,21 +216,21 @@ def update_worker_wage_expectation(wage_decision_data):
   return smoothed_wage
 
 
+
 def calculate_new_price(current_price, clearing_prices, market_demand, market_supply, inventory, optimal_inventory, expected_future_price):
     # Calculate market tightness
     market_tightness = market_demand / market_supply if market_supply > 0 else 1
 
-    # Estimate market clearing price (average of recent transactions)
-    eq_quantity,eq_price = estimate_intersection(clearing_prices, market_demand, market_supply)
+    # Estimate market clearing price and quantity
+    eq_quantity, eq_price, max_willingness_to_pay = estimate_intersection(market_supply, market_demand, clearing_prices)
 
-    # Estimate maximum willingness to pay (highest recent transaction price)
-    max_willingness_to_pay = max(t['price'] for t in recent_transactions) if recent_transactions else current_price
+
 
     # Set target price based on market tightness
     if market_tightness > 1:
-        target_price = max_willingness_to_pay
+        target_price = current_price + (max_willingness_to_pay- current_price)*.2
     else:
-        target_price = market_clearing_price
+        target_price = current_price + (eq_price-current_price)*.2
 
     # Adjust based on inventory
     inventory_ratio = inventory / optimal_inventory if optimal_inventory > 0 else 1
@@ -256,7 +256,8 @@ def estimate_intersection(supply, demand, clearing_prices):
 
     # Fit linear regression for supply
     slope_supply, intercept_supply, _, _, _ = stats.linregress(supply, clearing_prices)
-
+    max_supply = max(supply)
+    max_willingness_to_pay = slope_supply * max_supply + intercept_supply
     # Fit linear regression for demand
     slope_demand, intercept_demand, _, _, _ = stats.linregress(demand, clearing_prices)
 
@@ -264,4 +265,4 @@ def estimate_intersection(supply, demand, clearing_prices):
     quantity_intersection = (intercept_demand - intercept_supply) / (slope_supply - slope_demand)
     price_intersection = slope_supply * quantity_intersection + intercept_supply
 
-    return quantity_intersection, price_intersection
+    return quantity_intersection, price_intersection, max_willingness_to_pay
