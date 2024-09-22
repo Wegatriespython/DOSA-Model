@@ -1,4 +1,5 @@
 import numpy as np
+from scipy import stats
 def get_max_wage(total_working_hours, productivity, capital, capital_elasticity, price, total_labor_units, labor, minimum_wage):
     if total_working_hours < 16:
         production_capacity = calculate_production_capacity(productivity, capital, capital_elasticity, 1)
@@ -73,16 +74,20 @@ def get_desired_price(expected_price, desired_price, real_price, actual_sales, d
     inventory_deviation = inventory_ratio - 1.0 # Positive if inventory > optimal
 
     if abs(sales_deviation) < 0.2 and abs(inventory_deviation) < 0.2:
-      adjustment_factor = np.random.uniform(0.99, 1.10)
+      adjustment_factor = np.random.uniform(0.99, 1.15)
     else :
          # Overall adjustment factor: negative when sales are low or inventory is high
          adjustment_factor = (sales_deviation - inventory_deviation)
 
     # Cap the adjustment factor to be between -1 and 1
-    adjustment_factor = max(-1.0, min(adjustment_factor, 1.5)) + np.random.uniform(-0.05, 0.15)
+    adjustment_factor = max(-1.0, min(adjustment_factor, 2)) + np.random.uniform(-0.05, 0.15)
 
     # Scaling factor controls the magnitude of adjustment
-    scaling_factor = 0.05
+    if adjustment_factor < 0:
+      scaling_factor = 0.05
+    else:
+      scaling_factor = 0.25
+
 
     # Adjust the desired price directly based on the adjustment factor
     desired_price += desired_price * adjustment_factor * scaling_factor
@@ -114,7 +119,7 @@ def get_desired_wage(expected_wage, desired_wage, real_wage, optimal_labor, actu
   return smoothed_wage
 
 
-## Needs major fix. Something causes workers to adjust prices down randomly causing issues.
+## Not adjusting fast enough
 def update_worker_price_expectation(price_decision_data):
     # Extract data
     expected_price = price_decision_data['expected_price']
@@ -145,11 +150,11 @@ def update_worker_price_expectation(price_decision_data):
     if consumption_ratio < 1.0:
         # Need to increase desired_price to get more supply
         # Even if price_gap is small, we need to adjust desired_price upwards
-        adjustment_factor += (1.0 - consumption_ratio)
+        adjustment_factor += (1.0 - consumption_ratio)*3
         # Optionally, add more weight if price_gap is small
         if abs(price_gap_ratio) < 0.05:
             # Price gap is less than 5%, increase adjustment
-            adjustment_factor += (0.20 - abs(price_gap_ratio)) * 20  # Weight can be adjusted
+            adjustment_factor += (0.05 - abs(price_gap_ratio)) * 20  # Weight can be adjusted
 
     else:
         # Consuming desired amount or more
@@ -163,7 +168,7 @@ def update_worker_price_expectation(price_decision_data):
             adjustment_factor += 0.0  # No change needed
 
     # Cap adjustment_factor between -1 and 1
-    adjustment_factor = max(-1.0, min(adjustment_factor, 1.0))
+    adjustment_factor = max(-1.0, min(adjustment_factor, 2.0))
 
     # Scaling factor controls the magnitude of adjustment
     scaling_factor = 0.5  # Increased from 0.05 to allow for larger adjustments
@@ -172,7 +177,7 @@ def update_worker_price_expectation(price_decision_data):
     desired_price += desired_price * adjustment_factor * scaling_factor
 
     # Smooth the price to avoid abrupt changes
-    smoothed_price = desired_price * 0.9 + real_price * 0.1 # Slightly favor desired_price more
+    smoothed_price = desired_price * 0.6 + real_price * 0.4 # Slightly favor desired_price more
 
     # Ensure the smoothed price does not exceed the maximum price
     smoothed_price = min(smoothed_price, max_price)
@@ -209,3 +214,54 @@ def update_worker_wage_expectation(wage_decision_data):
   desired_wage = max(desired_wage, min_wage)
   smoothed_wage = desired_wage*0.7 + expected_wage*0.1 + real_wage*0.2
   return smoothed_wage
+
+
+def calculate_new_price(current_price, clearing_prices, market_demand, market_supply, inventory, optimal_inventory, expected_future_price):
+    # Calculate market tightness
+    market_tightness = market_demand / market_supply if market_supply > 0 else 1
+
+    # Estimate market clearing price (average of recent transactions)
+    eq_quantity,eq_price = estimate_intersection(clearing_prices, market_demand, market_supply)
+
+    # Estimate maximum willingness to pay (highest recent transaction price)
+    max_willingness_to_pay = max(t['price'] for t in recent_transactions) if recent_transactions else current_price
+
+    # Set target price based on market tightness
+    if market_tightness > 1:
+        target_price = max_willingness_to_pay
+    else:
+        target_price = market_clearing_price
+
+    # Adjust based on inventory
+    inventory_ratio = inventory / optimal_inventory if optimal_inventory > 0 else 1
+    if inventory_ratio > 1:
+        target_price *= 0.95  # Lower price if we have excess inventory
+    elif inventory_ratio < 0.5:
+        target_price *= 1.05  # Raise price if we have low inventory
+
+    # Incorporate future expectations
+    target_price = 0.8 * target_price + 0.2 * expected_future_price
+
+    # Implement gradual adjustment (max 5% change per period)
+    max_change = 0.05 * current_price
+    new_price = max(min(target_price, current_price + max_change), current_price - max_change)
+
+    return new_price
+
+def estimate_intersection(supply, demand, clearing_prices):
+    # Ensure all arrays are the same length
+    if len(supply) != len(demand) or len(supply) != len(clearing_prices):
+        raise ValueError("Supply, demand, and clearing_prices must be of equal length")
+
+
+    # Fit linear regression for supply
+    slope_supply, intercept_supply, _, _, _ = stats.linregress(supply, clearing_prices)
+
+    # Fit linear regression for demand
+    slope_demand, intercept_demand, _, _, _ = stats.linregress(demand, clearing_prices)
+
+    # Calculate intersection point
+    quantity_intersection = (intercept_demand - intercept_supply) / (slope_supply - slope_demand)
+    price_intersection = slope_supply * quantity_intersection + intercept_supply
+
+    return quantity_intersection, price_intersection

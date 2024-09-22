@@ -119,6 +119,9 @@ def _maximize_utility(savings, wages, prices, discount_rate, periods, alpha, max
             optimal_leisure = [pyo.value(model.leisure[t]) for t in model.T]
             optimal_savings = [pyo.value(model.savings[t]) for t in model.T]
 
+
+
+
             return optimal_consumption, optimal_working_hours, optimal_leisure, optimal_savings
         else:
 

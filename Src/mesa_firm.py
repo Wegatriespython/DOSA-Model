@@ -82,8 +82,11 @@ class Firm(Agent):
         self.expected_price = np.full(self.model.time_horizon, 0)
         self.productivity += round(self.labor_productivity,2)
         self.labor_productivity = 0
-        self.get_total_labor_units()
-        self.pay_wages()
+        labor = self.get_total_labor_units()
+        if labor == 0:
+          self.wage = self.model.config.INITIAL_WAGE
+        else:
+          self.pay_wages()
         self.update_average_price()
         ## Bugs in the employment and wage calculation, Sometimes firms get an inflated wage value with 0 employees.
 
@@ -113,7 +116,10 @@ class Firm(Agent):
 
 
         expected_capital_supply = expect_demand_ar(self.historic_capital_supply, capital_supply, self.model.time_horizon)
+        #labor supply seems too low compared to actual labor supply
+
         expected_labor_supply = expect_demand_ar(self.historic_labor_supply, labor_supply, self.model.time_horizon)
+        print(f"labor_supply: {labor_supply} expected_labor_supply: {expected_labor_supply[0]}")
 
         self.expected_price, self.expected_demand = get_expectations(demand, self.historic_demand,  price ,self.historic_price,(self.model.time_horizon))
 

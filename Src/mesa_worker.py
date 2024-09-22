@@ -109,7 +109,8 @@ class Worker(Agent):
           #print(Utility_params)
           results = maximize_utility(Utility_params)
           self.desired_consumption, self.working_hours, self.leisure, self.desired_savings = [arr[0] for arr in results]
-
+          working_hours_ratio = self.total_working_hours/self.working_hours if self.working_hours > 0 else 0
+          #self.desired_consumption = self.desired_consumption * working_hours_ratio if working_hours_ratio > 0 and working_hours_ratio < 1 else self.desired_consumption
           self.optimals = [self.desired_consumption, self.working_hours, self.desired_savings]
           print(self.optimals)
 
@@ -200,7 +201,7 @@ class Worker(Agent):
 
             match hours_to_quit, details['hours']:
                 case x, y if x >= y:
-                    self.get_fired(employer)
+                    self.get_fired(employer, layoff=False)
                     hours_to_quit -= y
                 case x, y if x < y:
                     self.update_hours(employer, y - x)
