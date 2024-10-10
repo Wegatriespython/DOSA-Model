@@ -153,21 +153,30 @@ class Firm(Agent):
         self.demand_record = update_dictionary(Demand,self.demand_record)
         self.supply_record = update_dictionary(Supply, self.supply_record)
 
-
         if self.model.step_count < 2:
-          return
-        #Maintain full period( history + time_horizon) forecasts, for use in adaptive expectations
-        self.demand_expectations = adaptive_expectations(self.demand_record, self.demand_expectations, self.model.time_horizon)
-        self.price_expectations  = adaptive_expectations(self.price_record, self.price_expectations, self.model.time_horizon)
-        self.supply_expectations = adaptive_expectations(self.supply_record, self.supply_expectations, self.model.time_horizon)
+            return
 
-        #For practical use only the future time horizon is needed
+        for category in ['demand', 'price', 'supply']:
+            historical_data = (
+                self.demand_record if category == 'demand' else
+                self.price_record if category == 'price' else
+                self.supply_record
+            )
+            self.expectations[category] = adaptive_expectations(
+                historical_data,
+                self.expectations[category],
+                self.model.time_horizon
+            )
+
+        # For practical use only the future time horizon is needed
         self.expectations = {
-          'demand': self.demand_expectations[-self.model.time_horizon:],
-          'price': self.price_expectations[-self.model.time_horizon:],
-          'supply': self.supply_expectations[-self.model.time_horizon:]
+            category: {
+                key: values[-self.model.time_horizon:]
+                for key, values in self.expectations[category].items()
+            }
+            for category in ['demand', 'price', 'supply']
         }
-        
+
         return self.expectations
 
 
@@ -464,10 +473,13 @@ class Firm(Agent):
       for record in records:
         assert record is not None
 
+
       desired_price = calculate_new_price(self.price,self.price_record['consumption'],self.demand_record['consumption'], self.supply_record['consumption'], self.inventory, self.optimals['inventory'],self.expectations['price']['consumption'])
 
-      desired_wage = calculate_new_price(wage_expectations,self.desireds['price'],self.wage, self.optimals['labor'], self.get_total_labor_units(), self.zero_profit_conditions['wage'], self.model.config.MINIMUM_WAGE)
 
+
+      desired_wage = calculate_new_price(wage_expectations[0],self.desireds['price'],self.wage, self.optimals['labor'], self.get_total_labor_units(), self.zero_profit_conditions['wage'], self.model.config.MINIMUM_WAGE)
+    
       self.desireds = {
         'wage': desired_wage,
         'price': desired_price,

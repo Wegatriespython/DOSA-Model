@@ -21,6 +21,7 @@ class Worker(Agent):
         self.dissatistifaction = 0
         self.wage_history1 = []
         self.price_history1 = []
+        self.quantity_history1 = []
         self.avg_price = 0
         self.wage = model.config.MINIMUM_WAGE
         self.income = 0
@@ -55,7 +56,8 @@ class Worker(Agent):
       if self.model.step_count < 1:
         wage = np.full(self.model.time_horizon,self.expected_wage)
         prices = np.full(self.model.time_horizon, self.expected_price)
-        self.worker_expectations = [wage, prices]
+        demand = np.full(self.model.time_horizon, 12)
+        self.worker_expectations = [wage, prices, demand]
 
         self.avg_price = self.expected_price
       else:
@@ -64,10 +66,13 @@ class Worker(Agent):
         if np.mean(mkt_wages) > self.model.config.MINIMUM_WAGE:
           self.wage_history1.append(mkt_wages)
           self.price_history1.append(mkt_price)
+          self.quantity_history1.append(quantity)
           if len(self.wage_history1)>10:
             self.wage_history1.pop(0)
           if len(self.price_history1)>10:
             self.price_history1.pop(0)
+          if len(self.quantity_history1)>10:
+            self.quantity_history1.pop(0)
 
         if len(self.prices) > 0 :
           self.prices = [p for p in self.prices if not np.isnan(p)]
@@ -91,8 +96,9 @@ class Worker(Agent):
 
         wage = expect_price_trend(self.wage_history1, wage, self.model.time_horizon)
         prices = expect_price_trend(self.price_history1, self.desired_price, self.model.time_horizon)
+        demand = expect_price_trend(self.quantity_history1, quantity, self.model.time_horizon)
 
-        self.worker_expectations = [wage, prices]
+        self.worker_expectations = [wage, prices, demand]
 
 
     def update_utilty(self):
@@ -104,7 +110,9 @@ class Worker(Agent):
             'discount_rate': self.model.config.DISCOUNT_RATE,
             'time_horizon': self.model.time_horizon,
             'alpha': 0.9,
-            'max_working_hours': 16
+            'max_working_hours': 16,
+            'working_hours': self.working_hours,            
+            'expected_labor_demand': self.worker_expectations[2]
           }
           #print(Utility_params)
           results = maximize_utility(Utility_params)

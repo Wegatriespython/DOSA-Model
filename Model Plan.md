@@ -1,96 +1,81 @@
+# Agent-Based Economic Model
 
+## Model Overview
+This model simulates an economy with three interconnected sectors: capital goods production, consumption goods production, and a labor market. The model uses an agent-based approach with discrete time steps and a fixed number of agents in each sector.
 
-## Introduction
+## Sectors and Markets
 
-This document outlines a comprehensive plan to extend the K+S (Keynes meets Schumpeter) Labor Extended model. The goal is to incorporate climate policy elements and enhance the representation of economic insecurity within the model framework. This extension aims to explore the complex interactions between climate policies, firm innovation decisions, labor market dynamics, and worker economic security.
+1. **Capital Goods Sector (Sector 1)**
+   - Produces capital goods using labor as input
+   - Sellers in the capital market
+   - Buyers in the labor market
 
-Research Question : What are the dynamics between climate policy and economic insecurity in the labor market 
+2. **Consumption Goods Sector (Sector 2)**
+   - Produces consumption goods using capital and labor as inputs
+   - Buyers in the capital market
+   - Buyers in the labor market
+   - Sellers in the consumption market
 
-## Base Model
+3. **Labor Market**
+   - Workers are sellers
+   - Both Sector 1 and Sector 2 firms are buyers
 
-The starting point is the K+S Labor Extended model, chosen for its:
-- Endogenous innovation module with imitation and innovation driven by a 2-stage Bernoulli trial
-- Detailed labor market component
+## Production Functions
+- Both firm types use Cobb-Douglas production functions
+- Capital goods firms: capital elasticity of 0
+- Consumption goods firms: capital elasticity of 0.5
 
-## Key Extensions
+## Agent Decision-Making
 
-### 1. Enhanced Labor Market Competition
+### Firms
+- Solve intertemporal profit maximization problems for production and investment decisions
+- Use simple AR projections for future prices and quantities
+- Intertemporal decision-making
 
-- Individualized wage offers based on worker skills
-- Strategic hiring process:
-  - Firms observe worker skill levels
-  - Labor demand calculated based on production requirements and worker productivity
-  - Applicants sorted by skill level in descending order
-  - Wage offers optimized based on firm budget and worker productivity
-- Skill-based firing decisions:
-  - Firms adjust non-contractually protected labor force
-  - Attempt to retain higher-performing workers within production requirements
+### Workers
+- Solve utility maximization problems for labor supply, consumption, and savings
+- Cobb-Douglas utility function between consumption and leisure
+### Expectations 
+- Used AR expectations initially, but now using adaptive expectations for firms. 
+- Optimisation done based on expectations
 
-### 2. Dual Innovation Types
+## Market Clearing Mechanism
 
-- Carbon intensity reducing innovations (A_C^τ, B_C^τ)
-- Productivity enhancing innovations (A^τ, B^τ)
-- Spillover effects between carbon and productivity innovations
+### Inputs
+- Buyers: quantity demanded, desired price, max price
+- Sellers: quantity supplied, desired price, min price
 
-### 3. Carbon Policies
+### Process
+1. Round 1: Transactions occur at desired prices
+2. Round 2: Adjustments based on market conditions
+   - Excess demand: Sellers have advantage, buyers use max price
+   - Excess supply: Buyers have advantage, sellers use min price
 
-- Carbon taxes:
-  - Levied on firms based on carbon emissions
-  - Tax rate ρ^C applied to quantity of carbon produced
-- Carbon subsidies:
-  - Awarded to firms that successfully innovate or imitate carbon-reducing technologies
-  - Selection process based on market share and innovation success
-  - Two subsidy models: Proportional and Flat
+### Price Adjustment Algorithms
 
-### 4. Carbon Emissions
+#### Buyers
+- If demand not met: Increase desired price
+- If demand met:
+  - Clearing price > desired price: Increase desired price
+  - Clearing price < desired price: Decrease desired price
 
-- Technology vintages have both productivity (A^τ, B^τ) and carbon intensity (A_C^τ, B_C^τ) ratings
-- Firms emit carbon based on production quantity multiplied by carbon intensity
+#### Sellers
+- If supply not cleared: Lower desired price
+- If supply cleared:
+  - Clearing price > desired price: Increase desired price
+  - Clearing price < desired price: Decrease desired price
 
-### 5. Endogenized Firm Capital Allocation
+### Heuristic Adjustment
+- Buyers: Based on actual_consumption / desired_consumption
+- Sellers: Based on actual_sales / desired_sales
+- Both: Consider clearing_price / desired_price ratio
 
-- Firms optimize capital allocation based on profit expectations
-- Investment decisions split between:
-  - Productivity enhancement (RD)
-  - Carbon reduction (RD^C)
-- Investment choices influenced by:
-  - Expectations of carbon taxes
-  - Potential profit gains
-  - Subsidy availability
+## Model Equilibrium
+The model aims to produce endogenous competitive prices in each market. Agents have limited information:
+- Clearing prices in each market
+- Aggregate expected demand and supply
+- Latent market demand, supply, and price
 
-### 6. Enhanced Government Role
-
-- More complex modeling to handle carbon policies
-- Decision-making process for:
-  - Awarding subsidies (based on firm innovation success and market share)
-  - Setting carbon tax rates
-- Imperfect knowledge of capital goods firms, leading to stochastic selection for subsidies
-
-### 7. Worker Skill Dynamics
-
-- Baseline skill level for new workers
-- Skill progression through learning-by-doing when employed
-- Skill deterioration when unemployed
-- Potential for divergent skill trajectories based on firm innovation focus (carbon vs. regular)
-- Skill distance calculation for worker-firm matching
-
-### 8. Strategic Contracts
-
-- Firms offer job contracts for fixed periods to top-performing workers
-- Contracted workers receive wage increases and job security
-- Contracts terminated if firm goes bankrupt
-
-### 9. Economic Insecurity Measures
-
-- Incorporating factors such as:
-  - Job stability (contract duration, employment history)
-  - Wage levels and growth
-  - Skill development opportunities
-
-## Proposed Future Developments
-
-1. Further refinement of the government's role in policy-making
-2. Potential expansion of economic insecurity metrics
-3. Possible inclusion of more sophisticated worker savings behavior
-4. Optimize model for performance 
-
+## Open Questions
+- Is this mechanism sufficient to produce an equilibrium with competitive markets?
+- How does the limited information available to agents affect market outcomes?

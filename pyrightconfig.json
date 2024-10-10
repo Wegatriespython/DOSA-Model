@@ -1,0 +1,6 @@
+{
+  "strictParameterNoneValue": false,
+  "reportOptionalMemberAccess": false,
+  "reportOptionalSubscript": false,
+  "reportPrivateUsage": false
+}

@@ -8,14 +8,24 @@ def adaptive_expectations(historical_data, previous_forecasts, time_horizon):
         prev_forecast = np.array(previous_forecasts.get(key, []))
 
         if len(history) == 0:
-            new_forecasts[key] = np.zeros(len(history) + time_horizon)
+            new_forecasts[key] = np.zeros(time_horizon)
             continue
 
-        # Align previous forecast with historical data
-        aligned_forecast = prev_forecast[-len(history):]
+        if len(prev_forecast) == 0:
+            # If there's no previous forecast, use the last historical value
+            aligned_forecast = np.full_like(history, history[-1])
+        else:
+            # Align forecast with history
+            aligned_forecast = prev_forecast[-min(len(history), len(prev_forecast)):]
+            
+        aligned_history = history[-len(aligned_forecast):]
 
-        # Calculate forecast error for the overlapping period
-        forecast_error = history[-len(aligned_forecast):] - aligned_forecast[-len(history):]
+        # Ensure aligned arrays have the same length
+        min_length = min(len(aligned_history), len(aligned_forecast))
+        aligned_history = aligned_history[-min_length:]
+        aligned_forecast = aligned_forecast[-min_length:]
+
+        forecast_error = aligned_history - aligned_forecast
         mse = np.mean(forecast_error**2)
 
         # Adaptive learning rate based on mean squared error

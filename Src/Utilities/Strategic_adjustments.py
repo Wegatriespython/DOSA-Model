@@ -1,5 +1,7 @@
 import numpy as np
 from scipy import stats
+
+
 def get_max_wage(total_working_hours, productivity, capital, capital_elasticity, price, total_labor_units, labor, minimum_wage):
     if total_working_hours < 16:
         production_capacity = calculate_production_capacity(productivity, capital, capital_elasticity, 1)
@@ -216,21 +218,33 @@ def update_worker_wage_expectation(wage_decision_data):
   return smoothed_wage
 
 
-
+# function signature mismatch 
 def calculate_new_price(current_price, clearing_prices, market_demand, market_supply, inventory, optimal_inventory, expected_future_price):
+    # Ensure market_demand and market_supply are lists
+
+
+    market_demand = [market_demand] if isinstance(market_demand, (int, float)) else market_demand
+    market_supply = [market_supply] if isinstance(market_supply, (int, float)) else market_supply
+    clearing_prices = [clearing_prices] if isinstance(clearing_prices, (int, float)) else clearing_prices
+    expected_future_price = [expected_future_price] if isinstance(expected_future_price, (int, float)) else expected_future_price
+    
     # Calculate market tightness
-    market_tightness = market_demand / market_supply if market_supply > 0 else 1
+    market_tightness = market_demand[0] / market_supply[0] if market_supply[0] > 0 else 1
 
     # Estimate market clearing price and quantity
     eq_quantity, eq_price, max_willingness_to_pay = estimate_intersection(market_supply, market_demand, clearing_prices)
 
-
-
     # Set target price based on market tightness
-    if market_tightness > 1:
-        target_price = current_price + (max_willingness_to_pay- current_price)*.2
+    if eq_quantity is None or eq_price is None or max_willingness_to_pay is None:
+
+        target_price = current_price
+
     else:
-        target_price = current_price + (eq_price-current_price)*.2
+        print(f"eq_quantity: {eq_quantity}, eq_price: {eq_price}, max_willingness_to_pay: {max_willingness_to_pay}")
+        if market_tightness > 1:
+            target_price = current_price + (max_willingness_to_pay - current_price) * 0.2
+        else:
+            target_price = current_price + (eq_price - current_price) * 0.2
 
     # Adjust based on inventory
     inventory_ratio = inventory / optimal_inventory if optimal_inventory > 0 else 1
@@ -240,11 +254,17 @@ def calculate_new_price(current_price, clearing_prices, market_demand, market_su
         target_price *= 1.05  # Raise price if we have low inventory
 
     # Incorporate future expectations
-    target_price = 0.8 * target_price + 0.2 * expected_future_price
+    target_price = 0.8 * target_price + 0.2 * expected_future_price[0]
 
     # Implement gradual adjustment (max 5% change per period)
     max_change = 0.05 * current_price
+
     new_price = max(min(target_price, current_price + max_change), current_price - max_change)
+
+    # Final check to ensure new_price is not NaN
+    if np.isnan(new_price):
+        print("Warning: new_price is NaN, falling back to current_price")
+        new_price = current_price
 
     return new_price
 
@@ -253,16 +273,25 @@ def estimate_intersection(supply, demand, clearing_prices):
     if len(supply) != len(demand) or len(supply) != len(clearing_prices):
         raise ValueError("Supply, demand, and clearing_prices must be of equal length")
 
+    try:
+        # Fit linear regression for supply
+        slope_supply, intercept_supply, r_value_supply, p_value_supply, std_err_supply = stats.linregress(supply, clearing_prices)
+        
+        max_supply = max(supply)
+        max_willingness_to_pay = slope_supply * max_supply + intercept_supply
 
-    # Fit linear regression for supply
-    slope_supply, intercept_supply, _, _, _ = stats.linregress(supply, clearing_prices)
-    max_supply = max(supply)
-    max_willingness_to_pay = slope_supply * max_supply + intercept_supply
-    # Fit linear regression for demand
-    slope_demand, intercept_demand, _, _, _ = stats.linregress(demand, clearing_prices)
+        # Fit linear regression for demand
+        slope_demand, intercept_demand, r_value_demand, p_value_demand, std_err_demand = stats.linregress(demand, clearing_prices)
+        
+        # Calculate intersection point
+        quantity_intersection = (intercept_demand - intercept_supply) / (slope_supply - slope_demand)
+        price_intersection = slope_supply * quantity_intersection + intercept_supply
 
-    # Calculate intersection point
-    quantity_intersection = (intercept_demand - intercept_supply) / (slope_supply - slope_demand)
-    price_intersection = slope_supply * quantity_intersection + intercept_supply
+        # Check for valid intersection
+        if quantity_intersection <= 0 or price_intersection <= 0:
+            return None, None, max_willingness_to_pay
 
-    return quantity_intersection, price_intersection, max_willingness_to_pay
+        return quantity_intersection, price_intersection, max_willingness_to_pay
+    except Exception as e:
+        print(f"Error in estimate_intersection: {str(e)}")
+        return None, None, None

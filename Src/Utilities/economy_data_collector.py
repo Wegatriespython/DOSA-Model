@@ -1,8 +1,8 @@
 from mesa.datacollection import DataCollector
 import numpy as np
 import pandas as pd
-from mesa_worker import Worker
-from mesa_firm import Firm1, Firm2
+from worker import Worker
+from firm import Firm1, Firm2
 class EconomyDataCollector:
     def __init__(self, model):
         self.model = model

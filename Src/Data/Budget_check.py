@@ -1,5 +1,5 @@
 from pandas.core.arrays.base import mode
-from mesa_economy import EconomyModel
+from Src.economy import EconomyModel
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt

@@ -6,9 +6,11 @@ from functools import lru_cache
 # Global variable to store the last solution for warm start
 last_solution = None
 
+
+### HOLY SHIT I GOT IT. THESE GUYS DON'T SEE LABOR DEMAND AT ALL. 
 @lru_cache(maxsize=2056)
-def memoized_maximize_utility(savings, wages, prices, discount_rate, periods, alpha, max_working_hours, linear_solver):
-    return _maximize_utility(savings, wages, prices, discount_rate, periods, alpha, max_working_hours, linear_solver)
+def memoized_maximize_utility(savings, wages, prices, discount_rate, periods, alpha, max_working_hours, working_hours, expected_labor_demand, linear_solver):
+    return _maximize_utility(savings, wages, prices, discount_rate, periods, alpha, max_working_hours, working_hours, expected_labor_demand, linear_solver)
 
 def maximize_utility(Utility_params, linear_solver='ma57'):
     global last_solution
@@ -19,7 +21,9 @@ def maximize_utility(Utility_params, linear_solver='ma57'):
     periods = Utility_params['time_horizon']
     alpha = Utility_params['alpha']
     max_working_hours = Utility_params['max_working_hours']
-    result = memoized_maximize_utility(savings, tuple(wages), tuple(prices), discount_rate, periods, alpha, max_working_hours, linear_solver)
+    working_hours = Utility_params['working_hours']
+    expected_labor_demand = Utility_params['expected_labor_demand']
+    result = memoized_maximize_utility(savings, tuple(wages), tuple(prices), discount_rate, periods, alpha, max_working_hours, working_hours, tuple(expected_labor_demand), linear_solver)
 
     if result is not None:
         last_solution = result  # Update last_solution for warm start
@@ -28,7 +32,7 @@ def maximize_utility(Utility_params, linear_solver='ma57'):
 
     return result
 
-def _maximize_utility(savings, wages, prices, discount_rate, periods, alpha, max_working_hours, linear_solver):
+def _maximize_utility(savings, wages, prices, discount_rate, periods, alpha, max_working_hours, working_hours, expected_labor_demand, linear_solver):
     global last_solution
 
     model = pyo.ConcreteModel()
@@ -37,6 +41,8 @@ def _maximize_utility(savings, wages, prices, discount_rate, periods, alpha, max
     model.T = pyo.RangeSet(0, periods-1)
 
     # Variables
+    print(expected_labor_demand)
+    max_labor = expected_labor_demand[0]/30 + working_hours
     model.consumption = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=1.0, bounds=(1e-6, None))
     model.working_hours = pyo.Var(model.T, domain=pyo.NonNegativeReals, bounds=(1e-6, max_working_hours))
     model.leisure = pyo.Var(model.T, domain=pyo.NonNegativeReals, bounds=(1e-6
@@ -56,7 +62,9 @@ def _maximize_utility(savings, wages, prices, discount_rate, periods, alpha, max
     @model.Constraint(model.T)
     def time_constraint(model, t):
         return model.leisure[t] + model.working_hours[t] == model.max_working_hours
-
+    @model.Constraint(model.T)
+    def max_labor_constraint(model, t):
+        return model.working_hours[t] <= max_labor
 
     @model.Constraint(model.T)
     def savings_evolution(model,t):

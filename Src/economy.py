@@ -1,7 +1,7 @@
 from mesa import Model
 from mesa.time import RandomActivationByType
 from Utilities.Config import Config
-from mesa_worker import Worker
+from worker import Worker
 from firm import Firm2, Firm1
 from Utilities.mesa_market_matching import market_matching
 from Utilities.economy_data_collector import EconomyDataCollector

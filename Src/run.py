@@ -1,6 +1,6 @@
 # Description: Run the EconomyModel with light analysis and CSV output using Mesa's DataCollector.
 from pandas.core.arrays.base import mode
-from mesa_economy import EconomyModel
+from economy import EconomyModel
 
 import pandas as pd
 import numpy as np
