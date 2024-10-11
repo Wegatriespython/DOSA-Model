@@ -37,26 +37,27 @@ def get_market_demand(self, market_type):
 
     return demand, price
 
+## Pre-{market}_transactions is cleared before we access it.
 
 def get_supply(self, market_type):
-  all_supply = 0
-  match market_type, self.model.step_count:
-    case _,0:
-      match market_type:
+    all_supply = 0
+    match market_type, self.model.step_count:
+        case _, 0:
+            match market_type:
+                case 'labor':
+                    all_supply = 300
+                case 'capital':
+                    all_supply = 6
+                case 'consumption':
+                    all_supply = 25
         case 'labor':
-          all_supply = 300
+            all_supply = self.model.get_total_labor_supply()
         case 'capital':
-          all_supply = 6
+            all_supply = self.model.get_total_capital_supply()
         case 'consumption':
-          all_supply = 25
-    case 'labor':
-      all_supply = self.model.pre_labor_transactions[1]
-    case 'capital':
-      all_supply = self.model.pre_capital_transactions[1]
-    case 'consumption':
-      all_supply = self.model.pre_consumption_transactions[1]
+            all_supply = self.model.get_total_consumption_supply()
 
-  return round(all_supply,2)
+    return round(all_supply, 2)
 
 
 

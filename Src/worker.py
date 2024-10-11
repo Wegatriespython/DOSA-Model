@@ -3,7 +3,7 @@ from mesa import Agent
 import numpy as np
 from Utilities.Config import Config
 from Utilities.utility_function import maximize_utility
-from Utilities.expectations import  expect_price_trend, get_market_demand, expect_price_ar
+from expectations import  expect_price_trend, get_market_demand, expect_price_ar, get_supply
 from Utilities.Strategic_adjustments import update_worker_price_expectation, update_worker_wage_expectation
 
 class Worker(Agent):
@@ -22,6 +22,7 @@ class Worker(Agent):
         self.wage_history1 = []
         self.price_history1 = []
         self.quantity_history1 = []
+        self.supply_history1 = []
         self.avg_price = 0
         self.wage = model.config.MINIMUM_WAGE
         self.income = 0
@@ -57,22 +58,28 @@ class Worker(Agent):
         wage = np.full(self.model.time_horizon,self.expected_wage)
         prices = np.full(self.model.time_horizon, self.expected_price)
         demand = np.full(self.model.time_horizon, 12)
-        self.worker_expectations = [wage, prices, demand]
+        supply = np.full(self.model.time_horizon, 20)
+        self.worker_expectations = [wage, prices, demand, supply]
 
         self.avg_price = self.expected_price
       else:
         quantity, mkt_wages= get_market_demand(self, 'labor')
-        demand, mkt_price = get_market_demand(self, 'consumption')
+        _, mkt_price = get_market_demand(self, 'consumption')
+        supply = get_supply(self, 'consumption')
+
         if np.mean(mkt_wages) > self.model.config.MINIMUM_WAGE:
           self.wage_history1.append(mkt_wages)
           self.price_history1.append(mkt_price)
           self.quantity_history1.append(quantity)
+          self.supply_history1.append(supply)
           if len(self.wage_history1)>10:
             self.wage_history1.pop(0)
           if len(self.price_history1)>10:
             self.price_history1.pop(0)
           if len(self.quantity_history1)>10:
             self.quantity_history1.pop(0)
+          if len(self.supply_history1)>10:
+            self.supply_history1.pop(0)
 
         if len(self.prices) > 0 :
           self.prices = [p for p in self.prices if not np.isnan(p)]
@@ -97,8 +104,9 @@ class Worker(Agent):
         wage = expect_price_trend(self.wage_history1, wage, self.model.time_horizon)
         prices = expect_price_trend(self.price_history1, self.desired_price, self.model.time_horizon)
         demand = expect_price_trend(self.quantity_history1, quantity, self.model.time_horizon)
+        supply = expect_price_trend(self.supply_history1, supply, self.model.time_horizon)
 
-        self.worker_expectations = [wage, prices, demand]
+        self.worker_expectations = [wage, prices, demand, supply]
 
 
     def update_utilty(self):
@@ -112,18 +120,16 @@ class Worker(Agent):
             'alpha': 0.9,
             'max_working_hours': 16,
             'working_hours': self.working_hours,            
-            'expected_labor_demand': self.worker_expectations[2]
-          }
-          #print(Utility_params)
+            'expected_labor_demand': self.worker_expectations[2],
+            'expected_consumption_supply': self.worker_expectations[3]
+        }
+          print(Utility_params)
           results = maximize_utility(Utility_params)
           self.desired_consumption, self.working_hours, self.leisure, self.desired_savings = [arr[0] for arr in results]
           working_hours_ratio = self.total_working_hours/self.working_hours if self.working_hours > 0 else 0
           #self.desired_consumption = self.desired_consumption * working_hours_ratio if working_hours_ratio > 0 and working_hours_ratio < 1 else self.desired_consumption
           self.optimals = [self.desired_consumption, self.working_hours, self.desired_savings]
           print(self.optimals)
-
-
-
 
     def update_strategy(self):
 

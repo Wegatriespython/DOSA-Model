@@ -1,7 +1,7 @@
 from mesa import Agent
 import numpy as np
 from Utilities.Simpler_profit_maxxin import profit_maximization
-from Utilities.expectations import get_market_demand,get_supply
+from expectations import get_market_demand,get_supply
 from Utilities.adaptive_expectations import adaptive_expectations
 from Utilities.Strategic_adjustments import get_max_wage, get_min_sale_price, get_max_capital_price,calculate_production_capacity, get_desired_wage, get_desired_capital_price, get_desired_price, calculate_new_price
 import logging
@@ -61,7 +61,9 @@ class Firm(Agent):
         self.desireds_record = {'wage': [], 'price': [], 'capital_price': []}
         self.performance_record = {'production': [], 'labor': [], 'capital': [], 'price': [], 'sales': [], 'profit': [], 'debt': [], 'market_share': [], 'budget':[]}
         self.gaps_record = {'production': [], 'labor': [], 'capital': [], 'price': [], 'sales': [], 'profit': [], 'debt': [], 'inventory' : []}
-        print(self.price_record)
+     
+
+
 
 
     def update_firm_state(self):
@@ -147,7 +149,7 @@ class Firm(Agent):
           'capital': capital_supply,
           'labor': labor_supply
         }
-        print(Price, self.price_record)
+
 
         self.price_record = update_dictionary(Price, self.price_record)
         self.demand_record = update_dictionary(Demand,self.demand_record)

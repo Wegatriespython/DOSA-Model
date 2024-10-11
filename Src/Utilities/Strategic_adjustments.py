@@ -240,7 +240,7 @@ def calculate_new_price(current_price, clearing_prices, market_demand, market_su
         target_price = current_price
 
     else:
-        print(f"eq_quantity: {eq_quantity}, eq_price: {eq_price}, max_willingness_to_pay: {max_willingness_to_pay}")
+
         if market_tightness > 1:
             target_price = current_price + (max_willingness_to_pay - current_price) * 0.2
         else:

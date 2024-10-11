@@ -59,10 +59,18 @@ class EconomyDataCollector:
                 "Total_Working_Hours": lambda a: getattr(a, 'total_working_hours', None),
                 "Working_Hours": lambda a: getattr(a, 'working_hours', None),
                 "Labor_Demand": lambda a: getattr(a, 'total_working_hours', None),
+                "desired_consumption": lambda a: getattr(a, 'desired_consumption', None),
+                "worker_expectations": lambda a: getattr(a, 'worker_expectations', None),
                 "Production": lambda a: getattr(a, 'production', None),
                 "Optimals": lambda a: getattr(a, 'optimals', None),
-                "Expectations": lambda a: getattr(a, 'expectations', None),
-                "worker_expectations": lambda a: getattr(a, 'worker_expectations', None),
+                "Expectations_Demand": lambda a: getattr(a, 'expectations', {}).get('demand', {}),
+                "Expectations_Price": lambda a: getattr(a, 'expectations', {}).get('price', {}),
+                "Expectations_Supply": lambda a: getattr(a, 'expectations', {}).get('supply', {}),
+                "Demand_Record": lambda a: getattr(a, 'demand_record', {}),
+                "Price_Record": lambda a: getattr(a, 'price_record', {}),
+                "Supply_Record": lambda a: getattr(a, 'supply_record', {}),
+                "Performance_Record": lambda a: getattr(a, 'performance_record', {}),
+                "Gaps_Record": lambda a: getattr(a, 'gaps_record', {}),
                 "Investment": lambda a: getattr(a, 'investment_demand', None),
                 "Sales": lambda a: getattr(a, 'sales', None),
                 "Wages_Firm": lambda a: getattr(a, 'wage', None),
@@ -72,11 +80,11 @@ class EconomyDataCollector:
                 "Productivity": lambda a: getattr(a, 'productivity', None),
                 "Wage": lambda a: getattr(a, 'wage', None),
                 "Income": lambda a: getattr(a, 'income', None),
-                "Per_Worker_Income": lambda a: getattr(a, 'per_worker_income',None),
+                "Per_Worker_Income": lambda a: getattr(a, 'per_worker_income', None),
                 "Skills": lambda a: getattr(a, 'skills', None),
                 "Savings": lambda a: getattr(a, 'savings', None),
-                "Consumption": lambda a: getattr(a, 'consumption', None),
-                "desired_consumption": lambda a: getattr(a, 'desired_consumption', None)
+                "Consumption": lambda a: getattr(a, 'consumption', None)
+
             }
         )
     @staticmethod

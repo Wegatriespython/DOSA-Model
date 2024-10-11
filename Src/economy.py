@@ -213,3 +213,21 @@ class EconomyModel(Model):
         for buyer, seller, quantity, price in transactions:
             buyer.consume(quantity, price)
             seller.sell_goods(quantity, price)
+
+    def get_total_labor_supply(self):
+        supply = sum(agent.available_hours() for agent in self.schedule.agents if hasattr(agent, 'available_hours'))
+  
+        if self.step_count >1:
+            print("Labor Supply", supply)
+        return supply
+
+    def get_total_capital_supply(self):
+        supply = sum(agent.inventory for agent in self.schedule.agents if hasattr(agent, 'inventory') and agent.firm_type == 'capital')
+        print("Capital Supply", supply)
+        return supply
+
+    def get_total_consumption_supply(self):
+        supply = (sum(agent.inventory for agent in self.schedule.agents if hasattr(agent, 'inventory') and agent.firm_type == 'consumption'))
+        if self.step_count >1:
+            print("Consumption", supply)        
+        return supply
