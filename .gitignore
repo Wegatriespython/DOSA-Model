@@ -4,6 +4,8 @@
 *.joblib
 *.txt
 *.pth
+*.log
+*.json
 
 # Ignore specific files
 Nash_Central_planner.py
@@ -16,7 +18,15 @@ Macro-Model.jl
 /Data_Collection/
 /Remind_Files_copy/
 /legacy/
+/.vscode/
+/.pytest_cache/
+/.zed/
+/Src/tests/
+/Src/models/
+/Src/Data/
+/Src/Theory/
 
+/Src/output.log
 # Ignore __pycache__ directories in all subdirectories
 **/__pycache__/
 
