@@ -74,11 +74,11 @@ def get_market_demand(self, market_type):
         # Return initial values for the first step, same as get_market_demand
         match market_type:
             case 'capital':
-                return 6, 3, 1, "none", 1  # quantity, price, round, market_advantage
+                return 6, 3, 1, "none", 1, 1, 1, 1  # quantity, price, round, market_advantage
             case 'consumption':
-                return 30, 1, 1, "none", 1
+                return 30, 1, 1, "none", 1, 1, 1, 1
             case 'labor':
-                return 300, 0.0625, 1, "none", 1
+                return 300, 0.0625, 1, "none", 1, 1, 1, 1
 
     # Get pre-transaction data
     pre_transactions = getattr(self.model, f"pre_{market_type}_transactions")
@@ -95,7 +95,7 @@ def get_market_demand(self, market_type):
     if avg_buyer_price >= avg_seller_price:
         clearing_price = (avg_buyer_price + avg_seller_price) / 2
         clearing_quantity = total_demand
-        return clearing_quantity, clearing_price, 1, "none", avg_buyer_max_price
+        return clearing_quantity, clearing_price, 1, "none", avg_buyer_max_price, avg_seller_min_price, avg_buyer_price, avg_seller_price
 
     # Round 2: Determine market advantage and adjust prices
     if total_demand > total_supply:
@@ -103,14 +103,14 @@ def get_market_demand(self, market_type):
         if avg_buyer_max_price >= avg_seller_price:
             clearing_price = (avg_buyer_max_price + avg_seller_price) / 2
             clearing_quantity = total_demand
-            return clearing_quantity, clearing_price, 2, "seller", avg_buyer_max_price
+            return clearing_quantity, clearing_price, 2, "seller", avg_buyer_max_price, avg_seller_min_price, avg_buyer_price, avg_seller_price
     else:
         # Buyers Advantage
         if avg_buyer_price >= avg_seller_min_price:
             clearing_price = (avg_buyer_price + avg_seller_min_price) / 2
             clearing_quantity = total_demand
-            return clearing_quantity, clearing_price, 2, "buyer", avg_buyer_max_price
+            return clearing_quantity, clearing_price, 2, "buyer", avg_buyer_max_price, avg_seller_min_price, avg_buyer_price, avg_seller_price
 
     # If no clearing in either round, return theoretical equilibrium
-    return total_demand, avg_buyer_price, 2, "failure", avg_buyer_max_price
+    return total_demand, avg_buyer_price, 2, "failure", avg_buyer_max_price, avg_seller_min_price, avg_buyer_price, avg_seller_price
 

@@ -155,25 +155,34 @@ class Firm(Agent):
 
     def update_expectations(self):
         # Grab the demand for relavent goods
-        consumption_demand, consumption_price, counsumption_round,   consumption_market_advantage, consumption_max_price = get_market_demand(self, 'consumption')
-        capital_demand, capital_price, capital_round, capital_market_advantage, capital_max_price = get_market_demand(self, 'capital')
-        labor_demand, wage, labor_round, labor_market_advantage, labor_max_price = get_market_demand(self, 'labor')
+        consumption_demand, consumption_price, counsumption_round,   consumption_market_advantage, consumption_max_price, consumption_min_price, consumption_buyer_price, consumption_seller_price = get_market_demand(self, 'consumption')
+        capital_demand, capital_price, capital_round, capital_market_advantage, capital_max_price, capital_min_price, capital_buyer_price, capital_seller_price = get_market_demand(self, 'capital')
+        labor_demand, wage, labor_round, labor_market_advantage, labor_max_price, labor_min_price, labor_buyer_price, labor_seller_price = get_market_demand(self, 'labor')
 
         self.strategy = {
           'consumption': {
             'round': counsumption_round,
             'advantage': consumption_market_advantage,
-            'max_price': consumption_max_price
+            'max_price': consumption_max_price,
+            'min_price': consumption_min_price,
+            'buyer_price': consumption_buyer_price,
+            'seller_price': consumption_seller_price
           },
           'capital': {
             'round': capital_round,
             'advantage': capital_market_advantage,
-            'max_price': capital_max_price
+            'max_price': capital_max_price,
+            'min_price': capital_min_price,
+            'buyer_price': capital_buyer_price,
+            'seller_price': capital_seller_price
           },
           'labor': {
             'round': labor_round,
             'advantage': labor_market_advantage,
-            'max_price': labor_max_price
+            'max_price': labor_max_price,
+            'min_price': labor_min_price,
+            'buyer_price': labor_buyer_price,
+            'seller_price': labor_seller_price
           }
         }
         
@@ -523,9 +532,12 @@ class Firm(Agent):
         'optimal_inventory': self.optimals['inventory'],
         'inventory': self.inventory,
         'production_gap': self.production_gap if hasattr(self, 'production_gap') else 0,
-        'a_round': self.strategy['consumption']['round'],
+        'marker_clearing_round': self.strategy['consumption']['round'],
         'market_advantage': self.strategy['consumption']['advantage'],
-        'max_price': self.strategy['consumption']['max_price']  
+        'buyer_max_price': self.strategy['consumption']['max_price'],
+        'seller_min_price': self.strategy['consumption']['min_price'],
+        'buyer_price': self.strategy['consumption']['buyer_price'],
+        'seller_price': self.strategy['consumption']['seller_price'] 
         }
 
 
@@ -539,8 +551,11 @@ class Firm(Agent):
         'actual_labor': self.get_total_labor_units(),
         'max_wage': self.zero_profit_conditions['wage'],
         'min_wage': self.model.config.MINIMUM_WAGE,
-        'a_round': self.strategy['labor']['round'],
-        'market_advantage': self.strategy['labor']['advantage']
+        'marker_clearing_round': self.strategy['labor']['round'],
+        'market_advantage': self.strategy['labor']['advantage'],
+        'seller_min_price': self.strategy['labor']['min_price'],
+        'buyer_price': self.strategy['labor']['buyer_price'],
+        'seller_price': self.strategy['labor']['seller_price']
       }
       desired_wage = get_desired_wage(wage_params)
 

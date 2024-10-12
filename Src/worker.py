@@ -28,6 +28,18 @@ class Worker(Agent):
         self.price_history1 = []
         self.quantity_history1 = []
         self.supply_history1 = []
+        self.strategy = {
+            'labor': {
+                'round': 0, 
+                'advantage': '',
+                'min_price': 0
+            },
+            'consumption': {
+                'round': 0,
+                'advantage': '',
+                'max_price': 0
+            }
+        }
         self.avg_price = 0
         self.a_round_seller = 0
         self.market_advantage_seller = 0
@@ -83,8 +95,28 @@ class Worker(Agent):
 
     def update_expectations(self):
         # Grab the demand for relevant goods
-        labor_demand, labor_price, self.p_round_seller, self.p_market_advantage, labor_max_price = get_market_demand(self, 'labor')
-        consumption_demand, consumption_price, self.p_round_buyer, _, consumption_max_price = get_market_demand(self, 'consumption')
+        labor_demand, labor_price, labor_market_round, labor_market_advantage, labor_max_price, labor_min_price = get_market_demand(self, 'labor')
+        consumption_demand, consumption_price, consumption_market_round, consumption_market_advantage, consumption_max_price, consumption_min_price = get_market_demand(self, 'consumption')
+
+        self.strategy = {
+            'labor': {
+                'round': labor_market_round,
+                'advantage': labor_market_advantage,
+                'min_price': labor_min_price,
+                'max_price': labor_max_price,
+                'buyer_price': labor_buyer_price,
+                'seller_price': labor_seller_price
+            },
+            'consumption': {
+                'round': consumption_market_round,
+                'advantage': consumption_market_advantage,
+                'max_price': consumption_max_price,
+                'min_price': consumption_min_price,
+                'buyer_price': consumption_buyer_price,
+                'seller_price': consumption_seller_price
+            }
+        }
+
         labor_supply = get_supply(self, 'labor')
         consumption_supply = get_supply(self, 'consumption')
 
@@ -166,8 +198,11 @@ class Worker(Agent):
             'consumption': self.consumption,
             'desired_consumption': self.desired_consumption,
             'max_price': max_price,
-            'a_round': self.a_round_buyer,
-            'market_advantage': self.market_advantage_buyer
+            'market_clearing_round': self.strategy['consumption']['round'],
+            'market_advantage': self.strategy['consumption']['advantage'],
+            'seller_min_price': self.strategy['consumption']['min_price'],
+            'seller_price': self.strategy['consumption']['seller_price'],
+            'buyer_price': self.strategy['consumption']['buyer_price']
         }
 
         desired_price = update_worker_price_expectation(price_decision_data)
@@ -180,8 +215,12 @@ class Worker(Agent):
             'working_hours': self.working_hours,
             'desired_working_hours': self.optimals[1],
             'min_wage': self.get_min_wage(),
-            'a_round': self.a_round_seller,
-            'market_advantage': self.market_advantage_seller
+            'market_clearing_round': self.strategy['labor']['round'],
+            'market_advantage': self.strategy['labor']['advantage'],
+            'buyer_max_wage': self.strategy['labor']['max_price'],
+            'buyer_price': self.strategy['labor']['buyer_price'],
+            'seller_price': self.strategy['labor']['seller_price']
+
         }
 
         desired_wage = update_worker_wage_expectation(wage_decision_data)

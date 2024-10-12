@@ -70,17 +70,20 @@ def get_desired_price(price_params):
     optimal_inventory = price_params['optimal_inventory']
     min_price = price_params['min_price']
     production_gap = price_params['production_gap']
-    a_round = price_params['a_round']
+    marker_clearing_round = price_params['marker_clearing_round']
     market_advantage = price_params['market_advantage']
-    max_price = price_params['max_price']
-    og_desired_price = desired_price
+    buyer_max_price = price_params['buyer_max_price']
+    buyer_price = price_params['buyer_price']
+    seller_price = price_params['seller_price']
+    
+  
 
     # Handle case when no transactions occurred
     if market_advantage == "failure":
         # Significant price cut when no transactions occur
-        price_cut_factor = 0.8  # 20% price cut
+        price_cut_factor = 0.95  # 5% price cut
         desired_price *= price_cut_factor
-        return max(min(desired_price, max_price), min_price)
+        return max(min(desired_price, buyer_max_price), min_price)
 
     # Rest of the function remains the same
     # Ratios and deviations
@@ -104,22 +107,22 @@ def get_desired_price(price_params):
     combined_factor = max(-0.2, min(combined_factor, 0.3))
 
     # Scaling factor controls the magnitude of adjustment
-    scaling_factor = 0.1 if a_round == 1 else 0.2
+    scaling_factor = 0.1 if marker_clearing_round == 1 else 0.2
 
     # Adjust the desired price
     desired_price += desired_price * combined_factor * scaling_factor
 
     # If in round 2 with seller advantage, be more aggressive
-    if a_round == 2 and market_advantage == 'seller':
+    if marker_clearing_round == 2 and market_advantage == 'seller':
         desired_price *= 1.1
-    elif a_round == 2 and market_advantage == 'buyer':
+    elif marker_clearing_round == 2 and market_advantage == 'buyer':
         desired_price *= 0.9
 
     # Smooth the price to avoid abrupt changes
     smoothed_price = desired_price * 0.7 + real_price * 0.3
 
     # Ensure the smoothed price is not below the minimum price
-    smoothed_price = max(min(smoothed_price, max_price), min_price)
+    smoothed_price = max(min(smoothed_price, buyer_max_price), min_price)
     return smoothed_price   
 
 def get_desired_wage(wage_params):
@@ -130,12 +133,15 @@ def get_desired_wage(wage_params):
     actual_labor = wage_params['actual_labor']
     max_wage = wage_params['max_wage']
     min_wage = wage_params['min_wage']
-    a_round = wage_params['a_round']
+    marker_clearing_round = wage_params['marker_clearing_round']
     market_advantage = wage_params['market_advantage']
+    seller_min_price = wage_params['seller_min_price']
+    buyer_price = wage_params['buyer_price']
+    seller_price = wage_params['seller_price']
 
     # Ensure wages are within bounds
-    real_wage = max(min_wage, min(real_wage, max_wage))
-    desired_wage = max(min_wage, min(desired_wage, max_wage))
+    real_wage = max(seller_min_price, min(real_wage, max_wage))
+    desired_wage = max(seller_min_price, min(desired_wage, max_wage))
 
     # Calculate labor ratio
     labor_ratio = actual_labor / optimal_labor if optimal_labor > 0 else 0
@@ -158,7 +164,7 @@ def get_desired_wage(wage_params):
     desired_wage *= combined_factor
 
     # Round-specific adjustments
-    if a_round == 1:
+    if marker_clearing_round == 1:
         # In round 1, be slightly more conservative
         desired_wage = desired_wage * 0.9 + real_wage * 0.1
     else:  # Round 2
@@ -173,7 +179,7 @@ def get_desired_wage(wage_params):
     desired_wage = min(max_wage, max(desired_wage, min_wage))
 
     # Smooth the wage changes
-    smoothed_wage = desired_wage * 0.6 + real_wage * 0.3 + expected_wage * 0.1
+    smoothed_wage = desired_wage * 0.7 + real_wage * 0.3 
 
     return smoothed_wage
 
@@ -187,12 +193,16 @@ def update_worker_price_expectation(price_decision_data):
     desired_consumption = price_decision_data['desired_consumption']
     consumption = price_decision_data['consumption']
     max_price = price_decision_data['max_price']
-    a_round = price_decision_data['a_round']
+    market_clearing_round = price_decision_data['market_clearing_round']
     market_advantage = price_decision_data['market_advantage']
-
-    if not a_round:
+    seller_min_price = price_decision_data['seller_min_price']
+    buyer_price = price_decision_data['buyer_price']
+    seller_price = price_decision_data['seller_price']
+   
+    if not market_clearing_round:
         desired_price *= 1.2
-        return max(desired_price, max_price)
+        desired_price = min(desired_price, max_price)
+        return max(desired_price, seller_min_price)
     # Ensure prices are within bounds
     real_price = max(real_price, expected_price)
     desired_price = min(desired_price, max_price)
@@ -220,16 +230,16 @@ def update_worker_price_expectation(price_decision_data):
             adjustment_factor -= price_gap_ratio * 0.5
 
     # Round-specific adjustments
-    if a_round == 1:
+    if market_clearing_round == 1:
         # Be more conservative in round 1
         adjustment_factor *= 0.5
     else:  # Round 2
         if market_advantage == 'buyer':
             # If buyers have advantage, be more aggressive in lowering price
-            adjustment_factor -= 0.1
+            adjustment_factor -= 0.5
         else:
             # If sellers have advantage, be more willing to increase price
-            adjustment_factor += 0.1
+            adjustment_factor += 0.5
 
     # Exploratory factor
     exploratory_factor = np.random.uniform(-0.05, 0.05)
@@ -238,19 +248,19 @@ def update_worker_price_expectation(price_decision_data):
     combined_factor = adjustment_factor + exploratory_factor
 
     # Cap combined_factor
-    combined_factor = max(-0.2, min(combined_factor, 0.2))
+    combined_factor = max(-0.4, min(combined_factor, 0.4))
 
     # Adjust the desired price
     desired_price *= (1 + combined_factor)
 
 
     # Smooth the price changes
-    smoothed_price = desired_price * 0.6 + real_price * 0.3 + expected_price * 0.1
+    smoothed_price = desired_price * 0.7 + real_price * 0.3 
 
     # Ensure the smoothed price does not exceed the maximum price
     smoothed_price = min(smoothed_price, max_price)
 
-    return smoothed_price
+    return max(smoothed_price, seller_min_price)
 
 
 def update_worker_wage_expectation(wage_decision_data):
@@ -260,17 +270,20 @@ def update_worker_wage_expectation(wage_decision_data):
     working_hours = wage_decision_data['working_hours']
     desired_working_hours = wage_decision_data['desired_working_hours']
     min_wage = wage_decision_data['min_wage']
-    a_round = wage_decision_data['a_round']
+    market_clearing_round = wage_decision_data['market_clearing_round']
     market_advantage = wage_decision_data['market_advantage']
+    buyer_max_wage = wage_decision_data['buyer_max_wage']
+    buyer_price = wage_decision_data['buyer_price']
+    seller_price = wage_decision_data['seller_price']
 
 
     # Ensure wages are within bounds
     real_wage = max(real_wage, min_wage)
     desired_wage = max(desired_wage, min_wage)
 
-    if not a_round:
-        desired_wage *= 1.05
-        return max(desired_wage, min_wage)
+    if not market_clearing_round:
+        desired_wage *= 0.95
+        return min(max(desired_wage, min_wage), buyer_max_wage) 
 
     # Calculate working hours ratio
     working_hours_ratio = working_hours / desired_working_hours if desired_working_hours > 0 else 0
@@ -284,7 +297,7 @@ def update_worker_wage_expectation(wage_decision_data):
         adjustment_factor = 0.0    # Maintain wage if work is about right
 
     # Round-specific adjustments
-    if a_round == 1:
+    if market_clearing_round == 1:
         # Be more conservative in round 1
         adjustment_factor *= 0.5
     else:  # Round 2
@@ -313,6 +326,6 @@ def update_worker_wage_expectation(wage_decision_data):
     # Smooth the wage changes
     smoothed_wage = desired_wage * 0.6 + real_wage * 0.3 + expected_wage * 0.1
 
-    return smoothed_wage
+    return min(max(smoothed_wage, min_wage), buyer_max_wage)
 
 
