@@ -3,10 +3,11 @@ import numpy as np
 from Utilities.Simpler_profit_maxxin import profit_maximization
 from expectations import get_market_demand,get_supply
 from Utilities.adaptive_expectations import adaptive_expectations
-from Utilities.Strategic_adjustments import get_max_wage, get_min_sale_price, get_max_capital_price,calculate_production_capacity, get_desired_wage, get_desired_capital_price, get_desired_price, calculate_new_price
+from Utilities.Strategic_adjustments import get_max_wage, get_min_sale_price, get_max_capital_price,calculate_production_capacity, get_desired_wage, get_desired_capital_price, get_desired_price
 import logging
 from math import isnan, nan
 from Utilities.tools import dict_arithmetic, update_dictionary, calculate_averages
+from statistics import mode, StatisticsError
 
 logging.basicConfig(level=logging.INFO)
 class Firm(Agent):
@@ -15,9 +16,27 @@ class Firm(Agent):
         self.workers = {}  # Dictionary to store workers and their working hours
         self.total_working_hours = 0
         self.prices = []
+        self.strategy = {
+          "consumption": {
+            "round" : 0,
+            "advantage" : ""
+          },
+          "captial" : {
+            "round": 0,
+            "advantage": ""},
+          "labor":{
+            "round": 0,
+            "advantage" :""
+          }     
+        }
         self.capital_prices =[]
         self.sales_same_period =0
         self.debt = 0
+        self.a_round_seller = []
+        self.market_advantage_seller = []
+        self.a_round_buyer = []
+        self.market_advantage_buyer = []
+
         self.production = 0
         self.sales = 0
         self.inventory =0
@@ -32,7 +51,7 @@ class Firm(Agent):
         self.max_working_hours = model.config.MAX_WORKING_HOURS
         self.zero_profit_conditions = {}
         self.optimals = {}
-        self.expectations = {
+        self.firm_expectations = {
           'demand': {
             'consumption':[],
             'capital':[],
@@ -109,7 +128,7 @@ class Firm(Agent):
       gaps = dict_arithmetic(self.optimals, performance_actuals, lambda x, y: x - y)
       key = self.firm_type
 
-      match self.expectations['demand'][key][-1:][0], (self.optimals['sales'] - gaps['production']):
+      match self.firm_expectations['demand'][key][-1:][0], (self.optimals['sales'] - gaps['production']):
           case x, y if y > 0 and x >= 0:
               market_share = x / y
           case _, y if y == 0:
@@ -122,14 +141,40 @@ class Firm(Agent):
       self.average_performance = calculate_averages(self.performance_record)
       self.gaps_record = update_dictionary(gaps, self.gaps_record)
       self.average_gaps = calculate_averages(self.gaps_record)
+      
+      print(f"rounds seller: {self.a_round_seller}, rounds buyer: {self.a_round_buyer}") 
+
+      #clear lists
+      self.a_round_seller = []
+      self.market_advantage_seller = [] 
+      self.a_round_buyer = []
+      self.market_advantage_buyer = []
+
 
       return performance_actuals, gaps
 
     def update_expectations(self):
         # Grab the demand for relavent goods
-        consumption_demand, consumption_price = get_market_demand(self, 'consumption')
-        capital_demand, capital_price = get_market_demand(self, 'capital')
-        labor_demand, wage = get_market_demand(self, 'labor')
+        consumption_demand, consumption_price, counsumption_round,   consumption_market_advantage = get_market_demand(self, 'consumption')
+        capital_demand, capital_price, capital_round, capital_market_advantage = get_market_demand(self, 'capital')
+        labor_demand, wage, labor_round, labor_market_advantage = get_market_demand(self, 'labor')
+
+        self.strategy = {
+          'consumption': {
+            'round': counsumption_round,
+            'advantage': consumption_market_advantage
+          },
+          'capital': {
+            'round': capital_round,
+            'advantage': capital_market_advantage
+          },
+          'labor': {
+            'round': labor_round,
+            'advantage': labor_market_advantage
+          }
+        }
+        
+
         capital_supply = get_supply(self, 'capital')
         consumption_supply = get_supply(self, 'consumption')
         labor_supply = get_supply(self, 'labor')
@@ -164,22 +209,22 @@ class Firm(Agent):
                 self.price_record if category == 'price' else
                 self.supply_record
             )
-            self.expectations[category] = adaptive_expectations(
+            self.firm_expectations[category] = adaptive_expectations(
                 historical_data,
-                self.expectations[category],
+                self.firm_expectations[category],
                 self.model.time_horizon
             )
 
         # For practical use only the future time horizon is needed
-        self.expectations = {
+        self.firm_expectations = {
             category: {
                 key: values[-self.model.time_horizon:]
-                for key, values in self.expectations[category].items()
+                for key, values in self.firm_expectations[category].items()
             }
             for category in ['demand', 'price', 'supply']
         }
 
-        return self.expectations
+        return self.firm_expectations
 
 
     def make_production_decision(self):
@@ -198,9 +243,9 @@ class Firm(Agent):
             'current_labor': round(self.total_labor_units,2),
             'current_price': round(self.price,2),
             'productivity': self.productivity,
-            'expected_demand': list(map(lambda x: x / number_of_firms, self.expectations['demand']['consumption'])),
+            'expected_demand': list(map(lambda x: x / number_of_firms, self.firm_expectations['demand']['consumption'])),
             'expected_price': self.expected_price,
-            'capital_price': self.expectations['price']['capital'][-1:][0],
+            'capital_price': self.firm_expectations['price']['capital'][-1:][0],
             'capital_elasticity': self.capital_elasticity,
             'inventory': round(self.inventory,2),
             'depreciation_rate': self.model.config.DEPRECIATION_RATE,
@@ -208,8 +253,8 @@ class Firm(Agent):
             'discount_rate': self.model.config.DISCOUNT_RATE,
             'budget': round(self.budget,2),
             'wage': round(self.wage * self.max_working_hours,2),
-            'expected_capital_supply': self.expectations['supply']['capital'][0],
-            'expected_labor_supply': self.expectations['supply']['labor'][0],
+            'expected_capital_supply': self.firm_expectations['supply']['capital'][0],
+            'expected_labor_supply': self.firm_expectations['supply']['labor'][0],
             'debt': self.debt,
             'carbon_intensity': self.carbon_intensity,
             'new_capital_carbon_intensity': 1,
@@ -246,21 +291,6 @@ class Firm(Agent):
         }
         print(f"Optimal values: {self.optimals}")
 
-        """self.zero_profit_conditions = {
-            'wage': zero_profit_wage,
-            'price': zero_profit_price,
-            'capital_price': zero_profit_capital_price}"""
-        """if zero_profit_conditions is not None:
-          zero_profit_wages = zero_profit_conditions['wage']
-          zero_profit_wage = zero_profit_wages[0]
-          zero_profit_prices = zero_profit_conditions['price']
-          zero_profit_price = zero_profit_prices[0]
-          zero_profit_capital_prices = zero_profit_conditions['capital_price']
-          print("Zero profit capital prices", zero_profit_capital_prices)
-          zero_profit_capital_price = zero_profit_capital_prices[0]"""
-        """zero_profit_wage = self.wage
-        zero_profit_price = self.price
-        zero_profit_capital_price = self.expectations[2]"""
 
         return self.optimals
 
@@ -277,27 +307,29 @@ class Firm(Agent):
         self.inventory += max(0, self.production)
         return self.production
 
-    def hire_worker(self, worker, wage, hours):
+    def hire_worker(self, worker, wage, hours, a_round, market_advantage):
         if hours < 0:
           print("Negative hours")
           breakpoint()
+        self.a_round_buyer.append(a_round)
+        self.market_advantage_buyer.append(market_advantage)
         if worker in self.workers:
             #print("Worker already hired incresing hours")
-            self.update_worker_hours(worker, hours)
+            self.update_worker_hours(worker, hours, a_round, market_advantage)
         else:
             #print("Hiring new Worker")
             self.workers[worker] = {'hours':hours, 'wage':wage}
             self.total_working_hours += hours
-            worker.get_hired(self, wage, hours)
+            worker.get_hired(self, wage, hours, a_round, market_advantage)
 
-    def update_worker_hours(self, worker, hours):
+    def update_worker_hours(self, worker, hours, a_round, market_advantage):
         if hours < 0:
           print("Negative hours")
           breakpoint()
         if worker in self.workers:
             self.workers[worker]['hours'] += hours
             self.total_working_hours += hours
-            worker.update_hours(self, hours)
+            worker.update_hours(self, hours, a_round, market_advantage)
 
     def wage_adjustment(self):
       #Implement periodic wage adjustments, ideally workforce should quit to create turnover, causing firms to implement wage_adjustments to lower turnover, but non-essential for thesis.
@@ -410,7 +442,7 @@ class Firm(Agent):
 
         return self.total_labor_units
 
-    def buy_capital(self, quantity, price):
+    def buy_capital(self, quantity, price, a_round, market_advantage):
         if isinstance(self, Firm2):
             self.capital += quantity
             self.investment_demand -= quantity
@@ -426,9 +458,12 @@ class Firm(Agent):
                 #self.debt += optimal_debt
                 #else:
                 #self.debt += budget_change
-    def sell_goods(self, quantity, price):
+    def sell_goods(self, quantity, price, a_round, market_advantage):
         inventory_change = self.inventory - quantity
-
+        self.a_round_seller.append(a_round) 
+        self.market_advantage_seller.append(market_advantage)
+        if a_round == 2 and market_advantage == 1:
+          breakpoint()
         self.inventory -= quantity
         self.sales += quantity
         budget_change = quantity * price
@@ -457,11 +492,11 @@ class Firm(Agent):
           return
         #for consumption firms
         case 'consumption', _:
-          price_expectations = self.expectations['price']['consumption']
+          price_expectations = self.firm_expectations['price']['consumption']
           desired_capital_price = get_desired_capital_price(self)
         #for capital firms
         case 'capital', _:
-          price_expectations = self.expectations['price']['capital']
+          price_expectations = self.firm_expectations['price']['capital']
           desired_capital_price = 0
         # Doesn't happen but just for pyright to not show red squiggly lines
         case _,_:
@@ -469,18 +504,42 @@ class Firm(Agent):
           breakpoint()
           return
 
-      wage_expectations = self.expectations['price']['labor']
+      wage_expectations = self.firm_expectations['price']['labor']
 
       records = [self.price_record, self.demand_record, self.supply_record]
       for record in records:
         assert record is not None
 
+      price_params = {
+        'expected_price': self.firm_expectations['price']['consumption'][-1],
+        'desired_price': self.desireds['price'],
+        'real_price': self.price,
+        'actual_sales': self.sales,
+        'desired_sales': self.supply_record['consumption'][-1],
+        'min_price': self.zero_profit_conditions['price'],
+        'optimal_inventory': self.optimals['inventory'],
+        'inventory': self.inventory,
+        'production_gap': self.production_gap if hasattr(self, 'production_gap') else 0,
+        'a_round': self.strategy['consumption']['round'],
+        'market_advantage': self.strategy['consumption']['advantage']
+}
 
-      desired_price = calculate_new_price(self.price,self.price_record['consumption'],self.demand_record['consumption'], self.supply_record['consumption'], self.inventory, self.optimals['inventory'],self.expectations['price']['consumption'])
 
+      desired_price = get_desired_price(price_params)
 
+      wage_params = { 
+        'expected_wage': wage_expectations[0],
+        'desired_wage': self.desireds['wage'],
+        'real_wage': self.wage,
+        'optimal_labor': self.optimals['labor'],
+        'actual_labor': self.get_total_labor_units(),
+        'max_wage': self.zero_profit_conditions['wage'],
+        'min_wage': self.model.config.MINIMUM_WAGE,
+        'a_round': self.strategy['labor']['round'],
+        'market_advantage': self.strategy['labor']['advantage']
+      }
+      desired_wage = get_desired_wage(wage_params)
 
-      desired_wage = calculate_new_price(wage_expectations[0],self.desireds['price'],self.wage, self.optimals['labor'], self.get_total_labor_units(), self.zero_profit_conditions['wage'], self.model.config.MINIMUM_WAGE)
     
       self.desireds = {
         'wage': desired_wage,
@@ -502,7 +561,7 @@ class Firm(Agent):
 
       max_capital_price = get_max_capital_price(self.investment_demand, self.optimals['production'],self.optimals['capital'], self.price, self.capital_elasticity, self.model.time_horizon, self.model.config.DISCOUNT_RATE)
       self.zero_profit_conditions = {
-      'wage':max_wage,
+      'wage': max_wage,
       'price': min_sale_price,
       'capital_price': max_capital_price}
 
@@ -561,7 +620,7 @@ class Firm2(Firm):
         self.historic_inventory = [self.inventory]
         self.expected_demand = [model.config.FIRM2_INITIAL_DEMAND]*self.model.time_horizon
         self.expected_price = [self.price]*self.model.time_horizon
-        self.expectations ={
+        self.firm_expectations ={
           'demand': {
            'consumption': self.expected_demand,
            'capital' : [],

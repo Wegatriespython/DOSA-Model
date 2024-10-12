@@ -111,6 +111,15 @@ app.layout = html.Div([
             dcc.Graph(id='firm-graph')
         ]),
         dcc.Tab(label='Workers', children=[
+            dcc.Dropdown(
+                id='worker-graph-type',
+                options=[
+                    {'label': 'Performance Metrics', 'value': 'performance'},
+                    {'label': 'Expectations', 'value': 'expectations'},
+                    {'label': 'Optimals', 'value': 'optimals'}
+                ],
+                value='performance'
+            ),
             dcc.Graph(id='worker-graph')
         ]),
         dcc.Tab(label='Aggregate Transactions', children=[
@@ -197,31 +206,19 @@ def update_firm_graph(firm_type, graph_type):
     elif graph_type == 'optimals':
         figure = go.Figure()
         optimal_data = firm_data[firm_data['Optimals'].notna()]
-
-        def parse_numpy_array_string(s):
-            try:
-                # Remove brackets and split by spaces
-                values = s.strip('[]').split()
-                # Convert to float and return as a list
-                return [float(x) for x in values]
-            except:
-                return None
-
-        # Convert string representation of NumPy array to list
-        optimal_data['Optimals'] = optimal_data['Optimals'].apply(parse_numpy_array_string)
-
-        for i, label in enumerate(['Optimal Labor', 'Optimal Capital', 'Optimal Production', 'Optimal Inventory', 'Optimal Sales']):
-            y = optimal_data['Optimals'].apply(lambda opt: opt[i] if isinstance(opt, list) and len(opt) > i else None)
-            figure.add_trace(go.Scatter(x=optimal_data['Step'], y=y, mode='lines', name=label))
+        
+        for key in ['production', 'labor', 'capital', 'price', 'sales', 'inventory']:
+            y = optimal_data['Optimals'].apply(lambda opt: opt.get(key, None))
+            figure.add_trace(go.Scatter(x=optimal_data['Step'], y=y, mode='lines', name=f'Optimal {key.capitalize()}'))
 
         figure.update_layout(title=f'{firm_type} Optimals',
             xaxis_title='Time Step', yaxis_title='Value')
     elif graph_type == 'expectations':
         figure = go.Figure()
-        expectations_data = firm_data[firm_data['Expectations'].notna()]
-        for i, label in enumerate(['Expected Demand', 'Expected Price']):
-            y = expectations_data['Expectations'].apply(lambda exp: exp[i] if isinstance(exp, list) and len(exp) > i else None)
-            figure.add_trace(go.Scatter(x=expectations_data['Step'], y=y, mode='lines', name=label))
+        for category in ['Demand', 'Price', 'Supply']:
+            for market in ['consumption', 'capital', 'labor']:
+                y = firm_data[f'Firm_Expectations_{category}'].apply(lambda exp: exp.get(market, None) if isinstance(exp, dict) else None)
+                figure.add_trace(go.Scatter(x=firm_data['Step'], y=y, mode='lines', name=f'Expected {category} ({market})'))
         figure.update_layout(title=f'{firm_type} Expectations',
                              xaxis_title='Time Step', yaxis_title='Value')
     else:
@@ -231,30 +228,57 @@ def update_firm_graph(firm_type, graph_type):
 
 @app.callback(
     Output('worker-graph', 'figure'),
-    [Input('market-dropdown', 'value')]  # This input is not used but required by Dash
+    [Input('worker-graph-type', 'value')]
 )
-def update_worker_graph(_):
+def update_worker_graph(graph_type):
     worker_data = agent_data[agent_data['Type'] == 'Worker']
-    avg_savings = worker_data.groupby('Step')['Savings'].mean()
-    avg_working_hours = worker_data.groupby('Step')['Working_Hours'].mean()
 
+    if graph_type == 'performance':
+        figure = go.Figure()
+        avg_savings = worker_data.groupby('Step')['Savings'].mean()
+        avg_working_hours = worker_data.groupby('Step')['Working_Hours'].mean()
+        avg_consumption = worker_data.groupby('Step')['Consumption'].mean()
 
-    figure = go.Figure()
-    figure.add_trace(go.Scatter(x=avg_savings.index, y=avg_savings.values, mode='lines', name='Average Savings'))
-    figure.add_trace(go.Scatter(x=avg_working_hours.index, y=avg_working_hours.values, mode='lines', name='Average Working Hours', yaxis='y2'))
-    expectations_data = worker_data[worker_data['worker_expectations'].notna()]
-    for i, label in enumerate(['Expected Wage', 'Expected Price']):
-        y = expectations_data['worker_expectations'].apply(lambda exp: exp[i] if isinstance(exp, list) and len(exp) > i else None)
-        figure.add_trace(go.Scatter(x=expectations_data['Step'], y=y, mode='lines', name=f'Worker {label}', yaxis='y3'))
+        figure.add_trace(go.Scatter(x=avg_savings.index, y=avg_savings.values, mode='lines', name='Average Savings'))
+        figure.add_trace(go.Scatter(x=avg_working_hours.index, y=avg_working_hours.values, mode='lines', name='Average Working Hours'))
+        figure.add_trace(go.Scatter(x=avg_consumption.index, y=avg_consumption.values, mode='lines', name='Average Consumption'))
 
-    figure.update_layout(
-        title='Worker Metrics and Expectations',
-        xaxis_title='Time Step',
-        yaxis=dict(title='Savings', side='left'),
-        yaxis2=dict(title='Working Hours', overlaying='y', side='right'),
-        yaxis3=dict(title='Expectations', overlaying='y', side='right', position=0.95),
-        legend=dict(x=1.05, y=1, traceorder='normal')
-    )
+        figure.update_layout(
+            title='Worker Performance Metrics',
+            xaxis_title='Time Step',
+            yaxis_title='Value',
+            legend=dict(x=1.05, y=1, traceorder='normal')
+        )
+    elif graph_type == 'optimals':
+        figure = go.Figure()
+        optimal_data = worker_data[worker_data['Optimals'].notna()]
+        
+        for key in ['consumption', 'labor_supply', 'savings']:
+            y = optimal_data['Optimals'].apply(lambda opt: opt.get(key, None))
+            figure.add_trace(go.Scatter(x=optimal_data['Step'], y=y, mode='lines', name=f'Optimal {key.capitalize()}'))
+
+        figure.update_layout(
+            title='Worker Optimals',
+            xaxis_title='Time Step',
+            yaxis_title='Value',
+            legend=dict(x=1.05, y=1, traceorder='normal')
+        )
+    elif graph_type == 'expectations':
+        figure = go.Figure()
+        for category in ['Demand', 'Price', 'Supply']:
+            for market in ['labor', 'consumption']:
+                y = worker_data[f'Worker_Expectations_{category}'].apply(lambda exp: exp.get(market, None) if isinstance(exp, dict) else None)
+                figure.add_trace(go.Scatter(x=worker_data['Step'], y=y, mode='lines', name=f'Expected {category} ({market})'))
+
+        figure.update_layout(
+            title='Worker Expectations',
+            xaxis_title='Time Step',
+            yaxis_title='Value',
+            legend=dict(x=1.05, y=1, traceorder='normal')
+        )
+    else:
+        figure = go.Figure()  # Empty figure if no valid graph_type is selected
+
     return figure
 
 @app.callback(

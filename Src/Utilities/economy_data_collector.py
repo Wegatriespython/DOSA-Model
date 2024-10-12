@@ -50,7 +50,12 @@ class EconomyDataCollector:
                 "capital_Market_Price": lambda m: np.mean([t[3] for t in m.capital_transactions]) if m.capital_transactions else 0,
                 "consumption_Market_Quantity": lambda m: sum(t[2] for t in m.consumption_transactions),
                 "consumption_Market_Price": lambda m: np.mean([t[3] for t in m.consumption_transactions]) if m.consumption_transactions else 0,
-
+                "Average_Firm_Expectations_Demand": self.get_average_firm_expectations_demand,
+                "Average_Firm_Expectations_Price": self.get_average_firm_expectations_price,
+                "Average_Firm_Expectations_Supply": self.get_average_firm_expectations_supply,
+                "Average_Worker_Expectations_Demand": self.get_average_worker_expectations_demand,
+                "Average_Worker_Expectations_Price": self.get_average_worker_expectations_price,
+                "Average_Worker_Expectations_Supply": self.get_average_worker_expectations_supply,
             },
             agent_reporters={
                 "Type": lambda a: type(a).__name__,
@@ -60,12 +65,14 @@ class EconomyDataCollector:
                 "Working_Hours": lambda a: getattr(a, 'working_hours', None),
                 "Labor_Demand": lambda a: getattr(a, 'total_working_hours', None),
                 "desired_consumption": lambda a: getattr(a, 'desired_consumption', None),
-                "worker_expectations": lambda a: getattr(a, 'worker_expectations', None),
                 "Production": lambda a: getattr(a, 'production', None),
                 "Optimals": lambda a: getattr(a, 'optimals', None),
-                "Expectations_Demand": lambda a: getattr(a, 'expectations', {}).get('demand', {}),
-                "Expectations_Price": lambda a: getattr(a, 'expectations', {}).get('price', {}),
-                "Expectations_Supply": lambda a: getattr(a, 'expectations', {}).get('supply', {}),
+                "Firm_Expectations_Demand": lambda a: self.format_expectations(a, 'firm_expectations', 'demand'),
+                "Firm_Expectations_Price": lambda a: self.format_expectations(a, 'firm_expectations', 'price'),
+                "Firm_Expectations_Supply": lambda a: self.format_expectations(a, 'firm_expectations', 'supply'),
+                "Worker_Expectations_Demand": lambda a: self.format_expectations(a, 'worker_expectations', 'demand'),
+                "Worker_Expectations_Price": lambda a: self.format_expectations(a, 'worker_expectations', 'price'),
+                "Worker_Expectations_Supply": lambda a: self.format_expectations(a, 'worker_expectations', 'supply'),
                 "Demand_Record": lambda a: getattr(a, 'demand_record', {}),
                 "Price_Record": lambda a: getattr(a, 'price_record', {}),
                 "Supply_Record": lambda a: getattr(a, 'supply_record', {}),
@@ -189,3 +196,36 @@ class EconomyDataCollector:
         total_output = sum(firm.production for firm in model.schedule.agents if isinstance(firm, (Firm1, Firm2)))
         total_labor_hours = EconomyDataCollector.get_total_labor_supply(model)
         return total_output / total_labor_hours if total_labor_hours > 0 else 0
+
+    @staticmethod
+    def format_expectations(agent, expectation_type, category):
+        expectations = getattr(agent, expectation_type, {}).get(category, {})
+        return {k: v[0] if isinstance(v, list) and v else v for k, v in expectations.items()}
+
+    def get_average_expectations(self, agent_types, expectation_type, expectation_category):
+        expectations = [getattr(agent, expectation_type) for agent in self.model.schedule.agents if isinstance(agent, agent_types)]
+        return {
+            k: np.mean([
+                exp.get(k, [0])[0] if isinstance(exp.get(k, []), list) and exp.get(k, []) else exp.get(k, 0) 
+                for exp in expectations
+            ]) 
+            for k in ['consumption', 'capital', 'labor']
+        }
+
+    def get_average_firm_expectations_demand(self):
+        return self.get_average_expectations((Firm1, Firm2), 'firm_expectations', 'demand')
+
+    def get_average_firm_expectations_price(self):
+        return self.get_average_expectations((Firm1, Firm2), 'firm_expectations', 'price')
+
+    def get_average_firm_expectations_supply(self):
+        return self.get_average_expectations((Firm1, Firm2), 'firm_expectations', 'supply')
+
+    def get_average_worker_expectations_demand(self):
+        return self.get_average_expectations(Worker, 'worker_expectations', 'demand')
+
+    def get_average_worker_expectations_price(self):
+        return self.get_average_expectations(Worker, 'worker_expectations', 'price')
+
+    def get_average_worker_expectations_supply(self):
+        return self.get_average_expectations(Worker, 'worker_expectations', 'supply')

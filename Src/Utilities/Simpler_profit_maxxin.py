@@ -113,7 +113,7 @@ def _profit_maximization(Profit_max_params, linear_solver):
             (expected_price[t] * model.sales[t])/scale_price -
             (wage * model.labor[t]/scale_labor  +
               depreciation_rate * model.capital[t]/scale_capital +
-              (capital_price * model.investment[t])/scale_capital + model.interest_payment[t]/scale_price + model.carbon_tax_payment[t]/scale_price)
+              (capital_price * model.investment[t])/scale_capital + model.inventory[t]* holding_costs/scale_price + model.interest_payment[t]/scale_price + model.carbon_tax_payment[t]/scale_price)
             ) * (1/(1 + discount_rate))**t
             for t in model.T
         )

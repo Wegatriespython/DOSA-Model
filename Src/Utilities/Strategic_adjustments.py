@@ -60,68 +60,125 @@ def get_desired_capital_price(self):
     capital_price = self.price * 3
     return capital_price
 
-def get_desired_price(expected_price, desired_price, real_price, actual_sales, desired_sales, min_price, optimal_inventory, inventory, production_gap):
+def get_desired_price(price_params):
+    expected_price = price_params['expected_price']
+    desired_price = price_params['desired_price']
+    real_price = price_params['real_price'] 
+    actual_sales = price_params['actual_sales']
+    desired_sales = price_params['desired_sales']
+    inventory = price_params['inventory']
+    optimal_inventory = price_params['optimal_inventory']
+    min_price = price_params['min_price']
+    production_gap = price_params['production_gap']
+    a_round = price_params['a_round']
+    market_advantage = price_params['market_advantage']
+    og_desired_price = desired_price
 
-    real_price = max(real_price, min_price)
-    desired_price = max(desired_price, min_price)
+    # Handle case when no transactions occurred
+    if not a_round:
+        # Significant price cut when no transactions occur
+        price_cut_factor = 0.95  # 20% price cut
+        desired_price *= price_cut_factor
+        return max(desired_price, min_price)
 
+    # Rest of the function remains the same
     # Ratios and deviations
-    if production_gap<0:
-      production_gap = 0
-    sales_ratio = actual_sales / (desired_sales - production_gap) if desired_sales - production_gap > 0 else  1.0
-    inventory_ratio = inventory / (optimal_inventory - production_gap) if optimal_inventory - production_gap > 0 else 1.0
+    sales_ratio = actual_sales / desired_sales if desired_sales > 0 else 1.0
+    inventory_ratio = inventory / optimal_inventory if optimal_inventory > 0 else 1.0
 
     # Deviations from the desired values
-    sales_deviation = sales_ratio - 1.0         # Negative if sales < desired
-    inventory_deviation = inventory_ratio - 1.0 # Positive if inventory > optimal
+    sales_deviation = sales_ratio - 1.0
+    inventory_deviation = inventory_ratio - 1.0
 
-    if abs(sales_deviation) < 0.2 and abs(inventory_deviation) < 0.2:
-      adjustment_factor = np.random.uniform(0.99, 1.15)
-    else :
-         # Overall adjustment factor: negative when sales are low or inventory is high
-         adjustment_factor = (sales_deviation - inventory_deviation)
+    # Base adjustment factor
+    adjustment_factor = (sales_deviation - inventory_deviation)
 
-    # Cap the adjustment factor to be between -1 and 1
-    adjustment_factor = max(-1.0, min(adjustment_factor, 2)) + np.random.uniform(-0.05, 0.15)
+    # Exploratory factor: allows for price increases even when sales are good
+    exploratory_factor = np.random.uniform(-0.1, 0.2)
+
+    # Combine adjustment and exploratory factors
+    combined_factor = adjustment_factor + exploratory_factor
+
+    # Cap the combined factor
+    combined_factor = max(-0.2, min(combined_factor, 0.3))
 
     # Scaling factor controls the magnitude of adjustment
-    if adjustment_factor < 0:
-      scaling_factor = 0.05
-    else:
-      scaling_factor = 0.25
+    scaling_factor = 0.1 if a_round == 1 else 0.2
 
+    # Adjust the desired price
+    desired_price += desired_price * combined_factor * scaling_factor
 
-    # Adjust the desired price directly based on the adjustment factor
-    desired_price += desired_price * adjustment_factor * scaling_factor
+    # If in round 2 with seller advantage, be more aggressive
+    if a_round == 2 and market_advantage == 'seller':
+        desired_price *= 1.1
+    elif a_round == 2 and market_advantage == 'buyer':
+        desired_price *= 0.9
 
     # Smooth the price to avoid abrupt changes
-    smoothed_price = desired_price * 0.6 + real_price * 0.4
+    smoothed_price = desired_price * 0.7 + real_price * 0.3
 
     # Ensure the smoothed price is not below the minimum price
     smoothed_price = max(smoothed_price, min_price)
-
+    print(f"og_desired_price: {og_desired_price}, smoothed_price: {smoothed_price}")
     return smoothed_price
 
-def get_desired_wage(expected_wage, desired_wage, real_wage, optimal_labor, actual_labor,max_wage, min_wage):
-  real_wage = max(min_wage, min(real_wage, max_wage))
-  desired_wage = max(min_wage,min(desired_wage, max_wage))
-  labor_ratio = actual_labor/ optimal_labor if optimal_labor > 0 else 0
-  adjustment_factor = 1
-  if labor_ratio < 0.9:
-    adjustment_factor = 0.98
-  elif labor_ratio > 1.1:
-    adjustment_factor = 1.02
-  adjustment_factor += np.random.uniform(-0.05, 0.05)
-  desired_wage = desired_wage * adjustment_factor
+def get_desired_wage(wage_params):
+    expected_wage = wage_params['expected_wage']
+    desired_wage = wage_params['desired_wage']
+    real_wage = wage_params['real_wage']
+    optimal_labor = wage_params['optimal_labor']
+    actual_labor = wage_params['actual_labor']
+    max_wage = wage_params['max_wage']
+    min_wage = wage_params['min_wage']
+    a_round = wage_params['a_round']
+    market_advantage = wage_params['market_advantage']
 
-  desired_wage =min(max_wage, max(desired_wage, min_wage))
+    # Ensure wages are within bounds
+    real_wage = max(min_wage, min(real_wage, max_wage))
+    desired_wage = max(min_wage, min(desired_wage, max_wage))
 
-  smoothed_wage = desired_wage*0.6 + real_wage*0.4
+    # Calculate labor ratio
+    labor_ratio = actual_labor / optimal_labor if optimal_labor > 0 else 0
 
-  return smoothed_wage
+    # Base adjustment factor
+    if labor_ratio < 0.9:
+        adjustment_factor = 0.98  # Lower wage if not enough work
+    elif labor_ratio > 1.1:
+        adjustment_factor = 1.02  # Increase wage if overworked
+    else:
+        adjustment_factor = 1.00  # Maintain wage if work is about right
+
+    # Exploratory factor
+    exploratory_factor = np.random.uniform(-0.05, 0.05)
+
+    # Combine adjustment and exploratory factors
+    combined_factor = adjustment_factor + exploratory_factor
+
+    # Adjust desired wage
+    desired_wage *= combined_factor
+
+    # Round-specific adjustments
+    if a_round == 1:
+        # In round 1, be slightly more conservative
+        desired_wage = desired_wage * 0.9 + real_wage * 0.1
+    else:  # Round 2
+        if market_advantage == 'seller':
+            # If sellers (workers) have advantage, be more aggressive
+            desired_wage = max(desired_wage, real_wage) * 1.05
+        else:
+            # If buyers (firms) have advantage, be more conservative
+            desired_wage = min(desired_wage, real_wage) * 0.98
+
+    # Ensure desired wage is within bounds
+    desired_wage = min(max_wage, max(desired_wage, min_wage))
+
+    # Smooth the wage changes
+    smoothed_wage = desired_wage * 0.6 + real_wage * 0.3 + expected_wage * 0.1
+
+    return smoothed_wage
 
 
-## Not adjusting fast enough
+
 def update_worker_price_expectation(price_decision_data):
     # Extract data
     expected_price = price_decision_data['expected_price']
@@ -130,13 +187,17 @@ def update_worker_price_expectation(price_decision_data):
     desired_consumption = price_decision_data['desired_consumption']
     consumption = price_decision_data['consumption']
     max_price = price_decision_data['max_price']
+    a_round = price_decision_data['a_round']
+    market_advantage = price_decision_data['market_advantage']
 
-
+    if not a_round:
+        desired_price *= 1.2
+        return max(desired_price, max_price)
+    # Ensure prices are within bounds
     real_price = max(real_price, expected_price)
-    max_price = max(max_price, desired_price, expected_price)
     desired_price = min(desired_price, max_price)
-
-
+    max_price = max(max_price, desired_price, real_price)
+    
     # Compute consumption ratio
     consumption_ratio = consumption / desired_consumption if desired_consumption > 0 else 1.0
 
@@ -151,35 +212,40 @@ def update_worker_price_expectation(price_decision_data):
     # If consuming less than desired
     if consumption_ratio < 1.0:
         # Need to increase desired_price to get more supply
-        # Even if price_gap is small, we need to adjust desired_price upwards
-        adjustment_factor += (1.0 - consumption_ratio)*3
-        # Optionally, add more weight if price_gap is small
-        if abs(price_gap_ratio) < 0.05:
-            # Price gap is less than 5%, increase adjustment
-            adjustment_factor += (0.05 - abs(price_gap_ratio)) * 20  # Weight can be adjusted
-
+        adjustment_factor += (1.0 - consumption_ratio) * 0.5
     else:
         # Consuming desired amount or more
         if desired_price > real_price:
             # Can lower desired_price to save money
-            price_gap = desired_price - real_price
-            price_gap_ratio = price_gap / desired_price if desired_price > 0 else 0.0
-            adjustment_factor -= price_gap_ratio
+            adjustment_factor -= price_gap_ratio * 0.5
+
+    # Round-specific adjustments
+    if a_round == 1:
+        # Be more conservative in round 1
+        adjustment_factor *= 0.5
+    else:  # Round 2
+        if market_advantage == 'buyer':
+            # If buyers have advantage, be more aggressive in lowering price
+            adjustment_factor -= 0.1
         else:
-            # Desired_price is less than or equal to real_price; maintain or slightly increase
-            adjustment_factor += 0.0  # No change needed
+            # If sellers have advantage, be more willing to increase price
+            adjustment_factor += 0.1
 
-    # Cap adjustment_factor between -1 and 1
-    adjustment_factor = max(-1.0, min(adjustment_factor, 2.0))
+    # Exploratory factor
+    exploratory_factor = np.random.uniform(-0.05, 0.05)
 
-    # Scaling factor controls the magnitude of adjustment
-    scaling_factor = 0.5  # Increased from 0.05 to allow for larger adjustments
+    # Combine adjustment and exploratory factors
+    combined_factor = adjustment_factor + exploratory_factor
 
-    # Adjust the desired price based on the adjustment factor
-    desired_price += desired_price * adjustment_factor * scaling_factor
+    # Cap combined_factor
+    combined_factor = max(-0.2, min(combined_factor, 0.2))
 
-    # Smooth the price to avoid abrupt changes
-    smoothed_price = desired_price * 0.6 + real_price * 0.4 # Slightly favor desired_price more
+    # Adjust the desired price
+    desired_price *= (1 + combined_factor)
+
+
+    # Smooth the price changes
+    smoothed_price = desired_price * 0.6 + real_price * 0.3 + expected_price * 0.1
 
     # Ensure the smoothed price does not exceed the maximum price
     smoothed_price = min(smoothed_price, max_price)
@@ -187,111 +253,66 @@ def update_worker_price_expectation(price_decision_data):
     return smoothed_price
 
 
-
 def update_worker_wage_expectation(wage_decision_data):
+    expected_wage = wage_decision_data['expected_wage']
+    desired_wage = wage_decision_data['desired_wage']
+    real_wage = wage_decision_data['real_wage']
+    working_hours = wage_decision_data['working_hours']
+    desired_working_hours = wage_decision_data['desired_working_hours']
+    min_wage = wage_decision_data['min_wage']
+    a_round = wage_decision_data['a_round']
+    market_advantage = wage_decision_data['market_advantage']
 
-  real_wage = wage_decision_data['real_wage']
-  desired_wage = wage_decision_data['desired_wage']
-  expected_wage = wage_decision_data['expected_wage']
-  working_hours = wage_decision_data['working_hours']
-  desired_working_hours = wage_decision_data['optimal_working_hours']
-  min_wage = wage_decision_data['min_wage']
 
-  real_wage = max(real_wage, min_wage)
-  desired_wage = max(desired_wage, min_wage)
+    # Ensure wages are within bounds
+    real_wage = max(real_wage, min_wage)
+    desired_wage = max(desired_wage, min_wage)
 
-  working_hours_ratio = working_hours / desired_working_hours if desired_working_hours > 0 else 0
+    if not a_round:
+        desired_wage *= 1.05
+        return max(desired_wage, min_wage)
 
-  if working_hours_ratio < 0.9:
-    adjustment_factor = 0.98
-  elif working_hours_ratio:
-    adjustment_factor = 1.02
-  else:
-    if desired_wage > real_wage:
-      adjustment_factor = 0.98
+    # Calculate working hours ratio
+    working_hours_ratio = working_hours / desired_working_hours if desired_working_hours > 0 else 0
+
+    # Base adjustment factor
+    if working_hours_ratio < 0.9:
+        adjustment_factor = -0.02  # Lower wage expectations if not enough work
+    elif working_hours_ratio > 1.1:
+        adjustment_factor = 0.02   # Increase wage expectations if overworked
     else:
-      adjustment_factor = 1.02
-  adjustment_factor += np.random.uniform(-0.05, 0.05)
-  desired_wage = desired_wage * adjustment_factor
-  desired_wage = max(desired_wage, min_wage)
-  smoothed_wage = desired_wage*0.7 + expected_wage*0.1 + real_wage*0.2
-  return smoothed_wage
+        adjustment_factor = 0.0    # Maintain wage if work is about right
 
-
-# function signature mismatch 
-def calculate_new_price(current_price, clearing_prices, market_demand, market_supply, inventory, optimal_inventory, expected_future_price):
-    # Ensure market_demand and market_supply are lists
-
-
-    market_demand = [market_demand] if isinstance(market_demand, (int, float)) else market_demand
-    market_supply = [market_supply] if isinstance(market_supply, (int, float)) else market_supply
-    clearing_prices = [clearing_prices] if isinstance(clearing_prices, (int, float)) else clearing_prices
-    expected_future_price = [expected_future_price] if isinstance(expected_future_price, (int, float)) else expected_future_price
-    
-    # Calculate market tightness
-    market_tightness = market_demand[0] / market_supply[0] if market_supply[0] > 0 else 1
-
-    # Estimate market clearing price and quantity
-    eq_quantity, eq_price, max_willingness_to_pay = estimate_intersection(market_supply, market_demand, clearing_prices)
-
-    # Set target price based on market tightness
-    if eq_quantity is None or eq_price is None or max_willingness_to_pay is None:
-
-        target_price = current_price
-
-    else:
-
-        if market_tightness > 1:
-            target_price = current_price + (max_willingness_to_pay - current_price) * 0.2
+    # Round-specific adjustments
+    if a_round == 1:
+        # Be more conservative in round 1
+        adjustment_factor *= 0.5
+    else:  # Round 2
+        if market_advantage == 'seller':
+            # If sellers (workers) have advantage, be more aggressive
+            adjustment_factor += 0.03
         else:
-            target_price = current_price + (eq_price - current_price) * 0.2
+            # If buyers (firms) have advantage, be more conservative
+            adjustment_factor -= 0.03
 
-    # Adjust based on inventory
-    inventory_ratio = inventory / optimal_inventory if optimal_inventory > 0 else 1
-    if inventory_ratio > 1:
-        target_price *= 0.95  # Lower price if we have excess inventory
-    elif inventory_ratio < 0.5:
-        target_price *= 1.05  # Raise price if we have low inventory
+    # Exploratory factor
+    exploratory_factor = np.random.uniform(-0.03, 0.03)
 
-    # Incorporate future expectations
-    target_price = 0.8 * target_price + 0.2 * expected_future_price[0]
+    # Combine adjustment and exploratory factors
+    combined_factor = adjustment_factor + exploratory_factor
 
-    # Implement gradual adjustment (max 5% change per period)
-    max_change = 0.05 * current_price
+    # Cap combined_factor
+    combined_factor = max(-0.1, min(combined_factor, 0.1))
 
-    new_price = max(min(target_price, current_price + max_change), current_price - max_change)
+    # Adjust desired wage
+    desired_wage *= (1 + combined_factor)
 
-    # Final check to ensure new_price is not NaN
-    if np.isnan(new_price):
-        print("Warning: new_price is NaN, falling back to current_price")
-        new_price = current_price
+    # Ensure desired wage is within bounds
+    desired_wage = max(min_wage, desired_wage)
 
-    return new_price
+    # Smooth the wage changes
+    smoothed_wage = desired_wage * 0.6 + real_wage * 0.3 + expected_wage * 0.1
 
-def estimate_intersection(supply, demand, clearing_prices):
-    # Ensure all arrays are the same length
-    if len(supply) != len(demand) or len(supply) != len(clearing_prices):
-        raise ValueError("Supply, demand, and clearing_prices must be of equal length")
+    return smoothed_wage
 
-    try:
-        # Fit linear regression for supply
-        slope_supply, intercept_supply, r_value_supply, p_value_supply, std_err_supply = stats.linregress(supply, clearing_prices)
-        
-        max_supply = max(supply)
-        max_willingness_to_pay = slope_supply * max_supply + intercept_supply
 
-        # Fit linear regression for demand
-        slope_demand, intercept_demand, r_value_demand, p_value_demand, std_err_demand = stats.linregress(demand, clearing_prices)
-        
-        # Calculate intersection point
-        quantity_intersection = (intercept_demand - intercept_supply) / (slope_supply - slope_demand)
-        price_intersection = slope_supply * quantity_intersection + intercept_supply
-
-        # Check for valid intersection
-        if quantity_intersection <= 0 or price_intersection <= 0:
-            return None, None, max_willingness_to_pay
-
-        return quantity_intersection, price_intersection, max_willingness_to_pay
-    except Exception as e:
-        print(f"Error in estimate_intersection: {str(e)}")
-        return None, None, None

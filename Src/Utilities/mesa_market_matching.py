@@ -23,9 +23,7 @@ def preference_function(quantity, quality1, quality2, preference):
     return quantity  # For now, just return the initial demand
 
 def market_matching(buyers, sellers):
-
-
-    def match_recursively(buyers, sellers, transactions, round):
+    def match_recursively(buyers, sellers, transactions, a_round, market_advantage):
         if not buyers or not sellers:
             return transactions
 
@@ -34,7 +32,7 @@ def market_matching(buyers, sellers):
         sellers.sort(key=lambda x: x[1])
 
         if buyers[0][1] < sellers[0][1]:
-            if round == 1:
+            if a_round == 1:
                 # Start round 2: swap prices
                 total_demand = sum(b[0] for b in buyers)
                 total_supply = sum(s[0] for s in sellers)
@@ -43,11 +41,13 @@ def market_matching(buyers, sellers):
                     # Sellers Advantage
                     new_buyers = [(b[0], b[3], b[2], b[1], b[4]) for b in buyers]  # b[3] is max price
                     new_sellers = [(s[0], s[1], s[2], s[3], s[4], s[5]) for s in sellers]  # s[3] is min price
+                    market_advantage = 'seller'  # Seller advantage
                 else:
                     # Buyers Advantage
                     new_buyers = [(b[0], b[1], b[2], b[3], b[4]) for b in buyers]  # b[3] is max price
                     new_sellers = [(s[0], s[3], s[2], s[1], s[4], s[5]) for s in sellers]  # s[3] is min price
-                return match_recursively(new_buyers, new_sellers, transactions, 2)
+                    market_advantage = 'buyer'  # Buyer advantage
+                return match_recursively(new_buyers, new_sellers, transactions, 2, market_advantage)
             else:
                 return transactions  # No more matches possible
 
@@ -60,19 +60,19 @@ def market_matching(buyers, sellers):
 
         quantity = min(adjusted_quantity, sellers[0][0])
 
-        transactions.append((buyers[0][2], sellers[0][2], quantity, clearing_price))
+        # Store round and market_advantage in the transaction
+        transactions.append((buyers[0][2], sellers[0][2], quantity, clearing_price, a_round, market_advantage))
 
         # Update quantities
         new_buyers = [(buyers[0][0] - quantity, buyers[0][1], buyers[0][2], buyers[0][3], buyers[0][4])] + buyers[1:] if buyers[0][0] > quantity else buyers[1:]
 
         new_sellers = [(sellers[0][0] - quantity, sellers[0][1], sellers[0][2], sellers[0][3], sellers[0][4], sellers[0][5])] + sellers[1:] if sellers[0][0] > quantity else sellers[1:]
 
-
         # Remove any buyers or sellers with zero quantity
         new_buyers = [b for b in new_buyers if b[0] > 0]
         new_sellers = [s for s in new_sellers if s[0] > 0]
 
         # Recursive call
-        return match_recursively(new_buyers, new_sellers, transactions, round)
+        return match_recursively(new_buyers, new_sellers, transactions, a_round, market_advantage)
 
-    return match_recursively(buyers, sellers, [], 1)
+    return match_recursively(buyers, sellers, [], 1, 0)  # Start with round 1 and buyer advantage (0)

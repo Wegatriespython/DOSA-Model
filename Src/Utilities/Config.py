@@ -6,13 +6,17 @@ class Config:
         #
 
         self.MAX_WORKING_HOURS = 16
-        self.TIME_HORIZON = 16 # One more than the model's number of steps to prevent array out of bounds errors
+        self.TIME_HORIZON = 21 # One more than the model's number of steps to prevent array out of bounds errors
         self.PLANNING_HORIZON = 10
         self.HOLDING_COST = 0.1
         self.INITIAL_SALES = 1
         self.INITIAL_PRODUCTIVITY = 1
         self.INITIAL_PRICE = 1
         self.INITIAL_WAGE = 0.0625 # 1/16
+        self.INITIAL_LABOR_DEMAND = 300
+        self.INITIAL_CONSUMPTION_DEMAND = 30
+        self.INITIAL_LABOR_SUPPLY = 300
+        self.INITIAL_CONSUMPTION_SUPPLY = 30
         self.DEPRECIATION_RATE = 0
         self.INITIAL_SKILLS = 0
         self.DISCOUNT_RATE = 0.05

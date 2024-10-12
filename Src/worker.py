@@ -3,8 +3,10 @@ from mesa import Agent
 import numpy as np
 from Utilities.Config import Config
 from Utilities.utility_function import maximize_utility
-from expectations import  expect_price_trend, get_market_demand, expect_price_ar, get_supply
+from expectations import  get_market_demand, get_supply
+from Utilities.adaptive_expectations import adaptive_expectations
 from Utilities.Strategic_adjustments import update_worker_price_expectation, update_worker_wage_expectation
+from Utilities.tools import update_dictionary
 
 class Worker(Agent):
     def __init__(self, unique_id, model):
@@ -15,6 +17,9 @@ class Worker(Agent):
         self.max_working_hours = 16
         self.worker_expectations = []
         self.skillscarbon = 1
+        self.p_round_buyer = 0
+        self.p_market_advantage = ""
+        self.p_round_seller = 0
         self.consumption_check = 0
         self.desired_price = self.model.config.INITIAL_PRICE
         self.desired_wage = self.model.config.MINIMUM_WAGE
@@ -24,6 +29,10 @@ class Worker(Agent):
         self.quantity_history1 = []
         self.supply_history1 = []
         self.avg_price = 0
+        self.a_round_seller = 0
+        self.market_advantage_seller = 0
+        self.a_round_buyer = 0
+        self.market_advantage_buyer = 0
         self.wage = model.config.MINIMUM_WAGE
         self.income = 0
         self.savings = self.model.config.INITIAL_SAVINGS
@@ -31,8 +40,6 @@ class Worker(Agent):
         self.got_paid = False
         self.working_hours = 0
         self.leisure = 16
-        self.expected_price = model.config.INITIAL_PRICE
-        self.expected_wage = model.config.MINIMUM_WAGE
         self.skills = model.config.INITIAL_SKILLS
         self.consumption = 0
         self.desired_consumption = 1
@@ -43,124 +50,141 @@ class Worker(Agent):
         self.MIN_CONSUMPTION = 1
         self.wage_history = [model.config.MINIMUM_WAGE]
         self.mode = 'decentralized'
+        self.worker_expectations = {
+            'demand': {
+                'labor': [model.config.INITIAL_LABOR_DEMAND] * model.time_horizon,
+                'consumption': [model.config.INITIAL_CONSUMPTION_DEMAND] * model.time_horizon
+            },
+            'price': {
+                'labor': [model.config.INITIAL_WAGE] * model.time_horizon,
+                'consumption': [model.config.INITIAL_PRICE] * model.time_horizon
+            },
+            'supply': {
+                'labor': [model.config.INITIAL_LABOR_SUPPLY] * model.time_horizon,
+                'consumption': [model.config.INITIAL_CONSUMPTION_SUPPLY] * model.time_horizon
+            }
+        }
+        self.demand_record = {'labor': [], 'consumption': []}
+        self.price_record = {'labor': [], 'consumption': []}
+        self.supply_record = {'labor': [], 'consumption': []}
+
+        # Initialize these for immediate use
+        self.expected_wage = model.config.INITIAL_WAGE
+        self.expected_price = model.config.INITIAL_PRICE
 
     def step(self):
-        self.worker_expectations.clear()
+        #self.worker_expectations.clear()
         self.desired_consumption = 0
         self.desired_savings = 0
         self.update_expectations()
-        self.update_utilty()
+        self.update_utility()
         self.update_strategy()
         self.update_skills()
 
     def update_expectations(self):
-      if self.model.step_count < 1:
-        wage = np.full(self.model.time_horizon,self.expected_wage)
-        prices = np.full(self.model.time_horizon, self.expected_price)
-        demand = np.full(self.model.time_horizon, 12)
-        supply = np.full(self.model.time_horizon, 20)
-        self.worker_expectations = [wage, prices, demand, supply]
+        # Grab the demand for relevant goods
+        labor_demand, labor_price, self.p_round_seller, self.p_market_advantage  = get_market_demand(self, 'labor')
+        consumption_demand, consumption_price, self.p_round_buyer, _ = get_market_demand(self, 'consumption')
+        labor_supply = get_supply(self, 'labor')
+        consumption_supply = get_supply(self, 'consumption')
 
-        self.avg_price = self.expected_price
-      else:
-        quantity, mkt_wages= get_market_demand(self, 'labor')
-        _, mkt_price = get_market_demand(self, 'consumption')
-        supply = get_supply(self, 'consumption')
+        demand = {
+            'labor': labor_demand,
+            'consumption': consumption_demand
+        }
+        price = {
+            'labor': labor_price,
+            'consumption': consumption_price
+        }
+        supply = {
+            'labor': labor_supply,
+            'consumption': consumption_supply
+        }
 
-        if np.mean(mkt_wages) > self.model.config.MINIMUM_WAGE:
-          self.wage_history1.append(mkt_wages)
-          self.price_history1.append(mkt_price)
-          self.quantity_history1.append(quantity)
-          self.supply_history1.append(supply)
-          if len(self.wage_history1)>10:
-            self.wage_history1.pop(0)
-          if len(self.price_history1)>10:
-            self.price_history1.pop(0)
-          if len(self.quantity_history1)>10:
-            self.quantity_history1.pop(0)
-          if len(self.supply_history1)>10:
-            self.supply_history1.pop(0)
+        self.price_record = update_dictionary(price, self.price_record)
+        self.demand_record = update_dictionary(demand, self.demand_record)
+        self.supply_record = update_dictionary(supply, self.supply_record)
 
-        if len(self.prices) > 0 :
-          self.prices = [p for p in self.prices if not np.isnan(p)]
-          self.avg_price = np.mean(self.prices)
-          self.price_history1.append(self.avg_price)
-          if len(self.price_history1)>10:
-            self.price_history1.pop(0)
-        else:
-          self.avg_price = 0
+        if self.model.step_count < 2:
+            return
 
+        for category in ['demand', 'price', 'supply']:
+            historical_data = (
+                self.demand_record if category == 'demand' else
+                self.price_record if category == 'price' else
+                self.supply_record
+            )
+            self.worker_expectations[category] = adaptive_expectations(
+                historical_data,
+                self.worker_expectations[category],
+                self.model.time_horizon
+            )
 
-        if self.wage > self.model.config.MINIMUM_WAGE and not np.isnan(self.wage):
-          wage = self.wage
-        else :
-          wage = max(np.mean(mkt_wages), self.model.config.MINIMUM_WAGE)
-        if self.avg_price != 0 and not np.isnan(self.avg_price):
-          price = self.avg_price
-        else:
-          price = mkt_price
+        # For practical use only the future time horizon is needed
+        self.worker_expectations = {
+            category: {
+                key: values[-self.model.time_horizon:]
+                for key, values in self.worker_expectations[category].items()
+            }
+            for category in ['demand', 'price', 'supply']
+        }
 
+        # Update wage and price for immediate use
+        self.expected_wage = self.worker_expectations['price']['labor'][0]
+        self.expected_price = self.worker_expectations['price']['consumption'][0]
 
-        wage = expect_price_trend(self.wage_history1, wage, self.model.time_horizon)
-        prices = expect_price_trend(self.price_history1, self.desired_price, self.model.time_horizon)
-        demand = expect_price_trend(self.quantity_history1, quantity, self.model.time_horizon)
-        supply = expect_price_trend(self.supply_history1, supply, self.model.time_horizon)
+        return self.worker_expectations
 
-        self.worker_expectations = [wage, prices, demand, supply]
-
-
-    def update_utilty(self):
-
-          Utility_params ={
-            'savings' : round(self.savings,2),
-            'wage': self.worker_expectations[0],
-            'price': self.worker_expectations[1],
+    def update_utility(self):
+        Utility_params = {
+            'savings': round(self.savings, 2),
+            'wage': self.worker_expectations['price']['labor'],
+            'price': self.worker_expectations['price']['consumption'],
             'discount_rate': self.model.config.DISCOUNT_RATE,
             'time_horizon': self.model.time_horizon,
             'alpha': 0.9,
             'max_working_hours': 16,
             'working_hours': self.working_hours,            
-            'expected_labor_demand': self.worker_expectations[2],
-            'expected_consumption_supply': self.worker_expectations[3]
+            'expected_labor_demand': self.worker_expectations['demand']['labor'],
+            'expected_consumption_supply': self.worker_expectations['supply']['consumption']
         }
-          print(Utility_params)
-          results = maximize_utility(Utility_params)
-          self.desired_consumption, self.working_hours, self.leisure, self.desired_savings = [arr[0] for arr in results]
-          working_hours_ratio = self.total_working_hours/self.working_hours if self.working_hours > 0 else 0
-          #self.desired_consumption = self.desired_consumption * working_hours_ratio if working_hours_ratio > 0 and working_hours_ratio < 1 else self.desired_consumption
-          self.optimals = [self.desired_consumption, self.working_hours, self.desired_savings]
-          print(self.optimals)
+        print(Utility_params)
+        
+        results = maximize_utility(Utility_params)
+        self.desired_consumption, self.working_hours, self.leisure, self.desired_savings = [arr[0] for arr in results]
+        working_hours_ratio = self.total_working_hours / self.working_hours if self.working_hours > 0 else 0
+        # self.desired_consumption = self.desired_consumption * working_hours_ratio if working_hours_ratio > 0 and working_hours_ratio < 1 else self.desired_consumption
+        self.optimals = [self.desired_consumption, self.working_hours, self.desired_savings]
+        print(self.optimals)
 
     def update_strategy(self):
-
         max_price = self.get_max_consumption_price()
         price_decision_data = {
-         'expected_price': self.worker_expectations[1][0],
-         'desired_price': self.desired_price,
-         'real_price': self.avg_price,
-         'consumption': self.consumption,
-         'desired_consumption': self.desired_consumption,
-         'max_price': max_price
-          }
-
-
-        desired_price = update_worker_price_expectation(price_decision_data)
-
-        self.desired_price = desired_price
-
-
-        wage_decision_data = {
-          'expected_wage': self.worker_expectations[0][1],
-          'desired_wage': self.desired_wage,
-          'real_wage': self.wage,
-          'working_hours': self.working_hours,
-          'optimal_working_hours': self.optimals[1],
-          'min_wage': self.get_min_wage()
+            'expected_price': self.worker_expectations['price']['consumption'][0],
+            'desired_price': self.desired_price,
+            'real_price': self.avg_price,
+            'consumption': self.consumption,
+            'desired_consumption': self.desired_consumption,
+            'max_price': max_price,
+            'a_round': self.a_round_buyer,
+            'market_advantage': self.market_advantage_buyer
         }
 
+        desired_price = update_worker_price_expectation(price_decision_data)
+        self.desired_price = desired_price
+
+        wage_decision_data = {
+            'expected_wage': self.worker_expectations['price']['labor'][0],
+            'desired_wage': self.desired_wage,
+            'real_wage': self.wage,
+            'working_hours': self.working_hours,
+            'desired_working_hours': self.optimals[1],
+            'min_wage': self.get_min_wage(),
+            'a_round': self.a_round_seller,
+            'market_advantage': self.market_advantage_seller
+        }
 
         desired_wage = update_worker_wage_expectation(wage_decision_data)
-
         self.desired_wage = desired_wage
 
         self.consumption = 0
@@ -177,7 +201,9 @@ class Worker(Agent):
         else:
             self.skills -= self.model.config.SKILL_DECAY_RATE if self.skills > 0 else 0
 
-    def get_hired(self, employer, wage, hours):
+    def get_hired(self, employer, wage, hours, a_round = None, market_advantage = None):
+        self.a_round_seller = a_round
+        self.market_advantage_seller = market_advantage
         self.employers[employer] = {'hours': hours, 'wage': wage}
         if hours<0:
           print("hours", hours)
@@ -185,7 +211,9 @@ class Worker(Agent):
         self.total_working_hours += hours
         self.update_average_wage()
 
-    def update_hours(self, employer, hours):
+    def update_hours(self, employer, hours, a_round = None, market_advantage = None):
+        self.a_round_seller = a_round
+        self.market_advantage_seller = market_advantage
         if hours < 0:
             print("hours", hours)
             breakpoint()
@@ -240,7 +268,9 @@ class Worker(Agent):
             self.income = 0
 
 
-    def consume(self, quantity, price):
+    def consume(self, quantity, price, a_round, market_advantage):
+        self.a_round_buyer = a_round
+        self.market_advantage_buyer = market_advantage
         total_cost = quantity * price
         self.price_history.append(price)
         self.consumption += quantity
@@ -252,9 +282,11 @@ class Worker(Agent):
         self.savings = max(0, self.savings) #prevent negative savings
 
     def get_max_consumption_price(self):
-       max = self.savings/(self.model.time_horizon) + (self.wage * self.working_hours) if self.wage > 0 else  self.savings/(self.model.time_horizon)
-       if max < self.savings:
-         return max
+       max_price = self.savings/(self.model.time_horizon) + (self.wage * self.working_hours) if self.wage > 0 else  self.savings/(self.model.time_horizon)
+       #max_price = self.worker_expectations['price']['consumption'][0] * 1.1
+       #willing to pay up to 10% more than expected price
+       if max_price < self.savings:
+         return max_price
        else:
          return self.savings
 

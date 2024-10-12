@@ -42,7 +42,7 @@ class TransformerTimeSeriesPredictor(nn.Module):
 
 def adaptive_expectations(historical_data, previous_forecasts, time_horizon):
 
-    transformer_forecasts = transformer_expectations(historical_data, time_horizon)
+    #transformer_forecasts = transformer_expectations(historical_data, time_horizon)
     new_forecasts = {}
 
     for key in historical_data:
@@ -86,7 +86,7 @@ def adaptive_expectations(historical_data, previous_forecasts, time_horizon):
                 forecast[i] = forecast[i-1]
 
         new_forecasts[key] = forecast
-    print(f"adaptive: {new_forecasts}, transformer: {transformer_forecasts}")
+    #print(f"adaptive: {new_forecasts}, transformer: {transformer_forecasts}")
     return new_forecasts
 
 def transformer_expectations(historical_data, time_horizon, model_dir='models'):

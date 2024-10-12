@@ -23,6 +23,12 @@ class EconomyModel(Model):
         self.pre_labor_transactions = np.zeros(4)
         self.pre_capital_transactions = np.zeros(4)
         self.pre_consumption_transactions = np.zeros(4)
+        self.labor_supply = 0
+        self.capital_supply = 0
+        self.consumption_supply = 0
+        self.capital_supply_history = []
+        self.labor_supply_history = []
+        self.consumption_supply_history = []
         self.labor_transactions = []
         self.labor_transactions_history = []
         self.capital_transactions = []
@@ -104,7 +110,7 @@ class EconomyModel(Model):
 
 
     def execute_labor_market(self):
-
+            
         buyers = [(firm.labor_demand, firm.desireds['wage'], firm, firm.zero_profit_conditions['wage'], firm.preference_mode
         )
                   for firm in self.schedule.agents
@@ -113,11 +119,11 @@ class EconomyModel(Model):
         sellers = [(worker.available_hours(), worker.desired_wage, worker, worker.get_min_wage(), worker.skills, worker.skillscarbon)
                    for worker in self.schedule.agents
                    if isinstance(worker, Worker) and worker.available_hours() > 0]
-
         #print("buyers", buyers, "sellers", sellers)
         #("Labor Market Transaction", transactions)
         buyer_demand = sum(b[0] for b in buyers) if buyers else 0
         seller_inventory = sum(s[0] for s in sellers) if sellers else 0
+        self.labor_supply = seller_inventory
         avg_buyer_price = sum(b[1] for b in buyers) / len(buyers) if buyers else 0
         avg_seller_price = sum(s[1] for s in sellers) / len(sellers) if sellers else 0
         avg_buyer_max = sum(b[3] for b in buyers)/ len(buyers) if buyers else 0
@@ -128,11 +134,11 @@ class EconomyModel(Model):
         self.labor_transactions = transactions
         labor_transactions_history = np.array([len(transactions), sum(t[2] for t in transactions), sum(t[3] for t in transactions)])
         self.labor_transactions_history.append(labor_transactions_history)
-        for firm, worker, hours, price in transactions:
+        for firm, worker, hours, price, a_round, market_advantage in transactions:
             # Round hours to the nearest integer
             hours = round(hours)
             if hours > 0:
-                firm.hire_worker(worker, price, hours)
+                firm.hire_worker(worker, price, hours, a_round, market_advantage)
 
         # Update labor demand for firms
         for firm in self.schedule.agents:
@@ -140,7 +146,7 @@ class EconomyModel(Model):
                 firm.labor_demand = max(0, firm.labor_demand - sum(t[2] for t in transactions if t[0] == firm))
 
     def execute_capital_market(self):
-
+        
         buyers = [(firm.investment_demand, firm.desireds['capital_price'], firm, firm.zero_profit_conditions['capital_price'], firm.preference_mode)
                   for firm in self.schedule.agents
                   if isinstance(firm, Firm2) and firm.investment_demand > 0]
@@ -155,6 +161,7 @@ class EconomyModel(Model):
                     sellers.append((firm.capital_inventory,firm.capital_resale_price, firm, 0.1, firm.productivity, firm.carbon_intensity))
         buyer_demand = sum(b[0] for b in buyers)  if buyers else 0
         seller_inventory = sum(s[0] for s in sellers)  if sellers else 0
+        self.capital_supply = seller_inventory
         avg_buyer_price = sum(b[1] for b in buyers) / len(buyers) if buyers else 0
         avg_seller_price = sum(s[1] for s in sellers) / len(sellers) if sellers else 0
         avg_buyer_max = sum(b[3] for b in buyers)/ len(buyers) if buyers else 0
@@ -166,14 +173,14 @@ class EconomyModel(Model):
         self.capital_transactions = transactions
         captial_transactions_history = np.array([len(transactions), sum(t[2] for t in transactions), sum(t[3] for t in transactions)])
         self.capital_transactions_history.append(captial_transactions_history)
-        for buyer, seller, quantity, price in transactions:
-            buyer.buy_capital(quantity, price)
-            seller.sell_goods(quantity, price)
-            # Remove global_accounting.record_capital_transaction
+        for buyer, seller, quantity, price, a_round, market_advantage in transactions:
+            buyer.buy_capital(quantity, price, a_round, market_advantage)
+            seller.sell_goods(quantity, price, a_round, market_advantage)
 
 
     def execute_consumption_market(self):
         #print("Executing consumption market")
+   
         buyers = [(worker.desired_consumption, worker.desired_price, worker, worker.get_max_consumption_price(), worker.preference_mode)
                   for worker in self.schedule.agents
                   if isinstance(worker, Worker) and worker.savings > 0]
@@ -192,6 +199,7 @@ class EconomyModel(Model):
 
         buyer_demand = sum(b[0] for b in buyers) if buyers else 0
         seller_inventory = sum(s[0] for s in sellers) if sellers else 0
+        self.consumption_supply = seller_inventory
         avg_buyer_price = sum(b[1] for b in buyers) / len(buyers) if buyers else 0
         avg_seller_price = sum(s[1] for s in sellers) / len(sellers) if sellers else 0
         avg_buyer_max = sum(b[3] for b in buyers)/ len(buyers) if buyers else 0
@@ -210,24 +218,15 @@ class EconomyModel(Model):
           print(f"Unsold Stuff{(seller_inventory - consumption_transactions_history[1])}")
         else:
           print(f"Seller Inventory: {seller_inventory} Sold: {consumption_transactions_history[1]}")
-        for buyer, seller, quantity, price in transactions:
-            buyer.consume(quantity, price)
-            seller.sell_goods(quantity, price)
+        for buyer, seller, quantity, price, a_round, market_advantage in transactions:
+            buyer.consume(quantity, price, a_round, market_advantage)
+            seller.sell_goods(quantity, price, a_round, market_advantage)
 
     def get_total_labor_supply(self):
-        supply = sum(agent.available_hours() for agent in self.schedule.agents if hasattr(agent, 'available_hours'))
-  
-        if self.step_count >1:
-            print("Labor Supply", supply)
-        return supply
+        return self.labor_supply    
 
-    def get_total_capital_supply(self):
-        supply = sum(agent.inventory for agent in self.schedule.agents if hasattr(agent, 'inventory') and agent.firm_type == 'capital')
-        print("Capital Supply", supply)
-        return supply
+    def  get_total_capital_supply(self):
+        return self.capital_supply
 
     def get_total_consumption_supply(self):
-        supply = (sum(agent.inventory for agent in self.schedule.agents if hasattr(agent, 'inventory') and agent.firm_type == 'consumption'))
-        if self.step_count >1:
-            print("Consumption", supply)        
-        return supply
+        return self.consumption_supply
