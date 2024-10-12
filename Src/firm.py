@@ -155,22 +155,25 @@ class Firm(Agent):
 
     def update_expectations(self):
         # Grab the demand for relavent goods
-        consumption_demand, consumption_price, counsumption_round,   consumption_market_advantage = get_market_demand(self, 'consumption')
-        capital_demand, capital_price, capital_round, capital_market_advantage = get_market_demand(self, 'capital')
-        labor_demand, wage, labor_round, labor_market_advantage = get_market_demand(self, 'labor')
+        consumption_demand, consumption_price, counsumption_round,   consumption_market_advantage, consumption_max_price = get_market_demand(self, 'consumption')
+        capital_demand, capital_price, capital_round, capital_market_advantage, capital_max_price = get_market_demand(self, 'capital')
+        labor_demand, wage, labor_round, labor_market_advantage, labor_max_price = get_market_demand(self, 'labor')
 
         self.strategy = {
           'consumption': {
             'round': counsumption_round,
-            'advantage': consumption_market_advantage
+            'advantage': consumption_market_advantage,
+            'max_price': consumption_max_price
           },
           'capital': {
             'round': capital_round,
-            'advantage': capital_market_advantage
+            'advantage': capital_market_advantage,
+            'max_price': capital_max_price
           },
           'labor': {
             'round': labor_round,
-            'advantage': labor_market_advantage
+            'advantage': labor_market_advantage,
+            'max_price': labor_max_price
           }
         }
         
@@ -521,8 +524,9 @@ class Firm(Agent):
         'inventory': self.inventory,
         'production_gap': self.production_gap if hasattr(self, 'production_gap') else 0,
         'a_round': self.strategy['consumption']['round'],
-        'market_advantage': self.strategy['consumption']['advantage']
-}
+        'market_advantage': self.strategy['consumption']['advantage'],
+        'max_price': self.strategy['consumption']['max_price']  
+        }
 
 
       desired_price = get_desired_price(price_params)

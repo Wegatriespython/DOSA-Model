@@ -83,8 +83,8 @@ class Worker(Agent):
 
     def update_expectations(self):
         # Grab the demand for relevant goods
-        labor_demand, labor_price, self.p_round_seller, self.p_market_advantage  = get_market_demand(self, 'labor')
-        consumption_demand, consumption_price, self.p_round_buyer, _ = get_market_demand(self, 'consumption')
+        labor_demand, labor_price, self.p_round_seller, self.p_market_advantage, labor_max_price = get_market_demand(self, 'labor')
+        consumption_demand, consumption_price, self.p_round_buyer, _, consumption_max_price = get_market_demand(self, 'consumption')
         labor_supply = get_supply(self, 'labor')
         consumption_supply = get_supply(self, 'consumption')
 

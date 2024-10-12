@@ -72,14 +72,15 @@ def get_desired_price(price_params):
     production_gap = price_params['production_gap']
     a_round = price_params['a_round']
     market_advantage = price_params['market_advantage']
+    max_price = price_params['max_price']
     og_desired_price = desired_price
 
     # Handle case when no transactions occurred
-    if not a_round:
+    if market_advantage == "failure":
         # Significant price cut when no transactions occur
-        price_cut_factor = 0.95  # 20% price cut
+        price_cut_factor = 0.8  # 20% price cut
         desired_price *= price_cut_factor
-        return max(desired_price, min_price)
+        return max(min(desired_price, max_price), min_price)
 
     # Rest of the function remains the same
     # Ratios and deviations
@@ -118,9 +119,8 @@ def get_desired_price(price_params):
     smoothed_price = desired_price * 0.7 + real_price * 0.3
 
     # Ensure the smoothed price is not below the minimum price
-    smoothed_price = max(smoothed_price, min_price)
-    print(f"og_desired_price: {og_desired_price}, smoothed_price: {smoothed_price}")
-    return smoothed_price
+    smoothed_price = max(min(smoothed_price, max_price), min_price)
+    return smoothed_price   
 
 def get_desired_wage(wage_params):
     expected_wage = wage_params['expected_wage']
