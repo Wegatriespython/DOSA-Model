@@ -32,14 +32,14 @@ def profit_maximization(Profit_max_params, linear_solver='ma57'):
             'inventory': Profit_max_params['inventory'],
         }
 
-        zero_profit_result, check = cost_minimization(rounded_result, params)
+        """zero_profit_result, check = cost_minimization(rounded_result, params)
         if check != False:
           zero_profit_result = round_results(zero_profit_result, 2)
         else:
-            zero_profit_result = None
+            zero_profit_result = None"""
 
 
-        return rounded_result, zero_profit_result
+        return rounded_result, None
 
     return None
 
@@ -73,7 +73,7 @@ def _profit_maximization(Profit_max_params, linear_solver):
 
     # Sets
     model.T = pyo.RangeSet(0, expected_periods - 1)
-    max_labor = labor_supply/16 + current_labor +1e-6
+    max_labor = max(labor_supply/16 + current_labor +1e-6, 30/5)
     max_capital = current_capital + 1e-6
     #(capital_supply if capital_supply > 0 else current_capital) + current_capital
     #double current capital when capital supllies are not available
@@ -220,7 +220,9 @@ def _profit_maximization(Profit_max_params, linear_solver):
         return model.net_borrowing[t] <= 10  #temporary disabling debt till model behavior is analysed wo debt
     model.borrowing_limit_constraint = pyo.Constraint(model.T, rule=borrowing_limit_rule)
 
-
+    def labor_limit_rule(model, t):
+        return model.labor[t] <= max_labor
+    model.labor_limit_constraint = pyo.Constraint(model.T, rule=labor_limit_rule)
 
     # Solve the model
     solver = SolverFactory('ipopt')

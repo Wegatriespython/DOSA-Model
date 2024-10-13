@@ -552,8 +552,8 @@ class Firm(Agent):
         'avg_seller_price': self.strategy['consumption']['seller_price'],
         'std_buyer_price': self.strategy['consumption']['std_buyer_price'],
         'std_seller_price': self.strategy['consumption']['std_seller_price'],
-        'avg_seller_min': self.strategy['consumption']['seller_min_price'],
-        'avg_buyer_max': self.strategy['consumption']['buyer_max_price'], 
+        'seller_min_price': self.strategy['consumption']['seller_min_price'],
+        'buyer_max_price': self.strategy['consumption']['buyer_max_price'], 
         'std_seller_min': self.strategy['consumption']['std_seller_min'],
         'std_buyer_max': self.strategy['consumption']['std_buyer_max'],
         'expected_demand': self.firm_expectations['demand']['consumption'][0],
@@ -572,10 +572,10 @@ class Firm(Agent):
         'avg_price': self.strategy['labor']['avg_price'],
         'avg_buyer_price': self.strategy['labor']['buyer_price'],
         'avg_seller_price': self.strategy['labor']['seller_price'],
-        'std_buyer_price': self.strategy['labor']['std_buyer_price'],
+        'seller_min_price': self.strategy['labor']['seller_min_price'],
+        'buyer_max_price': self.strategy['labor']['buyer_max_price'],  
         'std_seller_price': self.strategy['labor']['std_seller_price'],
-        'avg_seller_min': self.strategy['labor']['seller_min_price'],
-        'avg_buyer_max': self.strategy['labor']['buyer_max_price'],  
+        'std_buyer_price': self.strategy['labor']['std_buyer_price'],
         'std_seller_min': self.strategy['labor']['std_seller_min'],
         'std_buyer_max': self.strategy['labor']['std_buyer_max'],
         'expected_demand': self.firm_expectations['demand']['labor'][0],
@@ -597,16 +597,16 @@ class Firm(Agent):
 
 
     def get_zero_profit_conditions(self):
-      if self.zero_profit_conditionsb is not None:
+      """if self.zero_profit_conditionsb is not None:
          self.zero_profit_conditions = {
-          'wage': self.zero_profit_conditionsb['wage']/16,
-          'price': self.zero_profit_conditionsb['price'],
+          'wage': self.zero_profit_conditionsb['wage']/16 + 0.01,
+          'price': self.zero_profit_conditionsb['price'] - 0.01,
           'capital_price': self.zero_profit_conditionsb['capital_price']
          }
          if self.zero_profit_conditions['price'] == 0:
             breakpoint()
          print("Stored results ", self.zero_profit_conditions)
-         return self.zero_profit_conditions
+         return self.zero_profit_conditions"""
       max_wage = get_max_wage(self.total_working_hours, self.productivity, self.capital, self.capital_elasticity, self.price, self.get_total_labor_units(),self.optimals['labor'],self.model.config.MINIMUM_WAGE)
       min_sale_price = get_min_sale_price(self.firm_type, self.workers, self.productivity, self.capital, self.capital_elasticity, self.get_total_labor_units(), self.inventory)
 

@@ -10,7 +10,7 @@ def fake_result(params, profit_max_result):
 
     result = {
         'price': current_price * 0.75,
-        'wage': wage,
+        'wage': wage *1.25,
         'capital_price': capital_price
     }
     return result
@@ -50,10 +50,7 @@ def _solve_for_price(profit_max_result, params):
     # Zero profit constraint: revenue >= costs
     def zero_profit_rule(model):
         revenue = model.price * model.sales
-        costs = (wage * model.labor +
-                 capital_price * depreciation_rate * model.capital +
-                 holding_costs * model.inventory +
-                 carbon_tax_rate * model.emissions)
+        costs = wage * model.labor
         return revenue >= costs
     model.zero_profit = pyo.Constraint(rule=zero_profit_rule)
 
@@ -96,15 +93,12 @@ def _solve_for_wage(profit_max_result, params):
     model.emissions = pyo.Param(initialize=profit_max_result['optimal_emissions'][0])
 
     # Objective: Maximize wage
-    model.objective = pyo.Objective(expr=model.wage * model.labor, sense=pyo.maximize)
+    model.objective = pyo.Objective(expr=model.wage, sense=pyo.maximize)
 
     # Zero-profit constraint: revenue >= total costs
     def zero_profit_rule(model):
         revenue = model.price * model.sales
-        costs = (model.wage * model.labor +
-                 capital_price * depreciation_rate * model.capital +
-                 holding_costs * model.inventory +
-                 carbon_tax_rate * model.emissions)
+        costs = model.wage * model.labor
         return revenue >= costs
     model.zero_profit = pyo.Constraint(rule=zero_profit_rule)
 
@@ -117,6 +111,7 @@ def _solve_for_wage(profit_max_result, params):
     if (results.solver.status == pyo.SolverStatus.ok and
         results.solver.termination_condition == pyo.TerminationCondition.optimal):
         reservation_wage = pyo.value(model.wage)
+        
         return {'wage': reservation_wage}, True
     else:
         print("Wage optimization solver failed to find an optimal solution.")
@@ -146,3 +141,40 @@ def separate_optimization(profit_max_result, params):
         'wage': new_wage,
         'capital_price': params['capital_price']
     }, True
+
+    max_iterations = 100
+    tolerance = 1e-6
+    
+    for iteration in range(max_iterations):
+        # Step 1: Optimize for product price with wage held fixed
+        result_price, price_success = _solve_for_price(profit_max_result, params)
+        new_price = result_price['price']
+
+        # Step 2: Optimize for wage with product price held fixed
+        params_with_new_price = params.copy()
+        params_with_new_price['current_price'] = new_price
+        result_wage, wage_success = _solve_for_wage(profit_max_result, params_with_new_price)
+        new_wage = result_wage['wage']
+
+        # Check for convergence
+        price_change = abs(new_price - params['current_price']) / params['current_price']
+        wage_change = abs(new_wage - params['wage']) / params['wage']
+
+        print(f"Iteration {iteration + 1}: New wage: {new_wage}, New price: {new_price}")
+
+        if price_change < tolerance and wage_change < tolerance:
+            print(f"Converged after {iteration + 1} iterations.")
+            break
+
+        # Update params for next iteration
+        params['current_price'] = new_price
+        params['wage'] = new_wage
+
+    else:
+        print(f"Failed to converge after {max_iterations} iterations.")
+
+    return {
+        'price': new_price,
+        'wage': new_wage,
+        'capital_price': params['capital_price']
+    }, price_success and wage_success

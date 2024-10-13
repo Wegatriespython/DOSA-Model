@@ -21,7 +21,7 @@ def get_max_wage(total_working_hours, productivity, capital, capital_elasticity,
         extra_revenue_per_hour = extra_revenue / 16
         max_wage = extra_revenue_per_hour
 
-    return max(max_wage, minimum_wage)
+    return max(min(max_wage, 1.2), minimum_wage)
 
 def get_min_sale_price(firm_type, workers, productivity, capital, capital_elasticity, total_labor_units, inventory):
     if firm_type == 'consumption':
@@ -30,16 +30,16 @@ def get_min_sale_price(firm_type, workers, productivity, capital, capital_elasti
         total_cost = labor_cost + capital_cost
         total_output = calculate_production_capacity(productivity, capital, capital_elasticity, total_labor_units) + inventory
         if total_output <= 0 or total_cost <= 0.001:
-            return 0.5
-        return max(total_cost / total_output, 0.5)
+            return 0.7
+        return max(total_cost / total_output, 0.7)
     else:
         total_working_hours = sum([worker['hours'] for worker in workers.values()])
         average_wage = sum([worker['wage'] * worker['hours'] for worker in workers.values()]) / total_working_hours if total_working_hours > 0 else 0
         labor_cost = total_working_hours * average_wage
         total_output = calculate_production_capacity(productivity, capital, capital_elasticity, total_labor_units) + inventory
         if total_output <= 0 or labor_cost <= 0.001:
-            return 0.5
-        return max(labor_cost / total_output,0.5)
+            return 0.7
+        return max(labor_cost / total_output,0.7)
 
 def get_max_capital_price(investment_demand, optimal_production, optimal_capital, price, capital_elasticity, time_horizon, discount_rate):
 
@@ -64,100 +64,73 @@ def get_desired_capital_price(self):
     return capital_price
 
 
-
-
-def best_response_exact(price_decision_data):
+def buyer_heuristic(price_decision_data):
     """
-    Compute the exact optimal bid or ask price for a player in the two-round market clearing mechanism,
-    accounting for non-equilibrium market conditions.
+    Compute a heuristic bid price for a buyer in the two-round market clearing mechanism.
     """
-    is_buyer = price_decision_data['is_buyer']
-    round_num = price_decision_data['round_num']
-    avg_buyer_price = price_decision_data['avg_buyer_price']
     avg_seller_price = price_decision_data['avg_seller_price']
-    std_buyer_price = price_decision_data['std_buyer_price']
-    std_seller_price = price_decision_data['std_seller_price']
     pvt_res_price = price_decision_data['pvt_res_price']
+    avg_price = price_decision_data['avg_price']
     expected_demand = price_decision_data['expected_demand']
     expected_supply = price_decision_data['expected_supply']
     previous_price = price_decision_data['previous_price']
-    R_p = pvt_res_price
+    buyer_max_price = price_decision_data.get('buyer_max_price', pvt_res_price)
+    seller_min_price = price_decision_data['seller_min_price']
 
-    # Market imbalance
-    imbalance = expected_demand - expected_supply
+    # Calculate market imbalance factor
+    total_volume = expected_demand + expected_supply
+    imbalance_factor = (expected_demand - expected_supply) / total_volume if total_volume > 0 else 0
 
-    # Handle edge cases of zero supply or demand
-    if expected_supply == 0:
-        if is_buyer:
-            return R_p  # Buyers willing to pay up to their reservation price
-        else:
-            return R_p * 2  # Sellers can ask any price; no competition
-    if expected_demand == 0:
-        if is_buyer:
-            return 0  # Buyers will not bid
-        else:
-            return R_p  # Sellers accept their reservation price
+    # Calculate the initial price estimate
+    price_estimate = avg_seller_price - 0.1 * (avg_seller_price - seller_min_price)
 
-    # Determine opponent's average price and standard deviation
-    if is_buyer:
-        mu_opponent = avg_seller_price
-        sigma_opponent = std_seller_price
-    else:
-        mu_opponent = avg_buyer_price
-        sigma_opponent = std_buyer_price
+    # Adjust the price estimate based on market imbalance
+    price_estimate -= imbalance_factor * (price_estimate - pvt_res_price)
 
-    # Adjustment cost factor may represent economic frictions
-    adjustment_cost_factor = 0.1
+    # Blend with previous price to add stability
+    price_estimate = 0.2 * price_estimate + 0.7 * previous_price + 0.1 * avg_price
 
-    def adjustment_cost(price):
-        return adjustment_cost_factor * (price - previous_price) ** 2
+    # Ensure the price is within allowed bounds
+    return max(seller_min_price, min(price_estimate, pvt_res_price))
 
-    def expected_utility(price):
-        if is_buyer:
-            P_transaction = norm.cdf((price - mu_opponent) / sigma_opponent)
-            if P_transaction == 0:
-                return 0
-            expected_seller_ask = mu_opponent - sigma_opponent * norm.pdf((price - mu_opponent) / sigma_opponent) / P_transaction
-            P_t = (price + expected_seller_ask) / 2
-            U = (R_p - P_t) * P_transaction
-        else:
-            P_transaction = 1 - norm.cdf((price - mu_opponent) / sigma_opponent)
-            if P_transaction == 0:
-                return 0
-            expected_buyer_bid = mu_opponent + sigma_opponent * norm.pdf((price - mu_opponent) / sigma_opponent) / P_transaction
-            P_t = (price + expected_buyer_bid) / 2
-            U = (P_t - R_p) * P_transaction
+def seller_heuristic(price_decision_data):
+    """
+    Compute a heuristic ask price for a seller in the two-round market clearing mechanism.
+    """
+    avg_buyer_price = price_decision_data['avg_buyer_price']
+    pvt_res_price = price_decision_data['pvt_res_price']
+    expected_demand = price_decision_data['expected_demand']
+    expected_supply = price_decision_data['expected_supply']
+    avg_price = price_decision_data['avg_price']
+    previous_price = price_decision_data['previous_price']
+    buyer_max_price = price_decision_data['buyer_max_price']
+    seller_min_price = price_decision_data.get('seller_min_price', pvt_res_price)
 
-        # Subtract adjustment cost
-        U -= adjustment_cost(price)
+    # Calculate market imbalance factor
+    total_volume = expected_demand + expected_supply
+    imbalance_factor = (expected_demand - expected_supply) / total_volume if total_volume > 0 else 0
 
-        # Adjust utility based on market imbalance
-        if imbalance != 0:
-            imbalance_factor = imbalance / (expected_demand + expected_supply)
-            if is_buyer:
-                # Buyers may need to bid higher in tight markets
-                U += U * imbalance_factor
-            else:
-                # Sellers may raise prices when demand is high
-                U += U * (-imbalance_factor)
-        return -U  # Negative for minimization
+    # Calculate the initial price estimate
+    price_estimate = avg_buyer_price + 0.1 * (buyer_max_price - avg_buyer_price)
 
-    # Set optimization bounds
-    if is_buyer:
-        lower_bound = max(0, min(previous_price * 0.9, R_p))
-        upper_bound = R_p
-    else:
-        lower_bound = R_p
-        upper_bound = max(previous_price * 1.1, R_p)
+    # Adjust the price estimate based on market imbalance
+    price_estimate += imbalance_factor * (buyer_max_price - price_estimate)
 
-    # Optimize the expected utility
-    result = minimize_scalar(
-        expected_utility,
-        bounds=(lower_bound, upper_bound),
-        method='bounded'
-    )
+    # Blend with previous price to add stability
+    price_estimate = 0.2 * price_estimate + 0.7 * previous_price + 0.1 * avg_price
 
-    optimal_price = result.x
-    return optimal_price
+    # Ensure the price is within allowed bounds
+    return max(pvt_res_price, min(price_estimate, buyer_max_price))
+
+def best_response_exact(price_decision_data):
+    """
+    Compute a heuristic bid or ask price for a player in the two-round market clearing mechanism,
+    using a simplified approach based on market conditions and private reservation price.
+    """
+    is_buyer = price_decision_data['is_buyer']
+    return buyer_heuristic(price_decision_data) if is_buyer else seller_heuristic(price_decision_data)
+
+
+
 
 

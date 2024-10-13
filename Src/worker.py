@@ -210,8 +210,8 @@ class Worker(Agent):
             'avg_price': self.strategy['consumption']['avg_price'],
             'avg_buyer_price': self.strategy['consumption']['buyer_price'],
             'avg_seller_price': self.strategy['consumption']['seller_price'],
-            'avg_seller_min': self.strategy['consumption']['seller_min_price'],
-            'avg_buyer_max': self.strategy['consumption']['buyer_max_price'],
+            'seller_min_price': self.strategy['consumption']['seller_min_price'],
+            'buyer_max_price': self.strategy['consumption']['buyer_max_price'],
             'std_buyer_price': self.strategy['consumption']['std_buyer_price'],
             'std_seller_price': self.strategy['consumption']['std_seller_price'],
             'std_buyer_max': self.strategy['consumption']['std_buyer_max'],
@@ -234,8 +234,8 @@ class Worker(Agent):
             'avg_price': self.strategy['labor']['avg_price'],
             'avg_buyer_price': self.strategy['labor']['buyer_price'],
             'avg_seller_price': self.strategy['labor']['seller_price'],
-            'avg_seller_min': self.strategy['labor']['seller_min_price'],
-            'avg_buyer_max': self.strategy['labor']['buyer_max_price'],
+            'seller_min_price': self.strategy['labor']['seller_min_price'],
+            'buyer_max_price': self.strategy['labor']['buyer_max_price'],
             'std_seller_min': self.strategy['labor']['std_seller_min'],
             'std_buyer_price': self.strategy['labor']['std_buyer_price'],
             'std_seller_price': self.strategy['labor']['std_seller_price'],
@@ -346,9 +346,9 @@ class Worker(Agent):
     def get_max_consumption_price(self):
         # Calculate the per-period budget, accounting for discounting
         desired_savings = self.desired_savings
-        working_hours = self.working_hours
-        disposable_income = self.savings - desired_savings + (self.expected_wage * working_hours)
-        unit_price = disposable_income/self.desired_consumption if self.desired_consumption > 0 else disposable_income
+        
+        disposable_income = self.savings - desired_savings + (self.wage * self.total_working_hours)
+        unit_price = disposable_income 
         return unit_price
 
 

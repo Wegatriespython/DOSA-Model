@@ -54,14 +54,14 @@ def get_supply(self, market_type):
                 case 'consumption':
                     all_supply = 25
         case 'labor', _:
-            all_supply = self.model.get_total_labor_supply()
+            all_supply = self.model.pre_labor_transactions[1]
             print(f"all_supply: {all_supply}, market_type: {market_type}")
 
         case 'capital', _:
-            all_supply = self.model.get_total_capital_supply()
+            all_supply = self.model.pre_capital_transactions[1]
 
         case 'consumption', _:
-            all_supply = self.model.get_total_consumption_supply()
+            all_supply = self.model.pre_consumption_transactions[1]
             print(f"all_supply: {all_supply}, market_type: {market_type}")
         case _, _:
             raise ValueError(f"Invalid market type: {market_type}")
