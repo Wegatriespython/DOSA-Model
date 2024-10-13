@@ -3,7 +3,7 @@ from mesa.time import RandomActivationByType
 from Utilities.Config import Config
 from worker import Worker
 from firm import Firm2, Firm1
-from Utilities.mesa_market_matching import market_matching
+from Utilities.market_matching import market_matching
 from Utilities.economy_data_collector import EconomyDataCollector
 import numpy as np
 
@@ -128,7 +128,14 @@ class EconomyModel(Model):
         avg_seller_price = sum(s[1] for s in sellers) / len(sellers) if sellers else 0
         avg_buyer_max = sum(b[3] for b in buyers)/ len(buyers) if buyers else 0
         avg_seller_min = sum(s[3] for s in sellers)/ len(sellers) if sellers else 0
-        self.pre_labor_transactions = np.array([buyer_demand, seller_inventory, avg_buyer_price, avg_seller_price,avg_buyer_max, avg_seller_min])
+        std_buyer_price = np.std([b[1] for b in buyers]) if buyers else 0
+        std_seller_price = np.std([s[1] for s in sellers]) if sellers else 0
+        std_buyer_max = np.std([b[3] for b in buyers]) if buyers else 0
+        std_seller_min = np.std([s[3] for s in sellers]) if sellers else 0
+
+        self.pre_labor_transactions = np.array([buyer_demand, seller_inventory, avg_buyer_price, avg_seller_price,avg_buyer_max, avg_seller_min, std_buyer_price, std_seller_price, std_buyer_max, std_seller_min])
+
+
         print(self.pre_labor_transactions)
         transactions = market_matching(buyers, sellers)
         self.labor_transactions = transactions
@@ -166,7 +173,11 @@ class EconomyModel(Model):
         avg_seller_price = sum(s[1] for s in sellers) / len(sellers) if sellers else 0
         avg_buyer_max = sum(b[3] for b in buyers)/ len(buyers) if buyers else 0
         avg_seller_min = sum(s[3] for s in sellers)/ len(sellers) if sellers else 0
-        self.pre_capital_transactions = np.array([buyer_demand, seller_inventory, avg_buyer_price, avg_seller_price, avg_buyer_max, avg_seller_min])
+        std_buyer_price = np.std([b[1] for b in buyers]) if buyers else 0
+        std_seller_price = np.std([s[1] for s in sellers]) if sellers else 0
+        std_buyer_max = np.std([b[3] for b in buyers]) if buyers else 0
+        std_seller_min = np.std([s[3] for s in sellers]) if sellers else 0
+        self.pre_capital_transactions = np.array([buyer_demand, seller_inventory, avg_buyer_price, avg_seller_price, avg_buyer_max, avg_seller_min, std_buyer_price, std_seller_price, std_buyer_max, std_seller_min])
 
 
         transactions = market_matching(buyers, sellers)
@@ -204,8 +215,12 @@ class EconomyModel(Model):
         avg_seller_price = sum(s[1] for s in sellers) / len(sellers) if sellers else 0
         avg_buyer_max = sum(b[3] for b in buyers)/ len(buyers) if buyers else 0
         avg_seller_min = sum(s[3] for s in sellers)/ len(sellers) if sellers else 0
+        std_buyer_price = np.std([b[1] for b in buyers]) if buyers else 0
+        std_seller_price = np.std([s[1] for s in sellers]) if sellers else 0    
+        std_buyer_max = np.std([b[3] for b in buyers]) if buyers else 0
+        std_seller_min = np.std([s[3] for s in sellers]) if sellers else 0
 
-        self.pre_consumption_transactions = np.array([buyer_demand, seller_inventory, avg_buyer_price, avg_seller_price, avg_buyer_max, avg_seller_min])
+        self.pre_consumption_transactions = np.array([buyer_demand, seller_inventory, avg_buyer_price, avg_seller_price, avg_buyer_max, avg_seller_min, std_buyer_price, std_seller_price, std_buyer_max, std_seller_min])
 
         transactions = market_matching(buyers, sellers)
 

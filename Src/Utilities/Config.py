@@ -6,7 +6,7 @@ class Config:
         #
 
         self.MAX_WORKING_HOURS = 16
-        self.TIME_HORIZON = 51 # One more than the model's number of steps to prevent array out of bounds errors
+        self.TIME_HORIZON = 11 # One more than the model's number of steps to prevent array out of bounds errors
         self.PLANNING_HORIZON = 10
         self.HOLDING_COST = 0.1
         self.INITIAL_SALES = 1

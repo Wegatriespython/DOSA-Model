@@ -21,7 +21,7 @@ def fake_result(params, profit_max_result):
   capital_price = params['capital_price']
   wage = params['wage']
 
-  price = np.full(periods, current_price)
+  price = np.full(periods, current_price * 0.75)
   wage = np.full(periods, wage)
   capital_price = np.full(periods, capital_price)
   result = {

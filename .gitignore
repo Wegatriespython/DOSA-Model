@@ -7,11 +7,6 @@
 *.log
 *.json
 
-# Ignore specific files
-Nash_Central_planner.py
-Old_planner.py
-Macro-Model.jl
-
 # Ignore specific directories
 /Central_Planner/
 /MCTS_Solver/

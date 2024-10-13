@@ -3,7 +3,7 @@ from pyomo.opt import SolverFactory
 import numpy as np
 import logging
 from functools import lru_cache
-from Utilities.Cost_minimisation import cost_minimization
+from Utilities.Partial_EQ_cost_min import cost_minimization
 from pyomo.util.infeasible import log_infeasible_constraints
 # Global variable to store the last solution for warm start
 last_solution = None
@@ -34,10 +34,12 @@ def profit_maximization(Profit_max_params, linear_solver='ma57'):
 
         zero_profit_result, check = cost_minimization(rounded_result, params)
         if check != False:
-          zero_profit_result = round_results(zero_profit_result)
+          zero_profit_result = round_results(zero_profit_result, 2)
+        else:
+            zero_profit_result = None
 
 
-        return rounded_result
+        return rounded_result, zero_profit_result
 
     return None
 
@@ -281,13 +283,13 @@ def _profit_maximization(Profit_max_params, linear_solver):
         print(f"Solver status: {results.solver.status}")
         print(f"Termination condition: {results.solver.termination_condition}")
         return None
-def round_results(results):
+def round_results(results, precision=0):
     rounded = {}
     for key, value in results.items():
         if isinstance(value, list):
-            rounded[key] = [round(v) for v in value]
+            rounded[key] = [round(v, precision) for v in value]
         else:
-            rounded[key] = round(value)
+            rounded[key] = round(value, precision)
     return rounded
 def log_pyomo_infeasible_constraints(model_instance):
     # Create a logger object with DEBUG level

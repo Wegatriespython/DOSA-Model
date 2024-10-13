@@ -5,7 +5,7 @@ from Utilities.Config import Config
 from Utilities.utility_function import maximize_utility
 from expectations import  get_market_demand, get_supply
 from Utilities.adaptive_expectations import adaptive_expectations
-from Utilities.Strategic_adjustments import update_worker_price_expectation, update_worker_wage_expectation
+from Utilities.Strategic_adjustments import best_response_exact
 from Utilities.tools import update_dictionary
 
 class Worker(Agent):
@@ -95,25 +95,35 @@ class Worker(Agent):
 
     def update_expectations(self):
         # Grab the demand for relevant goods
-        labor_demand, labor_price, labor_market_round, labor_market_advantage, labor_max_price, labor_min_price = get_market_demand(self, 'labor')
-        consumption_demand, consumption_price, consumption_market_round, consumption_market_advantage, consumption_max_price, consumption_min_price = get_market_demand(self, 'consumption')
+        labor_demand, labor_price, labor_market_round, labor_market_advantage, labor_max_price, labor_min_price, labor_buyer_price, labor_seller_price, labor_std_buyer_price, labor_std_seller_price, labor_std_buyer_max, labor_std_seller_min = get_market_demand(self, 'labor')
+        consumption_demand, consumption_price, consumption_market_round, consumption_market_advantage, consumption_max_price, consumption_min_price, consumption_buyer_price, consumption_seller_price, consumption_std_buyer_price, consumption_std_seller_price, consumption_std_buyer_max, consumption_std_seller_min = get_market_demand(self, 'consumption')
 
         self.strategy = {
             'labor': {
                 'round': labor_market_round,
                 'advantage': labor_market_advantage,
-                'min_price': labor_min_price,
-                'max_price': labor_max_price,
+                'avg_price': labor_price,
+                'seller_min_price': labor_min_price,
+                'buyer_max_price': labor_max_price,
                 'buyer_price': labor_buyer_price,
-                'seller_price': labor_seller_price
+                'seller_price': labor_seller_price,
+                'std_buyer_price': labor_std_buyer_price,
+                'std_seller_price': labor_std_seller_price,
+                'std_buyer_max': labor_std_buyer_max,
+                'std_seller_min': labor_std_seller_min
             },
             'consumption': {
                 'round': consumption_market_round,
                 'advantage': consumption_market_advantage,
-                'max_price': consumption_max_price,
-                'min_price': consumption_min_price,
+                'avg_price': consumption_price,
+                'buyer_max_price': consumption_max_price,
+                'seller_min_price': consumption_min_price,
                 'buyer_price': consumption_buyer_price,
-                'seller_price': consumption_seller_price
+                'seller_price': consumption_seller_price,
+                'std_buyer_price': consumption_std_buyer_price,
+                'std_seller_price': consumption_std_seller_price,
+                'std_buyer_max': consumption_std_buyer_max,
+                'std_seller_min': consumption_std_seller_min
             }
         }
 
@@ -180,7 +190,9 @@ class Worker(Agent):
             'expected_labor_demand': self.worker_expectations['demand']['labor'],
             'expected_consumption_supply': self.worker_expectations['supply']['consumption']
         }
-        print(Utility_params)
+       
+        if np.random.randint(10) == 0:
+            print(Utility_params)
         
         results = maximize_utility(Utility_params)
         self.desired_consumption, self.working_hours, self.leisure, self.desired_savings = [arr[0] for arr in results]
@@ -192,38 +204,49 @@ class Worker(Agent):
     def update_strategy(self):
         max_price = self.get_max_consumption_price()
         price_decision_data = {
-            'expected_price': self.worker_expectations['price']['consumption'][0],
-            'desired_price': self.desired_price,
-            'real_price': self.avg_price,
-            'consumption': self.consumption,
-            'desired_consumption': self.desired_consumption,
-            'max_price': max_price,
-            'market_clearing_round': self.strategy['consumption']['round'],
+            'is_buyer': True,
+            'round_num': self.strategy['consumption']['round'],
             'market_advantage': self.strategy['consumption']['advantage'],
-            'seller_min_price': self.strategy['consumption']['min_price'],
-            'seller_price': self.strategy['consumption']['seller_price'],
-            'buyer_price': self.strategy['consumption']['buyer_price']
+            'avg_price': self.strategy['consumption']['avg_price'],
+            'avg_buyer_price': self.strategy['consumption']['buyer_price'],
+            'avg_seller_price': self.strategy['consumption']['seller_price'],
+            'avg_seller_min': self.strategy['consumption']['seller_min_price'],
+            'avg_buyer_max': self.strategy['consumption']['buyer_max_price'],
+            'std_buyer_price': self.strategy['consumption']['std_buyer_price'],
+            'std_seller_price': self.strategy['consumption']['std_seller_price'],
+            'std_buyer_max': self.strategy['consumption']['std_buyer_max'],
+            'std_seller_min': self.strategy['consumption']['std_seller_min'],
+            'expected_demand': self.worker_expectations['demand']['consumption'][0],
+            'expected_supply': self.worker_expectations['supply']['consumption'][0],
+            'pvt_res_price': max_price,
+            'previous_price': self.desired_price
         }
 
-        desired_price = update_worker_price_expectation(price_decision_data)
+        desired_price = best_response_exact(price_decision_data)
+
+
         self.desired_price = desired_price
 
         wage_decision_data = {
-            'expected_wage': self.worker_expectations['price']['labor'][0],
-            'desired_wage': self.desired_wage,
-            'real_wage': self.wage,
-            'working_hours': self.working_hours,
-            'desired_working_hours': self.optimals[1],
-            'min_wage': self.get_min_wage(),
-            'market_clearing_round': self.strategy['labor']['round'],
+            'is_buyer': False,
+            'round_num': self.strategy['labor']['round'],
             'market_advantage': self.strategy['labor']['advantage'],
-            'buyer_max_wage': self.strategy['labor']['max_price'],
-            'buyer_price': self.strategy['labor']['buyer_price'],
-            'seller_price': self.strategy['labor']['seller_price']
-
+            'avg_price': self.strategy['labor']['avg_price'],
+            'avg_buyer_price': self.strategy['labor']['buyer_price'],
+            'avg_seller_price': self.strategy['labor']['seller_price'],
+            'avg_seller_min': self.strategy['labor']['seller_min_price'],
+            'avg_buyer_max': self.strategy['labor']['buyer_max_price'],
+            'std_seller_min': self.strategy['labor']['std_seller_min'],
+            'std_buyer_price': self.strategy['labor']['std_buyer_price'],
+            'std_seller_price': self.strategy['labor']['std_seller_price'],
+            'std_buyer_max': self.strategy['labor']['std_buyer_max'],
+            'expected_demand': self.worker_expectations['demand']['labor'][0],
+            'expected_supply': self.worker_expectations['supply']['labor'][0],
+            'pvt_res_price': self.model.config.MINIMUM_WAGE,
+            'previous_price': self.desired_wage
         }
 
-        desired_wage = update_worker_wage_expectation(wage_decision_data)
+        desired_wage = best_response_exact(wage_decision_data)
         self.desired_wage = desired_wage
 
         self.consumption = 0
@@ -321,13 +344,12 @@ class Worker(Agent):
         self.savings = max(0, self.savings) #prevent negative savings
 
     def get_max_consumption_price(self):
-       max_price = self.savings/(self.model.time_horizon) + (self.wage * self.working_hours) if self.wage > 0 else  self.savings/(self.model.time_horizon)
-       #max_price = self.worker_expectations['price']['consumption'][0] * 1.1
-       #willing to pay up to 10% more than expected price
-       if max_price < self.savings:
-         return max_price
-       else:
-         return self.savings
+        # Calculate the per-period budget, accounting for discounting
+        desired_savings = self.desired_savings
+        working_hours = self.working_hours
+        disposable_income = self.savings - desired_savings + (self.expected_wage * working_hours)
+        unit_price = disposable_income/self.desired_consumption if self.desired_consumption > 0 else disposable_income
+        return unit_price
 
 
     def get_paid(self, wage):
