@@ -1,8 +1,8 @@
 from mesa import Agent
 import numpy as np
 from Utilities.Simpler_profit_maxxin import profit_maximization
-from expectations import get_market_demand,get_supply
-from Utilities.adaptive_expectations import adaptive_expectations
+from expectations import get_market_stats,get_supply
+from Utilities.adaptive_expectations import adaptive_expectations, autoregressive
 from Utilities.Strategic_adjustments import best_response_exact, get_max_wage,get_min_sale_price, get_desired_capital_price, calculate_production_capacity, get_max_capital_price
 import logging
 from math import isnan, nan
@@ -156,75 +156,51 @@ class Firm(Agent):
 
     def update_expectations(self):
         # Grab the demand for relavent goods
-        consumption_demand, consumption_price, counsumption_round,   consumption_market_advantage, consumption_max_price, consumption_min_price, consumption_buyer_price, consumption_seller_price, consumption_std_buyer_price, consumption_std_seller_price, consumption_std_buyer_max, consumption_std_seller_min  = get_market_demand(self, 'consumption')
-
-        capital_demand, capital_price, capital_round, capital_market_advantage, capital_max_price, capital_min_price, capital_buyer_price, capital_seller_price, capital_std_buyer_price, capital_std_seller_price, capital_std_buyer_max, capital_std_seller_min = get_market_demand(self, 'capital')
-
-        labor_demand, labor_price, labor_round, labor_market_advantage, labor_max_price, labor_min_price, labor_buyer_price, labor_seller_price, labor_std_buyer_price, labor_std_seller_price, labor_std_buyer_max, labor_std_seller_min = get_market_demand(self, 'labor')
+        consumption_market_stats = get_market_stats(self, 'consumption')
+        capital_market_stats = get_market_stats(self, 'capital')
+        labor_market_stats = get_market_stats(self, 'labor')
 
         self.strategy = {
-          'consumption': {
-            'round': counsumption_round,
-            'advantage': consumption_market_advantage,
-            'avg_price': consumption_price,
-            'buyer_max_price': consumption_max_price,
-            'seller_min_price': consumption_min_price,
-            'buyer_price': consumption_buyer_price,
-            'seller_price': consumption_seller_price,
-            'std_buyer_price': consumption_std_buyer_price,
-            'std_seller_price': consumption_std_seller_price,
-            'std_buyer_max': consumption_std_buyer_max,
-            'std_seller_min': consumption_std_seller_min
-          },
-          'capital': {
-            'round': capital_round,
-            'advantage': capital_market_advantage,
-            'avg_price': capital_price,
-            'buyer_max_price': capital_max_price,
-            'seller_min_price': capital_min_price,
-            'buyer_price': capital_buyer_price,
-            'seller_price': capital_seller_price,
-            'std_buyer_price': capital_std_buyer_price,
-            'std_seller_price': capital_std_seller_price,
-            'std_buyer_max': capital_std_buyer_max,
-            'std_seller_min': capital_std_seller_min
-          },
-          'labor': {
-            'round': labor_round,
-            'advantage': labor_market_advantage,
-            'avg_price': labor_price,
-            'buyer_max_price': labor_max_price,
-            'seller_min_price': labor_min_price,
-            'buyer_price': labor_buyer_price,
-            'seller_price': labor_seller_price,
-            'std_buyer_price': labor_std_buyer_price,
-            'std_seller_price': labor_std_seller_price,
-            'std_buyer_max': labor_std_buyer_max,
-            'std_seller_min': labor_std_seller_min
-          }
+          'consumption': consumption_market_stats,
+          'capital': capital_market_stats,
+          'labor': labor_market_stats
         }
-        
-
-        capital_supply = get_supply(self, 'capital')
-        consumption_supply = get_supply(self, 'consumption')
-        labor_supply = get_supply(self, 'labor')
+      
 
         Demand ={
-          'consumption': consumption_demand,
-          'capital': capital_demand,
-          'labor': labor_demand
+          'consumption': consumption_market_stats['demand'],
+          'capital': capital_market_stats['demand'],
+          'labor': labor_market_stats['demand']
         }
         Price = {
-          'consumption': consumption_price,
-          'capital': capital_price,
-          'labor': labor_price
+          'consumption': consumption_market_stats['price'],
+          'capital': capital_market_stats['price'],
+          'labor': labor_market_stats['price'],
+          'labor_avg_buyer_max_price': labor_market_stats['avg_buyer_max_price'],
+          'labor_avg_seller_min_price': labor_market_stats['avg_seller_min_price'],
+          'labor_avg_buyer_price': labor_market_stats['avg_buyer_price'],
+          'labor_avg_seller_price': labor_market_stats['avg_seller_price'],
+          'consumption_avg_buyer_max_price': consumption_market_stats['avg_buyer_max_price'],
+          'consumption_avg_buyer_price': consumption_market_stats['avg_buyer_price'],
+          'consumption_avg_seller_min_price': consumption_market_stats['avg_seller_min_price'],
+          'consumption_avg_seller_price': consumption_market_stats['avg_seller_price'],
+          'capital_avg_buyer_max_price': capital_market_stats['avg_buyer_max_price'],
+          'capital_avg_buyer_price': capital_market_stats['avg_buyer_price'],
+          'capital_avg_seller_min_price': capital_market_stats['avg_seller_min_price'],
+          'capital_avg_seller_price': capital_market_stats['avg_seller_price']
         }
         Supply = {
-          'consumption': consumption_supply,
-          'capital': capital_supply,
-          'labor': labor_supply
+          'consumption': consumption_market_stats['supply'],
+          'capital': capital_market_stats['supply'],
+          'labor': labor_market_stats['supply']
         }
 
+
+        # Non Trivial Error: Find out why buyers bid higher than max price.
+        
+        """if Price['consumption_avg_buyer_max_price'] + 1e-3< Price['consumption_avg_buyer_price'] :
+          print("consumption_avg_buyer_max_price < consumption_avg_buyer_price", consumption_market_stats)
+          breakpoint()"""
 
         self.price_record = update_dictionary(Price, self.price_record)
         self.demand_record = update_dictionary(Demand,self.demand_record)
@@ -239,20 +215,17 @@ class Firm(Agent):
                 self.price_record if category == 'price' else
                 self.supply_record
             )
-            self.firm_expectations[category] = adaptive_expectations(
+            new_forecasts = autoregressive(
                 historical_data,
                 self.firm_expectations[category],
-                self.model.time_horizon
+                self.model.time_horizon - 1  # Forecast one less step
             )
-
-        # For practical use only the future time horizon is needed
-        self.firm_expectations = {
-            category: {
-                key: values[-self.model.time_horizon:]
-                for key, values in self.firm_expectations[category].items()
+            
+            # Combine most recent actual data with forecasts
+            self.firm_expectations[category] = {
+                key: [historical_data[key][-1]] + new_forecasts[key].tolist()
+                for key in new_forecasts
             }
-            for category in ['demand', 'price', 'supply']
-        }
 
         return self.firm_expectations
 
@@ -545,45 +518,40 @@ class Firm(Agent):
 
       price_params = {
         'is_buyer': False,
-        'round_num': self.strategy['consumption']['round'],
-        'market_advantage': self.strategy['consumption']['advantage'],
-        'avg_price': self.strategy['consumption']['avg_price'],
-        'avg_buyer_price': self.strategy['consumption']['buyer_price'],
-        'avg_seller_price': self.strategy['consumption']['seller_price'],
-        'std_buyer_price': self.strategy['consumption']['std_buyer_price'],
-        'std_seller_price': self.strategy['consumption']['std_seller_price'],
-        'seller_min_price': self.strategy['consumption']['seller_min_price'],
-        'buyer_max_price': self.strategy['consumption']['buyer_max_price'], 
-        'std_seller_min': self.strategy['consumption']['std_seller_min'],
-        'std_buyer_max': self.strategy['consumption']['std_buyer_max'],
-        'expected_demand': self.firm_expectations['demand']['consumption'][0],
-        'expected_supply': self.firm_expectations['supply']['consumption'][0],
+        'price': self.strategy['consumption']['price'],
+        'avg_buyer_price': self.strategy['consumption']['avg_buyer_price'],
+        'avg_seller_price': self.strategy['consumption']['avg_seller_price'],
+        'avg_seller_min_price': self.strategy['consumption']['avg_seller_min_price'],
+        'avg_buyer_max_price': self.strategy['consumption']['avg_buyer_max_price'], 
+        'demand': self.strategy['consumption']['demand'],
+        'supply': self.strategy['consumption']['supply'],
         'pvt_res_price': self.zero_profit_conditions['price'],
         'previous_price': self.desireds['price']
         }
+      desired_price = best_response_exact(price_params, debug = True)
 
+      if desired_price > price_params['avg_buyer_max_price']:
+        print("price_params", price_params)
+        breakpoint()
 
-      desired_price = best_response_exact(price_params)
-
+      if self.strategy['consumption']['avg_buyer_max_price'] < desired_price:
+        print("desired_price", desired_price)
+        print("strategy", self.strategy['consumption'])
+        print("price params", price_params)
+        breakpoint()
       wage_params = { 
         'is_buyer': True,
-        'round_num': self.strategy['labor']['round'],
-        'market_advantage': self.strategy['labor']['advantage'],
-        'avg_price': self.strategy['labor']['avg_price'],
-        'avg_buyer_price': self.strategy['labor']['buyer_price'],
-        'avg_seller_price': self.strategy['labor']['seller_price'],
-        'seller_min_price': self.strategy['labor']['seller_min_price'],
-        'buyer_max_price': self.strategy['labor']['buyer_max_price'],  
-        'std_seller_price': self.strategy['labor']['std_seller_price'],
-        'std_buyer_price': self.strategy['labor']['std_buyer_price'],
-        'std_seller_min': self.strategy['labor']['std_seller_min'],
-        'std_buyer_max': self.strategy['labor']['std_buyer_max'],
-        'expected_demand': self.firm_expectations['demand']['labor'][0],
-        'expected_supply': self.firm_expectations['supply']['labor'][0],
+        'price': self.strategy['labor']['price'],
+        'avg_buyer_price': self.strategy['labor']['avg_buyer_price'],
+        'avg_seller_price': self.strategy['labor']['avg_seller_price'],
+        'avg_seller_min_price': self.strategy['labor']['avg_seller_min_price'],
+        'avg_buyer_max_price': self.strategy['labor']['avg_buyer_max_price'],  
+        'demand': self.strategy['labor']['demand'],
+        'supply': self.strategy['labor']['supply'],
         'pvt_res_price': self.zero_profit_conditions['wage'],
         'previous_price': self.desireds['wage']
       }
-      desired_wage = best_response_exact(wage_params)
+      desired_wage = best_response_exact(wage_params, debug = True)
 
       self.desireds = {
         'wage': desired_wage,

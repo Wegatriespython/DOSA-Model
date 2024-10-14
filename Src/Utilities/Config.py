@@ -6,9 +6,9 @@ class Config:
         #
 
         self.MAX_WORKING_HOURS = 16
-        self.TIME_HORIZON = 151 # One more than the model's number of steps to prevent array out of bounds errors
+        self.TIME_HORIZON = 21 # One more than the model's number of steps to prevent array out of bounds errors
         self.PLANNING_HORIZON = 10
-        self.HOLDING_COST = 0.1
+        self.HOLDING_COST = 0.00
         self.INITIAL_SALES = 1
         self.INITIAL_PRODUCTIVITY = 1
         self.INITIAL_PRICE = 1
@@ -22,10 +22,9 @@ class Config:
         self.DISCOUNT_RATE = 0.05
         self.INITIAL_SAVINGS = 2
         self.MIN_CONSUMPTION = 1
-        self.PRODUCTION_FACTOR = 0.1
-        self.WAGE_OFFER_FACTOR = 1.1
+
         self.MINIMUM_WAGE = 0.0625
-        self.CONSUMPTION_PROPENSITY =1
+
         self.INITIAL_CONSUMPTION = 1
         self.TOTAL_FACTOR_PRODUCTIVITY = 1.0
         self.CAPITAL_ELASTICITY_FIRM2 = 0.5
@@ -54,11 +53,7 @@ class Config:
         self.PREFERNCE_MODE_CONSUMPTION = 0
         self.PREFERNCE_MODE_CAPITAL = 0
         self.PREFERNCE_MODE_LABOR = 0
-        # Simulation parameters
-        self.INITIAL_WORKERS = 10
-        self.INITIAL_CAPITAL_FIRMS = 2  # This was previously INITIAL_FIRM1S
-        self.INITIAL_CONSUMPTION_FIRMS = 3  # This was previously INITIAL_FIRM2S
-        self.SIMULATION_STEPS = 100
+
 
 # Create a global configuration object
 config = Config()

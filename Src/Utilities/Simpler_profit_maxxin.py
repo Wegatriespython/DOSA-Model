@@ -19,6 +19,10 @@ def profit_maximization(Profit_max_params, linear_solver='ma57'):
     if result is not None:
         last_solution = (result['optimal_labor'], result['optimal_capital'])
         rounded_result = round_results(result)
+        if result['optimal_labor'][0] > 6:
+            print(result['optimal_labor'])
+            print("maximum labor violation")
+            breakpoint()
 
                 # Perform cost minimization
         params = {
@@ -73,7 +77,7 @@ def _profit_maximization(Profit_max_params, linear_solver):
 
     # Sets
     model.T = pyo.RangeSet(0, expected_periods - 1)
-    max_labor = max(labor_supply/16 + current_labor +1e-6, 30/5)
+    max_labor = max(labor_supply/80, 30/5)
     max_capital = current_capital + 1e-6
     #(capital_supply if capital_supply > 0 else current_capital) + current_capital
     #double current capital when capital supllies are not available

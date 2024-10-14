@@ -4,43 +4,34 @@ import os
 import torch.nn as nn
 import torch.optim as optim
 
-class PositionalEncoding(nn.Module):
-    def __init__(self, d_model, max_len=5000):
-        super(PositionalEncoding, self).__init__()
-        # Create constant 'pe' matrix with values dependent on
-        # pos and i
-        pe = torch.zeros(max_len, d_model)
-        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-np.log(10000.0) / d_model))
-        pe[:, 0::2] = torch.sin(position * div_term)  # Even indices
-        pe[:, 1::2] = torch.cos(position * div_term)  # Odd indices
-        pe = pe.unsqueeze(1)  # Shape: [max_len, 1, d_model]
-        self.register_buffer('pe', pe)
 
-    def forward(self, x):
-        # Add positional encoding to input tensor
-        x = x + self.pe[:x.size(0), :]
-        return x
-    
-class TransformerTimeSeriesPredictor(nn.Module):
-    def __init__(self, input_size=1, d_model=64, nhead=4, num_layers=2, dim_feedforward=128, output_size=1, dropout=0.1):
-        super(TransformerTimeSeriesPredictor, self).__init__()
-        self.input_projection = nn.Linear(input_size, d_model)
-        self.positional_encoding = PositionalEncoding(d_model)
-        encoder_layer = nn.TransformerEncoderLayer(d_model=d_model, nhead=nhead, dim_feedforward=dim_feedforward, dropout=dropout)
-        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
-        self.decoder = nn.Linear(d_model, output_size)
 
-    def forward(self, src):
-        # src shape: [seq_len, batch_size, input_size]
-        src = self.input_projection(src) * np.sqrt(src.size(-1))
-        src = self.positional_encoding(src)
-        output = self.transformer_encoder(src)
-        output = self.decoder(output)
-        return output
+def autoregressive(historical_data, previous_forecasts, time_horizon):
+    new_forecasts = {}
+    alpha = 0.3  # Smoothing factor, higher values give more weight to recent observations
 
+    for key in historical_data:
+        history = np.array(historical_data[key])
+        
+        if len(history) < 2:
+            new_forecasts[key] = np.full(time_horizon, history[-1])
+        else:
+            # Calculate EMA
+            ema = history[-1]  # Start with the most recent observation
+            for i in range(2, len(history) + 1):
+                ema = alpha * history[-i] + (1 - alpha) * ema
+            
+            # Create forecast array
+            forecast = np.empty(time_horizon)
+            forecast[0] = history[-1]  # Set first element to last historical value
+            forecast[1:] = ema  # Use EMA for remaining predictions
+            
+            new_forecasts[key] = forecast
+
+    return new_forecasts
 
 def adaptive_expectations(historical_data, previous_forecasts, time_horizon):
+   
 
     #transformer_forecasts = transformer_expectations(historical_data, time_horizon)
     new_forecasts = {}
@@ -68,10 +59,18 @@ def adaptive_expectations(historical_data, previous_forecasts, time_horizon):
         aligned_forecast = aligned_forecast[-min_length:]
 
         forecast_error = aligned_history - aligned_forecast
-        mse = np.mean(forecast_error**2)
+        
+        # Calculate weighted MSE with more emphasis on recent errors
+        weights = np.exp(np.arange(len(forecast_error)) / 5) / np.exp(np.arange(len(forecast_error)) / 5).sum()
+        weighted_mse = np.average(forecast_error**2, weights=weights)
 
-        # Adaptive learning rate based on mean squared error
-        alpha = 1 / (1 + np.exp(-mse))  # Sigmoid function to keep alpha between 0 and 1
+        # Adaptive learning rate based on weighted MSE
+        alpha = 1 / (1 + 0.5 * np.exp(-weighted_mse))  # Adjusted sigmoid for more responsiveness
+
+        # Increase alpha for the most recent 5 periods
+        recent_alpha = min(1.0, alpha * 2)  # Double alpha for recent periods, but cap at 1.0
+        alpha_values = np.full(len(forecast_error), alpha)
+        alpha_values[-min(5, len(alpha_values)):] = recent_alpha
 
         # Generate new forecast
         forecast = np.zeros(len(history) + time_horizon)
@@ -85,7 +84,7 @@ def adaptive_expectations(historical_data, previous_forecasts, time_horizon):
                 # For periods beyond previous forecast, use the last adapted value
                 forecast[i] = forecast[i-1]
 
-        new_forecasts[key] = forecast
+        new_forecasts[key] = forecast[-time_horizon:]  # Return only the forecasted values
     #print(f"adaptive: {new_forecasts}, transformer: {transformer_forecasts}")
     return new_forecasts
 
