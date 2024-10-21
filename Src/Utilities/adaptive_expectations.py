@@ -6,25 +6,28 @@ import torch.optim as optim
 
 
 
-def autoregressive(historical_data, previous_forecasts, time_horizon):
+def autoregressive(historical_data, previous_forecasts, time_horizon= 10):
     new_forecasts = {}
-    alpha = 0.3  # Smoothing factor, higher values give more weight to recent observations
-
+    
     for key in historical_data:
         history = np.array(historical_data[key])
         
         if len(history) < 2:
             new_forecasts[key] = np.full(time_horizon, history[-1])
         else:
-            # Calculate EMA
-            ema = history[-1]  # Start with the most recent observation
-            for i in range(2, len(history) + 1):
-                ema = alpha * history[-i] + (1 - alpha) * ema
+            # Use the last 10 periods (or all if less than 10) for the AR model
+            recent_history = history[-min(time_horizon, len(history)):]
             
-            # Create forecast array
-            forecast = np.empty(time_horizon)
-            forecast[0] = history[-1]  # Set first element to last historical value
-            forecast[1:] = ema  # Use EMA for remaining predictions
+            # Fit a simple AR(1) model
+            diff = np.diff(recent_history)
+            ar_coef = np.mean(diff)
+            
+            # Generate forecast
+            forecast = np.zeros(time_horizon)
+            forecast[0] = history[-1] + ar_coef  # First forecast
+            
+            for i in range(1, time_horizon):
+                forecast[i] = forecast[i-1] + ar_coef
             
             new_forecasts[key] = forecast
 

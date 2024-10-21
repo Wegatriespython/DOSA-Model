@@ -10,7 +10,7 @@ last_solution = None
 
 
 
-def profit_maximization(Profit_max_params, linear_solver='ma57'):
+def profit_maximization(Profit_max_params, linear_solver='mumps'):
 
     global last_solution
 

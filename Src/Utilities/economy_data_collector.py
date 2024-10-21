@@ -96,6 +96,7 @@ class EconomyDataCollector:
         )
     @staticmethod
     def get_total_labor_supply(model):
+        print("model.schedule.agents", model.schedule.agents)
         return sum(worker.available_hours() for worker in model.schedule.agents if isinstance(worker, Worker))
     @staticmethod
     def get_total_labor_demand(model):

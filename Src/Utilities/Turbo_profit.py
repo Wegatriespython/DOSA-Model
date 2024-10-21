@@ -3,57 +3,51 @@ from pyomo.opt import SolverFactory
 import numpy as np
 from functools import lru_cache
 
-# Global variable to store the last solution for warm start
-last_solution = None
 
-@lru_cache(maxsize=2056)
-def memoized_profit_maximization(
-    current_capital, current_labor, current_price, current_productivity,
-    expected_demand, expected_price, capital_price, capital_elasticity,
-    current_inventory, depreciation_rate, expected_periods, discount_rate,
-    budget, wage,capital_supply,labor_supply, linear_solver):
-    return _profit_maximization(
-      current_capital, current_labor, current_price, current_productivity,
-      expected_demand, expected_price, capital_price, capital_elasticity,
-      current_inventory, depreciation_rate, expected_periods, discount_rate,
-      budget, wage,capital_supply,labor_supply, linear_solver)
 
-def profit_maximization(
-    current_capital, current_labor, current_price, current_productivity,
-    expected_demand, expected_price, capital_price, capital_elasticity,
-    current_inventory, depreciation_rate, expected_periods, discount_rate,
-    budget, wage,capital_supply,labor_supply, linear_solver='mumps'):
+def profit_maximization(params):
 
-    global last_solution
+    current_capital = params['current_capital']
+    current_labor = params['current_labor']
+    current_price = params['current_price']
+    current_productivity = params['current_productivity']
+    expected_demand = [demand/5 for demand in params['expected_demand']]
+    expected_price = params['expected_price']
+    capital_price = params['capital_price']
+    capital_elasticity = params['capital_elasticity']
+    current_inventory = params['current_inventory']
+    depreciation_rate = params['depreciation_rate']
+    expected_periods = params['expected_periods']
+    discount_rate = params['discount_rate']
+    budget = params['budget']
+    wage = params['wage'][0]
+    capital_supply = params['capital_supply']
+    labor_supply = [supply / (16*5) for supply in params['labor_supply']][0]
 
-    # Convert numpy arrays to tuples for hashing
-    expected_demand_tuple = tuple(expected_demand)
-    expected_price_tuple = tuple(expected_price)
 
-    result = memoized_profit_maximization(
-        current_capital, current_labor, current_price, current_productivity,
-        expected_demand_tuple, expected_price_tuple, capital_price, capital_elasticity,
+    results = _profit_maximization(current_capital, current_labor, current_price, current_productivity,
+        expected_demand, expected_price, capital_price, capital_elasticity,
         current_inventory, depreciation_rate, expected_periods, discount_rate,
-        budget, wage,capital_supply,labor_supply,linear_solver)
+        budget, wage,capital_supply, labor_supply, linear_solver = 'mumps')
+    if results is None:
+        print("No optimal solution found")
+        return None
+    else:
+        return round_results(results)
 
-    if result is not None:
-        last_solution = (result['optimal_labor'], result['optimal_capital'])
-        rounded_result = round_results(result)
-        return rounded_result
-
-    return result
 
 def _profit_maximization(
         current_capital, current_labor, current_price, current_productivity,
         expected_demand, expected_price, capital_price, capital_elasticity,
         current_inventory, depreciation_rate, expected_periods, discount_rate,
-        budget, wage,capital_supply, labor_supply, linear_solver):
+        budget, wage,capital_supply, labor_supply, linear_solver = 'mumps') :
 
     model = pyo.ConcreteModel()
 
     # Sets
     model.T = pyo.RangeSet(0, expected_periods - 1)
-    max_labor = labor_supply/16 + current_labor
+    max_labor = max(labor_supply + current_labor, 3)
+    print(f"max_labor: {max_labor}")
     max_capital = capital_supply + current_capital
 
 
@@ -63,6 +57,7 @@ def _profit_maximization(
     # Scaling factors
     scale_capital = max(1, guess_capital)
     scale_labor = max(1, guess_labor)
+    print(f"scale_labor: {scale_labor}")
     scale_price = max(1, max(expected_price))
     scale_demand = max(1, max(expected_demand))
 

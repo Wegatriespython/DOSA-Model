@@ -3,35 +3,33 @@ from pyomo.opt import SolverFactory
 import numpy as np
 from functools import lru_cache
 
-# Global variable to store the last solution for warm start
 last_solution = None
 
-
-### HOLY SHIT I GOT IT. THESE GUYS DON'T SEE LABOR DEMAND AT ALL. 
 @lru_cache(maxsize=2056)
 def memoized_maximize_utility(savings, wages, prices, discount_rate, periods, alpha, max_working_hours, working_hours, expected_labor_demand, expected_consumption_supply, linear_solver):
     return _maximize_utility(savings, wages, prices, discount_rate, periods, alpha, max_working_hours, working_hours, expected_labor_demand, expected_consumption_supply, linear_solver)
 
-def maximize_utility(Utility_params, linear_solver='mumps'):
-    global last_solution
-    savings = Utility_params['savings']
-    wages = Utility_params['wage']
-    prices = Utility_params['price']
-    discount_rate = Utility_params['discount_rate']
-    periods = Utility_params['time_horizon']
-    alpha = Utility_params['alpha']
-    max_working_hours = Utility_params['max_working_hours']
-    working_hours = Utility_params['working_hours']
-    expected_labor_demand = Utility_params['expected_labor_demand']
-    expected_consumption_supply = Utility_params['expected_consumption_supply']
-    result = memoized_maximize_utility(savings, tuple(wages), tuple(prices), discount_rate, periods, alpha, max_working_hours, working_hours, tuple(expected_labor_demand), tuple(expected_consumption_supply), linear_solver)
+def maximize_utility(params):
+    savings = params['savings']
+    wages = params['wage']
+    prices = params['price']
+    discount_rate = params['discount_rate']
+    periods = params['time_horizon']
+    alpha = params['alpha']
+    max_working_hours = params['max_working_hours']
+    working_hours = params['working_hours']
+    expected_labor_demand = [demand*16/30 for demand in params['expected_labor_demand']] #Convert to hours for workers
+    expected_consumption_supply = [supply / 30 for supply in params['expected_consumption_supply']] # Per-worker consumption available. 
+    results = memoized_maximize_utility(savings, tuple(wages), tuple(prices), discount_rate, periods, alpha, max_working_hours, working_hours, tuple(expected_labor_demand), tuple(expected_consumption_supply), linear_solver = 'mumps')
+    if results is None:
+        print("No optimal solution found")
+        return None
+    else:
+        return round_to_integers(results)
 
-    if result is not None:
-        last_solution = result  # Update last_solution for warm start
-        rounded_result = round_to_integers(result)
-        return rounded_result
 
-    return result
+
+
 
 def _maximize_utility(savings, wages, prices, discount_rate, periods, alpha, max_working_hours, working_hours, expected_labor_demand, expected_consumption_supply, linear_solver):
     global last_solution

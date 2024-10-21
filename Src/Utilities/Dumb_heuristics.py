@@ -1,69 +1,3 @@
-import numpy as np
-from scipy import stats
-from scipy.stats import norm
-from scipy.optimize import minimize_scalar
-from Src.Utilities.Dumb_heuristics import determine_scenario, best_response_scenario_buyer, best_response_scenario_seller
-
-
-
-def get_max_wage(total_working_hours, productivity, capital, capital_elasticity, price, total_labor_units, labor, minimum_wage):
-    if total_working_hours < 16:
-        production_capacity = calculate_production_capacity(productivity, capital, capital_elasticity, 1)
-        revenue_per_hour = (production_capacity * price) / 16
-        max_wage = revenue_per_hour
-    else:
-        labor_demand = labor
-        new_units = labor_demand
-
-        new_production_capacity = calculate_production_capacity(productivity, capital, capital_elasticity, new_units)
-
-        extra_revenue = (new_production_capacity ) * price
-
-        extra_revenue_per_hour = extra_revenue / 16
-        max_wage = extra_revenue_per_hour
-
-    return max(min(max_wage, 1.2), minimum_wage)
-
-def get_min_sale_price(firm_type, workers, productivity, capital, capital_elasticity, total_labor_units, inventory):
-    if firm_type == 'consumption':
-        labor_cost = sum([worker['wage'] * worker['hours'] for worker in workers.values()])
-        capital_cost = 0
-        total_cost = labor_cost + capital_cost
-        total_output = calculate_production_capacity(productivity, capital, capital_elasticity, total_labor_units) + inventory
-        if total_output <= 0 or total_cost <= 0.001:
-            return 0.7
-        return max(total_cost / total_output, 0.7)
-    else:
-        total_working_hours = sum([worker['hours'] for worker in workers.values()])
-        average_wage = sum([worker['wage'] * worker['hours'] for worker in workers.values()]) / total_working_hours if total_working_hours > 0 else 0
-        labor_cost = total_working_hours * average_wage
-        total_output = calculate_production_capacity(productivity, capital, capital_elasticity, total_labor_units) + inventory
-        if total_output <= 0 or labor_cost <= 0.001:
-            return 0.7
-        return max(labor_cost / total_output,0.7)
-
-def get_max_capital_price(investment_demand, optimal_production, optimal_capital, price, capital_elasticity, time_horizon, discount_rate):
-
-
-    optimal_price = price
-
-
-    total_revenue = sum([optimal_production * optimal_price * (1 - discount_rate)**i for i in range(time_horizon)])
-
-    marginal_revenue_product = (total_revenue / optimal_capital) * capital_elasticity
-
-    max_price_factor = 1.2
-    max_capital_price = marginal_revenue_product * max_price_factor
-
-    return max_capital_price
-
-def calculate_production_capacity(productivity, capital, capital_elasticity, total_labor_units):
-    production_capacity = productivity *(capital ** capital_elasticity)* total_labor_units ** (1 - capital_elasticity)
-    return production_capacity
-def get_desired_capital_price(self):
-    capital_price = self.price * 3
-    return capital_price
-
 def buyer_heuristic(price_decision_data, debug = False):
     """
     Compute a heuristic bid price for a buyer in the two-round market clearing mechanism, Think deeper. Rn in case of round 1, buyers are not pushing up prices to raise supply and curb demand. 
@@ -109,7 +43,7 @@ def buyer_heuristic(price_decision_data, debug = False):
                     if debug:
                         print("Round 2: Buyer Advantage, seller_min_price < avg_buyer_price")
                 case (x, y) if x >= y:
-                    min_price_estimate =seller_min_price * 1.10 # 5% margin of safety to prevent crashing through the price floor. 
+                    min_price_estimate =seller_min_price * 1.05 # 5% margin of safety to prevent crashing through the price floor. 
                     if debug:
                         print("Round 2: Seller Advantage, seller_min_price >= avg_buyer_price")
         case (_, _, _, _, _, _, _) :
@@ -150,7 +84,7 @@ def buyer_heuristic(price_decision_data, debug = False):
         
     target_price = max(price_estimate, seller_min_price)
 
-    final_price = previous_price + 0.01 * (target_price - previous_price)
+    final_price = previous_price + 0.2 * (target_price - previous_price)
     if debug:
         print(f"target_price {target_price}, previous_price {previous_price}, final_price {final_price}")
         print(f"pvt_res_price: {pvt_res_price}, seller_min_price: {seller_min_price}, output: {final_price}")
@@ -182,7 +116,7 @@ def seller_heuristic(price_decision_data, debug = False):
         case (_, _, supply, demand, _, _, _) if demand >= supply : 
             match buyer_max_price, avg_seller_price:
                 case (x, y) if x >= y:
-                    max_price_estimate = buyer_max_price * 0.85 # 5% margin of safety to prevent flying above the price ceiling. 
+                    max_price_estimate = buyer_max_price * 0.95 # 5% margin of safety to prevent flying above the price ceiling. 
                     if debug:
                         print("Round 2: Seller Advantage, buyer_max_price >= avg_seller_price")
                 case (x, y) if x < y:
@@ -234,7 +168,7 @@ def seller_heuristic(price_decision_data, debug = False):
     target_price = min(price_estimate, buyer_max_price)
 
   
-    final_price =  previous_price + 0.01 * (target_price - previous_price)
+    final_price =  previous_price + 0.2 * (target_price - previous_price)
 
 
     if debug:
@@ -248,14 +182,159 @@ def best_response_exact(price_decision_data, debug = False):
     Compute a heuristic bid or ask price for a player in the two-round market clearing mechanism,
     using a simplified approach based on market conditions and private reservation price.
     """
-    scenario = determine_scenario(price_decision_data)
-    print(f"scenario: {scenario}")
-    
     is_buyer = price_decision_data['is_buyer']
-    return best_response_scenario_buyer(price_decision_data, debug) if is_buyer else best_response_scenario_seller(price_decision_data, debug)
+    return buyer_heuristic(price_decision_data, debug) if is_buyer else seller_heuristic(price_decision_data, debug)
+
+def determine_scenario(price_decision_data):
+    """Determine the current scenario for a buyer or seller."""
+    #market_type = price_decision_data['market_type']
+    round_num = price_decision_data['round_num']
+    demand = price_decision_data['demand']
+    supply = price_decision_data['supply']
+    buyer_price = price_decision_data['avg_buyer_price']
+    seller_price = price_decision_data['avg_seller_price']
+    buyer_max_price = price_decision_data['avg_buyer_max_price']
+    seller_min_price = price_decision_data['avg_seller_min_price']
+    
+    #print("market_type", market_type)
+
+    if demand > supply:
+        market_balance = "ExcessDemand"
+    elif supply > demand:
+        market_balance = "ExcessSupply"
+    else:
+        market_balance = "Equilibrium"
+
+    if round_num == 1:
+        trade_condition = "Trade" if buyer_price >= seller_price else "NoTrade"
+        return f"Round1_{market_balance}_{trade_condition}"
+    else:  # Round 2
+        if market_balance == "ExcessDemand":
+            trade_condition = "Trade" if buyer_max_price >= seller_price else "NoTrade"
+            return f"Round2_SellerAdv_{market_balance}_{trade_condition}"
+        else:  # ExcessSupply or Equilibrium (Buyer Advantage)
+            trade_condition = "Trade" if buyer_price >= seller_min_price else "NoTrade"
+            return f"Round2_BuyerAdv_{market_balance}_{trade_condition}"
 
 
+def best_response_scenario_buyer(price_decision_data, debug=False):
+    """Determine the optimal policy for a buyer based on the current scenario."""
+    scenario = determine_scenario(price_decision_data)
+    
+    avg_buyer_price = price_decision_data['avg_buyer_price']
+    avg_seller_price = price_decision_data['avg_seller_price']
+    avg_buyer_max_price = price_decision_data['avg_buyer_max_price']
+    avg_seller_min_price = price_decision_data['avg_seller_min_price']
+    pvt_res_price = price_decision_data['pvt_res_price']
+    previous_price = price_decision_data['previous_price']
+    demand = price_decision_data['demand']
+    supply = price_decision_data['supply']
+    
+    def adjust_for_imbalance(base_price, upper_bound=None, lower_bound=None):
+        imbalance_factor = (demand - supply) / (demand + supply)
+        # test value demand = 30, supply = 20, demand + supply = 50, imbalance_factor = 10/50 = 0.2
+        if imbalance_factor >= 0:
+            return base_price + imbalance_factor * (upper_bound - base_price)
+        else:
+            return base_price + imbalance_factor * (base_price - lower_bound)
+    
+    def blend_with_previous(target_price):
+        return previous_price + 0.001 * (target_price - previous_price) # Since we are setting the target price to the limiting value, we need to make small adjustments. 
+    
+    match scenario:
+        case "Round1_ExcessDemand_Trade" | "Round1_ExcessDemand_NoTrade" :
+            # Seller will set price close to the ceiling. Buyers are competing for limited supply. Race to be the highest bidder. 
+            # Probably need to test to ensure this is proportional to the imbalance
+            upper_bound = min(avg_buyer_max_price*1.01, pvt_res_price)
+            target_price = adjust_for_imbalance(max(avg_seller_price, avg_buyer_price), upper_bound= upper_bound)
+            if debug:
+                print(f"Scenario: {scenario}, Target Price: {target_price}, base_price: {max(avg_seller_price, avg_buyer_price)}, upper_bound: {upper_bound}, pvt_res_price: {pvt_res_price}, average_buyer_max_price: {avg_buyer_max_price}")
+        # Not possible. Round 1 always trades.  Its round 2 that might not trade. 
+        case "Round2_SellerAdv_ExcessDemand_Trade"| "Round2_SellerAdv_ExcessDemand_NoTrade" :
+            target_price = min(avg_buyer_max_price * 1.01, pvt_res_price)
+            if debug: 
+                print(f"Scenario: {scenario}, Target Price: {target_price} ") 
+
+        case "Round1_Equilibrium_Trade" | "Round1_Equilibrium_NoTrade" | "Round2_BuyerAdv_Equilibrium_Trade" | "Round2_BuyerAdv_Equilibrium_NoTrade":
+            # This is very close to the equilibrium price, sellers will target avg_buyer_price and buyers will target avg_seller_price.
+            target_price = avg_seller_price * 1.02
+            if debug: 
+                print(f"Scenario: {scenario}, Target Price: {target_price} ") 
+        
+        case "Round1_ExcessSupply_Trade" | "Round1_ExcessSupply_NoTrade":
+            # In Round 2 with seller advantage and possible trade, bid close to the average seller price
+            lower_bound = avg_seller_min_price # Less caution as the imbalance factor dampens the adjustment lowering risk of overshooting. 
+            target_price = adjust_for_imbalance(avg_buyer_price, lower_bound= lower_bound)
+            if debug: 
+                print(f"Scenario: {scenario}, Target Price: {target_price}, base_price: {avg_buyer_price} lower_bound: {lower_bound} ") 
+        # Round 2 Equilibrium is not possible? Or is it?
+        case "Round2_BuyerAdv_ExcessSupply_Trade" | "Round2_BuyerAdv_ExcessSupply_NoTrade":
+            target_price = avg_seller_min_price * 1.05 # More caution when directly approaching the floor. 
+            if debug: 
+                print(f"Scenario: {scenario}, Target Price: {target_price} ") 
+        case _:
+            raise ValueError(f"Unknown scenario: {scenario}")
+    
+    final_price = blend_with_previous(target_price)
+
+    final_price_true = min(final_price, pvt_res_price)
+    # Ensure we don't exceed private reservation price
+    if debug: 
+        print(f"Scenario: {scenario}, Final Price: {final_price}, final_price_true: {final_price_true} ") 
+    
+    
+    return final_price_true
 
 
+def best_response_scenario_seller(price_decision_data, debug=False):
+    """Determine the optimal policy for a seller based on the current scenario."""
+    scenario = determine_scenario(price_decision_data)
+    
+    avg_buyer_price = price_decision_data['avg_buyer_price']
+    avg_seller_price = price_decision_data['avg_seller_price']
+    avg_buyer_max_price = price_decision_data['avg_buyer_max_price']
+    avg_seller_min_price = price_decision_data['avg_seller_min_price']
+    pvt_res_price = price_decision_data['pvt_res_price']
+    previous_price = price_decision_data['previous_price']
+    demand = price_decision_data['demand']
+    supply = price_decision_data['supply']
+    
+    def adjust_for_imbalance(base_price, lower_bound = None, upper_bound = None):
+        imbalance_factor = (demand - supply) / (demand + supply)
+        if imbalance_factor >= 0:
+            return base_price + imbalance_factor * (upper_bound - base_price)
+            # imbalance_factor is +ve when demand > supply, so this will raise the price estimate. 
+        else:
+            return base_price + imbalance_factor * (base_price - lower_bound) # Base price is always higher than lower_bound.  so this will lower the price estimate. 
+            # imbalance_factor is -ve when supply > demand, so this will lower the price estimate. 
+    
+    def blend_with_previous(target_price):
+        return previous_price + 0.001 * (target_price - previous_price)
+    
+    match scenario:
+        case "Round1_ExcessDemand_Trade" | "Round1_ExcessDemand_NoTrade":
+            upper_bound = avg_buyer_max_price * 0.85
+            target_price = adjust_for_imbalance(base_price=max(avg_seller_price, avg_buyer_price), upper_bound=upper_bound)
 
+        case "Round2_SellerAdv_ExcessDemand_Trade" | "Round2_SellerAdv_ExcessDemand_NoTrade":
+            target_price = avg_buyer_max_price * 0.95
+
+        case "Round1_Equilibrium_Trade" | "Round1_Equilibrium_NoTrade" | "Round2_BuyerAdv_Equilibrium_Trade" | "Round2_BuyerAdv_Equilibrium_NoTrade":
+            target_price = avg_buyer_price * 0.99
+
+        case "Round1_ExcessSupply_Trade" | "Round1_ExcessSupply_NoTrade":
+            lower_bound = pvt_res_price
+            target_price = adjust_for_imbalance(base_price=min(avg_seller_price, avg_buyer_price), lower_bound=lower_bound)
+        case "Round2_BuyerAdv_ExcessSupply_Trade" | "Round2_BuyerAdv_ExcessSupply_NoTrade":
+            target_price = min(avg_seller_min_price*0.98, pvt_res_price)
+        case _:
+            raise ValueError(f"Unknown scenario: {scenario}")
+    
+    final_price = blend_with_previous(target_price)
+    final_price_true = max(final_price, pvt_res_price)  # Ensure we don't go below private reservation price
+    
+    if debug:
+        print(f"Scenario: {scenario}, Final Price: {final_price}")
+    
+    return final_price_true
 

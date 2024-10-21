@@ -82,7 +82,7 @@ def get_market_stats(self, market_type):
     base_result = {
         'quantity': 0, 
         'price': 0, 
-        'round': 0, 
+        'round_num': 0, 
         'advantage': "none",
         'avg_buyer_price': 0, 
         'avg_seller_price': 0,
@@ -100,18 +100,18 @@ def get_market_stats(self, market_type):
         
         match market_type:
             case 'capital':
-                base_result.update({'quantity': 6, 'price': 3, 'round': 1, 'advantage': "none",   
+                base_result.update({'quantity': 6, 'price': 3, 'round_num': 1, 'advantage': "none",   
                     'avg_buyer_max_price': 3, 'avg_seller_min_price': 3, 'avg_buyer_price': 3, 'avg_seller_price': 3,
                     'std_buyer_price': 0, 'std_seller_price': 0, 'std_buyer_max': 0, 'std_seller_min': 0, 'total_demand': 0, 'total_supply': 0})
                 return base_result
                 
             case 'consumption':
-                base_result.update({'quantity': 30, 'price': 1, 'round': 1, 'advantage': "none",
+                base_result.update({'quantity': 30, 'price': 1, 'round_num': 1, 'advantage': "none",
                     'avg_buyer_max_price': 1, 'avg_seller_min_price': 1, 'avg_buyer_price': 1, 'avg_seller_price': 1,
                     'std_buyer_price': 0, 'std_seller_price': 0, 'std_buyer_max': 0, 'std_seller_min': 0, 'total_demand': 30, 'total_supply': 30})
                 return base_result
             case 'labor':
-                base_result.update({'quantity': 300, 'price': 0.0625, 'round': 1, 'advantage': "none",
+                base_result.update({'quantity': 300, 'price': 0.0625, 'round_num': 1, 'advantage': "none",
                     'avg_buyer_max_price': 0.0625, 'avg_seller_min_price': 0.0625, 'avg_buyer_price': 0.0625, 'avg_seller_price': 0.0625,
                     'std_buyer_price': 0, 'std_seller_price': 0, 'std_buyer_max': 0, 'std_seller_min': 0, 'total_demand': 480, 'total_supply': 480})
                 return base_result
@@ -131,17 +131,17 @@ def get_market_stats(self, market_type):
         case (0, _, _, _, _, _):
             # 0 Demand Case, returns with supply as demand
             
-            base_result.update({'quantity':total_supply , 'price': avg_seller_min_price, 'round': 2, 'advantage': "buyer"})
+            base_result.update({'quantity':total_supply , 'price': avg_seller_min_price, 'round_num': 2, 'advantage': "buyer"})
             return base_result
         case (_, 0, _, _, _, _):
             # 0 Supply Case, returns with full demand at max price
-            base_result.update({'quantity': total_demand, 'price': avg_buyer_max_price, 'round': 2, 'advantage': "seller"})
+            base_result.update({'quantity': total_demand, 'price': avg_buyer_max_price, 'round_num': 2, 'advantage': "seller"})
             return base_result
         
 
         case (_, _, buyer_price, seller_price, _, _) if buyer_price >= seller_price:
             # Round 1 Case, ideal market function  
-            base_result.update({'quantity': total_demand, 'price': (buyer_price + seller_price) / 2, 'round': 1, 'advantage': "none"})
+            base_result.update({'quantity': total_demand, 'price': (buyer_price + seller_price) / 2, 'round_num': 1, 'advantage': "none"})
             return base_result
 
         case (demand, supply, _, seller_price, buyer_max_price, _) if demand > supply:
@@ -152,7 +152,7 @@ def get_market_stats(self, market_type):
                     base_result.update({
                         'quantity': supply, 
                         'price': (bid + ask) / 2, 
-                        'round': 2, 
+                        'round_num': 2, 
                         'advantage': "seller"})
                     return base_result
                 case _:
@@ -160,7 +160,7 @@ def get_market_stats(self, market_type):
                     base_result.update({
                         'quantity': supply, 
                         'price': buyer_max_price, 
-                        'round': 2, 
+                        'round_num': 2, 
                         'advantage': "failure",
                     })
                     return base_result
@@ -169,16 +169,16 @@ def get_market_stats(self, market_type):
             match (buyer_price, seller_min_price):
                 case (bid, ask) if bid >= ask:
                     # Buyer is pricing correctly
-                    base_result.update({'quantity': demand, 'price': (bid + ask) / 2, 'round': 2, 'advantage': "buyer"})
+                    base_result.update({'quantity': demand, 'price': (bid + ask) / 2, 'round_num': 2, 'advantage': "buyer"})
                     return base_result
                 case _:
                     # Buyer has priced themselves out of the market
-                    base_result.update({'quantity': demand, 'price': seller_min_price, 'round': 2, 'advantage': "failure"})
+                    base_result.update({'quantity': demand, 'price': seller_min_price, 'round_num': 2, 'advantage': "failure"})
                     return base_result
 
         case _:
             # Catch all case, failure
-            base_result.update({'quantity': total_demand, 'price': avg_buyer_price, 'round': 2, 'advantage': "failure"})
+            base_result.update({'quantity': total_demand, 'price': avg_buyer_price, 'round_num': 2, 'advantage': "failure"})
             return base_result
 
 def update_market_statistics(self):

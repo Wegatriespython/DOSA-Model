@@ -21,6 +21,9 @@
 /Src/Data/*
 !/Src/Data/Dashboard.py
 /Src/Theory/
+Project Plan.md
+Prompts.md
+Notes.md
 
 /Src/output.log
 # Ignore __pycache__ directories in all subdirectories

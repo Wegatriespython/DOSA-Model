@@ -157,21 +157,21 @@ class Worker(Agent):
             'expected_consumption_supply': self.worker_expectations['supply']['consumption']
         }
        
-        if np.random.randint(10) == 0:
+        if np.random.randint(2) == 0:
             print(Utility_params)
         
         results = maximize_utility(Utility_params)
         self.desired_consumption, self.working_hours, self.leisure, self.desired_savings = [arr[0] for arr in results]
         working_hours_ratio = self.total_working_hours / self.working_hours if self.working_hours > 0 else 0
-        # self.desired_consumption = self.desired_consumption * working_hours_ratio if working_hours_ratio > 0 and working_hours_ratio < 1 else self.desired_consumption
         self.optimals = [self.desired_consumption, self.working_hours, self.desired_savings]
         print(self.optimals)
 
     def update_strategy(self):
         max_price = self.get_max_consumption_price()
         price_decision_data = {
+            'market_type': 'consumption',
             'is_buyer': True,
-            'round_num': self.strategy['consumption']['round'],
+            'round_num': self.strategy['consumption']['round_num'],
             'advantage': self.strategy['consumption']['advantage'],
             'price': self.strategy['consumption']['price'],
             'avg_buyer_price': self.strategy['consumption']['avg_buyer_price'],
@@ -189,6 +189,7 @@ class Worker(Agent):
         }
 
         desired_price = best_response_exact(price_decision_data, debug = True)
+
         if max_price != self.get_max_consumption_price():
             print("inconsistent prices!")
             breakpoint()
@@ -201,8 +202,9 @@ class Worker(Agent):
         self.desired_price = desired_price
 
         wage_decision_data = {
+            'market_type': 'labor',
             'is_buyer': False,
-            'round_num': self.strategy['labor']['round'],
+            'round_num': self.strategy['labor']['round_num'],
             'advantage': self.strategy['labor']['advantage'],
             'price': self.strategy['labor']['price'],
             'avg_buyer_price': self.strategy['labor']['avg_buyer_price'],

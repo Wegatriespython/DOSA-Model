@@ -77,7 +77,7 @@ class Firm(Agent):
         self.demand_expectations = {'consumption': [], 'capital': [], 'labor': []}
         self.price_expectations = {'consumption': [], 'capital': [], 'labor': []}
         self.supply_expectations = {'consumption': [], 'capital': [], 'labor': []}
-
+        self.desireds = {'wage': 0.0625, 'price': 1, 'capital_price': 3}
         self.desireds_record = {'wage': [], 'price': [], 'capital_price': []}
         self.performance_record = {'production': [], 'labor': [], 'capital': [], 'price': [], 'sales': [], 'profit': [], 'debt': [], 'market_share': [], 'budget':[]}
         self.gaps_record = {'production': [], 'labor': [], 'capital': [], 'price': [], 'sales': [], 'profit': [], 'debt': [], 'inventory' : []}
@@ -175,7 +175,9 @@ class Firm(Agent):
         Price = {
           'consumption': consumption_market_stats['price'],
           'capital': capital_market_stats['price'],
+          'desired_price': self.desireds['price'],
           'labor': labor_market_stats['price'],
+          'desired_wage': self.desireds['wage'],
           'labor_avg_buyer_max_price': labor_market_stats['avg_buyer_max_price'],
           'labor_avg_seller_min_price': labor_market_stats['avg_seller_min_price'],
           'labor_avg_buyer_price': labor_market_stats['avg_buyer_price'],
@@ -247,7 +249,7 @@ class Firm(Agent):
             'current_price': round(self.price,2),
             'productivity': self.productivity,
             'expected_demand': list(map(lambda x: x / number_of_firms, self.firm_expectations['demand']['consumption'])),
-            'expected_price': self.expected_price,
+            'expected_price': self.firm_expectations['price']['consumption'],
             'capital_price': self.firm_expectations['price']['capital'][-1:][0],
             'capital_elasticity': self.capital_elasticity,
             'inventory': round(self.inventory,2),
@@ -255,7 +257,7 @@ class Firm(Agent):
             'time_horizon': (self.model.time_horizon),
             'discount_rate': self.model.config.DISCOUNT_RATE,
             'budget': round(self.budget,2),
-            'wage': round(self.wage * self.max_working_hours,2),
+            'wage': self.firm_expectations['price']['labor'][0],
             'expected_capital_supply': self.firm_expectations['supply']['capital'][0],
             'expected_labor_supply': self.firm_expectations['supply']['labor'][0],
             'debt': self.debt,
@@ -518,6 +520,8 @@ class Firm(Agent):
 
       price_params = {
         'is_buyer': False,
+        'market_type': 'consumption',
+        'round_num': self.strategy['consumption']['round_num'],
         'price': self.strategy['consumption']['price'],
         'avg_buyer_price': self.strategy['consumption']['avg_buyer_price'],
         'avg_seller_price': self.strategy['consumption']['avg_seller_price'],
@@ -528,7 +532,7 @@ class Firm(Agent):
         'pvt_res_price': self.zero_profit_conditions['price'],
         'previous_price': self.desireds['price']
         }
-      desired_price = best_response_exact(price_params, debug = True)
+      desired_price = best_response_exact(price_params, debug = False)
 
       if desired_price > price_params['avg_buyer_max_price']:
         print("price_params", price_params)
@@ -541,6 +545,8 @@ class Firm(Agent):
         breakpoint()
       wage_params = { 
         'is_buyer': True,
+        'market_type': 'labor',
+        'round_num': self.strategy['labor']['round_num'],
         'price': self.strategy['labor']['price'],
         'avg_buyer_price': self.strategy['labor']['avg_buyer_price'],
         'avg_seller_price': self.strategy['labor']['avg_seller_price'],
@@ -551,7 +557,7 @@ class Firm(Agent):
         'pvt_res_price': self.zero_profit_conditions['wage'],
         'previous_price': self.desireds['wage']
       }
-      desired_wage = best_response_exact(wage_params, debug = True)
+      desired_wage = max(best_response_exact(wage_params, debug = True), self.model.config.MINIMUM_WAGE)
 
       self.desireds = {
         'wage': desired_wage,
