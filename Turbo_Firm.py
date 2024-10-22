@@ -23,12 +23,16 @@ class Firm:
         # Set consumption prices based on labor price expectations
         costs = self.labor_demand * self.labor_price_expectations[0]
         price = costs / self.production
+        increment_factor = 1 + np.random.uniform(0, 0.1)
+        price *= increment_factor
         return price
 
     def get_max_labor_price(self):
         # Set labor prices based on consumption price expectations
         revenue = self.production * self.consumption_price_expectations[0]
-        price = revenue / self.labor_demand
+        price = revenue / self.labor_demand # Hourly wage maximum firm can pay
+        decrease_factor = 1 - np.random.uniform(0, 0.1)
+        price *= decrease_factor
         return price
     
     def get_profit_params(self):
@@ -55,18 +59,21 @@ class Firm:
         return params
 
     def update_expectations(self, labor_market_stats, consumption_market_stats):
-        """
-        Update firm's expectations based on market statistics.
+        alpha = 1  # Weight for new information
         
-        :param labor_market_stats: Dictionary containing labor market statistics
-        :param consumption_market_stats: Dictionary containing consumption market statistics
-        """
         # Update labor market expectations
         if is_valid_number(labor_market_stats.get('price')):
-            self.labor_price_expectations = [labor_market_stats['price']]
-            self.labor_supply_expectations = [labor_market_stats['supply']]
+            new_labor_price = alpha * labor_market_stats['price'] + (1 - alpha) * self.labor_price_expectations[0]
+            self.labor_price_expectations = [new_labor_price]
+            
+            new_labor_supply = alpha * labor_market_stats['supply'] + (1 - alpha) * self.labor_supply_expectations[0]
+            self.labor_supply_expectations = [new_labor_supply]
+        
         # Update consumption market expectations
         if is_valid_number(consumption_market_stats.get('price')):
-            self.consumption_price_expectations = [consumption_market_stats['price']]
+            new_consumption_price = alpha * consumption_market_stats['price'] + (1 - alpha) * self.consumption_price_expectations[0]
+            self.consumption_price_expectations = [new_consumption_price]
+        
         if is_valid_number(consumption_market_stats.get('demand')):
-            self.consumption_demand_expectations = [consumption_market_stats['demand']]
+            new_consumption_demand = alpha * consumption_market_stats['demand'] + (1 - alpha) * self.consumption_demand_expectations[0]
+            self.consumption_demand_expectations = [new_consumption_demand]

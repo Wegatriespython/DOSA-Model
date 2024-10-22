@@ -9,3 +9,5 @@ Based on the auction system firms and workers update their supply and demand fun
 Then they run through the best response function for prices based on the previous round's bid, ask, bid_max, ask_min, supply, demand. 
 
 Our goal is to see if we can acheive a fixed point equilibrium in this market economy. 
+
+![alt text](consumption_prices-1.png) ![alt text](consumption_supply_demand-1.png) ![alt text](labor_prices-1.png) ![alt text](labor_supply_demand-1.png)
