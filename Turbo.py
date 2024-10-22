@@ -1,11 +1,13 @@
 import numpy as np
 from Src.Utilities.market_matching import market_matching
+from Src.Utilities.Turbo_profit import profit_maximization
+from Src.Utilities.Turbo_utility import maximize_utility
 from Src.Utilities.adaptive_expectations import autoregressive
 from Turbo_Firm import *
 from Turbo_Worker import *
 from Turbo_utils import *
 import matplotlib.pyplot as plt
-from best_response import best_response, find_equilibrium
+
 
 def info_dump(agent):
     print(f"{'=' * 40}")
@@ -35,7 +37,7 @@ def info_dump(agent):
 def simulate_market():
     num_workers = 30
     num_firms = 5
-    max_iterations = 600
+    max_iterations = 500
     tolerance = 1e-3
 
     # Create workers and firms using their initialized values
@@ -46,65 +48,124 @@ def simulate_market():
     labor_market_data = []
     consumption_market_data = []
 
-    # Initial prices guess
-    initial_prices = np.array([1, 1])  # [wage, goods_price]
-
     for iteration in range(max_iterations):
         print(f"\nIteration {iteration + 1}")
 
-        # Prepare worker and firm parameters for optimization
-        worker_params = [worker.get_utility_params() for worker in workers]
-        firm_params = [firm.get_profit_params() for firm in firms]
-
-        # Find equilibrium prices
-        try:
-            equilibrium_prices = find_equilibrium(worker_params, firm_params, initial_prices)
-            new_wage, new_goods_price = equilibrium_prices
-        except ValueError as e:
-            print(f"Error in finding equilibrium: {e}")
-            new_wage, new_goods_price = initial_prices
-
-        # Update worker and firm decisions based on equilibrium prices
-        for worker, params in zip(workers, worker_params):
-            params['wage'] = new_wage
-            params['price'] = new_goods_price
+        # Update expectations and decisions
+        for worker in workers:
             try:
-                optimal_decision, _ = best_response('worker', params)
-                worker.update_decision(optimal_decision)
+                utility_params = worker.get_utility_params()
+                results = maximize_utility(utility_params)
+                worker.desired_consumption, worker.working_hours, _, _ = [arr[0] for arr in results]
             except ValueError as e:
-                print(f"Error in worker optimization: {e}")
+                print(f"Error in worker utility maximization: {e}")
+                worker.desired_consumption, worker.working_hours = 1, 8  # Default values
 
-        for firm, params in zip(firms, firm_params):
-            params['wage'] = new_wage
-            params['price'] = new_goods_price
+        for firm in firms:
             try:
-                optimal_decision, _ = best_response('firm', params)
-                firm.update_decision(optimal_decision)
+                print(f"calling profit maximization with {firm.get_profit_params()}")
+                profit_params = firm.get_profit_params()
+                result = profit_maximization(profit_params)
+                if result:
+                    firm.labor_demand = result['optimal_labor'] * 16
+                    firm.production = result['optimal_production']
+                else:
+                    print("Profit maximization returned None")
+                    firm.labor_demand, firm.production = 1, 1  # Default values
             except ValueError as e:
-                print(f"Error in firm optimization: {e}")
+                print(f"Error in firm profit maximization: {e}")
+                firm.labor_demand, firm.production = 1, 1  # Default values
 
-        # Update market statistics
-        labor_market_stats = {
-            'demand': sum(firm.labor_demand for firm in firms),
+
+        labor_price_params = {
+            'demand': sum(firm.labor_demand for firm in firms), 
             'supply': sum(worker.working_hours for worker in workers),
-            'price': new_wage,
             'bid': np.mean([firm.labor_bid for firm in firms]),
             'ask': np.mean([worker.desired_wage for worker in workers]),
             'bid_max': np.mean([firm.get_max_labor_price() for firm in firms]),
             'ask_min': np.mean([worker.get_min_wage() for worker in workers])
         }
+        # Labor market
+        labor_market_stats = {
+            'demand': labor_price_params['demand'],
+            'supply': labor_price_params['supply'],
+            'price': find_equilibrium_price(**labor_price_params),
+            'bid': labor_price_params['bid'],
+            'ask': labor_price_params['ask'],
+            'bid_max': labor_price_params['bid_max'],
+            'ask_min': labor_price_params['ask_min'],
+            'round_num': 1,
+            'advantage': '',
+            'market_type': 'labor'
+        }
 
-        consumption_market_stats = {
+        # Consumption market
+        Consumption_price_params = {
             'demand': sum(worker.desired_consumption for worker in workers),
             'supply': sum(firm.production for firm in firms),
-            'price': new_goods_price,
             'bid': np.mean([worker.desired_price for worker in workers]),
             'ask': np.mean([firm.consumption_ask for firm in firms]),
             'bid_max': np.mean([worker.get_max_consumption_price() for worker in workers]),
             'ask_min': np.mean([firm.get_min_consumption_price() for firm in firms])
         }
+        consumption_market_stats = {
+            'demand': Consumption_price_params['demand'],
+            'supply': Consumption_price_params['supply'],
+            'price': find_equilibrium_price(**Consumption_price_params),
+            'bid': Consumption_price_params['bid'],
+            'ask': Consumption_price_params['ask'],
+            'bid_max': Consumption_price_params['bid_max'],
+            'ask_min': Consumption_price_params['ask_min'],
+            'round_num': 1,
+            'advantage': '',
+            'market_type': 'consumption'
+        }
+
+        # Labor market strategic adjustments
+        for worker in workers:
+            price_decision_data = {**labor_market_stats, 'pvt_res_price': worker.get_min_wage(), 'is_buyer': False, 'previous_price': worker.desired_wage}
+            worker.desired_wage = best_response_exact(price_decision_data)
+
+        for firm in firms:
+            price_decision_data = {**labor_market_stats, 'pvt_res_price': firm.get_max_labor_price(), 'is_buyer': True, 'previous_price': firm.labor_bid}
+            firm.labor_bid = best_response_exact(price_decision_data)
+
+        # Consumption market strategic adjustments
+        for worker in workers:
+            price_decision_data = {**consumption_market_stats, 'pvt_res_price': worker.get_max_consumption_price(), 'is_buyer': True, 'previous_price': worker.desired_price}
+            worker.desired_price = best_response_exact(price_decision_data)
+
+        for firm in firms:
+            price_decision_data = {**consumption_market_stats, 'pvt_res_price': firm.get_min_consumption_price(), 'is_buyer': False, 'previous_price': firm.consumption_ask}
+            firm.consumption_ask = best_response_exact(price_decision_data)
+
+        # Market matching
+        labor_transactions = market_matching(
+            [(firm.labor_demand, firm.labor_bid, firm.id, firm.get_max_labor_price(), 0) for firm in firms],
+            [(worker.working_hours, worker.desired_wage, worker.unique_id, worker.get_min_wage(), 0, 0) for worker in workers]
+        )
+
+        consumption_transactions = market_matching(
+            [(worker.desired_consumption, worker.desired_price, worker.unique_id, worker.get_max_consumption_price(), 0) for worker in workers],
+            [(firm.production, firm.consumption_ask, firm.id, firm.get_min_consumption_price(), 0, 0) for firm in firms]
+        )
 
         # Update expectations
+        new_labor_price = np.mean([t[3] for t in labor_transactions]) if labor_transactions else labor_market_stats['price']
+        new_consumption_price = np.mean([t[3] for t in consumption_transactions]) if consumption_transactions else consumption_market_stats['price']
+
+        # Update the existing dictionaries instead of creating new ones
+        labor_market_stats.update({
+            'price': new_labor_price,
+            'demand': sum(t[2] for t in labor_transactions) if labor_transactions else labor_market_stats['demand']
+        })
+
+        consumption_market_stats.update({
+            'price': new_consumption_price,
+            'demand': sum(t[2] for t in consumption_transactions) if consumption_transactions else consumption_market_stats['demand'],
+            'supply': sum(t[2] for t in consumption_transactions if t[1] in [f.id for f in firms]) if consumption_transactions else consumption_market_stats['supply']
+        })
+
         for worker in workers:
             worker.update_expectations(labor_market_stats, consumption_market_stats)
 
@@ -112,18 +173,17 @@ def simulate_market():
             firm.update_expectations(labor_market_stats, consumption_market_stats)
 
         # Check for convergence
-        price_change = np.linalg.norm(equilibrium_prices - initial_prices) / np.linalg.norm(initial_prices)
-        print(f"Price change: {price_change:.4f}")
+        labor_price_change = abs(new_labor_price - labor_market_stats['price']) / labor_market_stats['price']
+        consumption_price_change = abs(new_consumption_price - consumption_market_stats['price']) / consumption_market_stats['price']
 
-        if price_change < tolerance:
+        print(f"Labor price change: {labor_price_change:.4f}")
+        print(f"Consumption price change: {consumption_price_change:.4f}")
+
+        if labor_price_change < tolerance and consumption_price_change < tolerance:
             print(f"Convergence achieved in {iteration + 1} iterations.")
-            break
 
         if iteration == max_iterations - 1:
             print(f"Max iterations ({max_iterations}) reached.")
-
-        # Update initial prices for next iteration
-        initial_prices = equilibrium_prices
 
         # After updating expectations and decisions
         if iteration % 10 == 0:  # Print info dump every 10 iterations
