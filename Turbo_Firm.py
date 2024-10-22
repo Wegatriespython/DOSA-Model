@@ -76,4 +76,6 @@ class Firm:
         
         if is_valid_number(consumption_market_stats.get('demand')):
             new_consumption_demand = alpha * consumption_market_stats['demand'] + (1 - alpha) * self.consumption_demand_expectations[0]
+
             self.consumption_demand_expectations = [new_consumption_demand]
+

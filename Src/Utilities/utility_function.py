@@ -42,9 +42,10 @@ def _maximize_utility(savings, wages, prices, discount_rate, periods, alpha, max
     model.T = pyo.RangeSet(0, periods-1)
 
     #Feed expectation values instead of raw current values for expected_labor_demand and expected_consumption_supply
+    expected_labor_demand = expected_labor_demand[0]/(30*max_working_hours)
+    max_working_hours = min(max(10, expected_labor_demand), 16)
 
-
-    max_consumption = expected_consumption_supply[0]/30 + 1
+    max_consumption = min(expected_consumption_supply[0], 1)
     model.consumption = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=1.0, bounds=(1e-6, None))
     model.working_hours = pyo.Var(model.T, domain=pyo.NonNegativeReals, bounds=(1e-6, max_working_hours))
     model.leisure = pyo.Var(model.T, domain=pyo.NonNegativeReals, bounds=(1e-6

@@ -18,8 +18,8 @@ def maximize_utility(params):
     alpha = params['alpha']
     max_working_hours = params['max_working_hours']
     working_hours = params['working_hours']
-    expected_labor_demand = [demand*16/30 for demand in params['expected_labor_demand']] #Convert to hours for workers
-    expected_consumption_supply = [supply / 30 for supply in params['expected_consumption_supply']] # Per-worker consumption available. 
+    expected_labor_demand = [demand for demand in params['expected_labor_demand']] #Convert to hours for workers
+    expected_consumption_supply = [supply for supply in params['expected_consumption_supply']] # Per-worker consumption available. 
     results = memoized_maximize_utility(savings, tuple(wages), tuple(prices), discount_rate, periods, alpha, max_working_hours, working_hours, tuple(expected_labor_demand), tuple(expected_consumption_supply), linear_solver = 'mumps')
     if results is None:
         print("No optimal solution found")
@@ -42,7 +42,7 @@ def _maximize_utility(savings, wages, prices, discount_rate, periods, alpha, max
     #Feed expectation values instead of raw current values for expected_labor_demand and expected_consumption_supply
 
 
-    max_consumption = expected_consumption_supply[0]/30 + 1
+    max_consumption = expected_consumption_supply[0] + 1
     model.consumption = pyo.Var(model.T, domain=pyo.NonNegativeReals, initialize=1.0, bounds=(1e-6, None))
     model.working_hours = pyo.Var(model.T, domain=pyo.NonNegativeReals, bounds=(1e-6, max_working_hours))
     model.leisure = pyo.Var(model.T, domain=pyo.NonNegativeReals, bounds=(1e-6

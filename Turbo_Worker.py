@@ -39,7 +39,7 @@ class Worker:
 
         income = wage * self.working_hours
 
-        price = (savings + income) / desired_consumption if desired_consumption != 0 else 0
+        price = income / desired_consumption if desired_consumption != 0 else 0
         # Apply a random reduction between 0-10% on the price
         reduction_factor = 1 - np.random.uniform(0, 0.1)
         price *= reduction_factor

@@ -37,7 +37,7 @@ def info_dump(agent):
 def simulate_market():
     num_workers = 30
     num_firms = 5
-    max_iterations = 500
+    max_iterations = 100
     tolerance = 1e-3
 
     # Create workers and firms using their initialized values
@@ -56,6 +56,8 @@ def simulate_market():
             try:
                 utility_params = worker.get_utility_params()
                 results = maximize_utility(utility_params)
+
+
                 worker.desired_consumption, worker.working_hours, _, _ = [arr[0] for arr in results]
             except ValueError as e:
                 print(f"Error in worker utility maximization: {e}")
@@ -66,6 +68,8 @@ def simulate_market():
                 print(f"calling profit maximization with {firm.get_profit_params()}")
                 profit_params = firm.get_profit_params()
                 result = profit_maximization(profit_params)
+                print(f"result: {result}")
+
                 if result:
                     firm.labor_demand = result['optimal_labor'] * 16
                     firm.production = result['optimal_production']
@@ -98,6 +102,7 @@ def simulate_market():
             'advantage': '',
             'market_type': 'labor'
         }
+
 
         # Consumption market
         Consumption_price_params = {
@@ -157,13 +162,14 @@ def simulate_market():
         # Update the existing dictionaries instead of creating new ones
         labor_market_stats.update({
             'price': new_labor_price,
-            'demand': sum(t[2] for t in labor_transactions) if labor_transactions else labor_market_stats['demand']
+            'quantity': sum(t[2] for t in labor_transactions) if labor_transactions else 0
+
         })
 
         consumption_market_stats.update({
             'price': new_consumption_price,
-            'demand': sum(t[2] for t in consumption_transactions) if consumption_transactions else consumption_market_stats['demand'],
-            'supply': sum(t[2] for t in consumption_transactions if t[1] in [f.id for f in firms]) if consumption_transactions else consumption_market_stats['supply']
+            'quantity': sum(t[2] for t in consumption_transactions) if consumption_transactions else 0
+
         })
 
         for worker in workers:
