@@ -6,8 +6,8 @@ from functools import lru_cache
 last_solution = None
 
 @lru_cache(maxsize=2056)
-def memoized_maximize_utility(savings, wages, prices, discount_rate, periods, alpha, max_working_hours, working_hours, expected_labor_demand, expected_consumption_supply, linear_solver):
-    return _maximize_utility(savings, wages, prices, discount_rate, periods, alpha, max_working_hours, working_hours, expected_labor_demand, expected_consumption_supply, linear_solver)
+def memoized_maximize_utility(savings, wages, prices, discount_rate, periods, alpha, max_working_hours, working_hours, expected_labor_demand, expected_consumption_supply, profit_income, linear_solver):
+    return _maximize_utility(savings, wages, prices, discount_rate, periods, alpha, max_working_hours, working_hours, expected_labor_demand, expected_consumption_supply, profit_income, linear_solver)
 
 def maximize_utility(params):
     savings = params['savings']
@@ -18,9 +18,10 @@ def maximize_utility(params):
     alpha = params['alpha']
     max_working_hours = params['max_working_hours']
     working_hours = params['working_hours']
+    profit_income = params['profit_income']
     expected_labor_demand = [demand for demand in params['expected_labor_demand']] #Convert to hours for workers
     expected_consumption_supply = [supply for supply in params['expected_consumption_supply']] # Per-worker consumption available. 
-    results = memoized_maximize_utility(savings, tuple(wages), tuple(prices), discount_rate, periods, alpha, max_working_hours, working_hours, tuple(expected_labor_demand), tuple(expected_consumption_supply), linear_solver = 'mumps')
+    results = memoized_maximize_utility(savings, tuple(wages), tuple(prices), discount_rate, periods, alpha, max_working_hours, working_hours, tuple(expected_labor_demand), tuple(expected_consumption_supply), tuple(profit_income), linear_solver = 'mumps')
     if results is None:
         print("No optimal solution found")
         return None
@@ -31,7 +32,7 @@ def maximize_utility(params):
 
 
 
-def _maximize_utility(savings, wages, prices, discount_rate, periods, alpha, max_working_hours, working_hours, expected_labor_demand, expected_consumption_supply, linear_solver):
+def _maximize_utility(savings, wages, prices, discount_rate, periods, alpha, max_working_hours, working_hours, expected_labor_demand, expected_consumption_supply, profit_income, linear_solver):
     global last_solution
 
     model = pyo.ConcreteModel()
@@ -48,7 +49,7 @@ def _maximize_utility(savings, wages, prices, discount_rate, periods, alpha, max
     model.leisure = pyo.Var(model.T, domain=pyo.NonNegativeReals, bounds=(1e-6
       , max_working_hours))
     model.savings = pyo.Var(model.T, domain=pyo.NonNegativeReals)
-
+    model.profit_income = pyo.Param(model.T, initialize=dict(enumerate(profit_income)))
     # Parameters
     model.initial_savings = pyo.Param(initialize=savings)
     model.wages = pyo.Param(model.T, initialize=dict(enumerate(wages)))
@@ -71,15 +72,12 @@ def _maximize_utility(savings, wages, prices, discount_rate, periods, alpha, max
     @model.Constraint(model.T)
     def savings_evolution(model,t):
         if t == 0:
-            return model.savings[t] == model.initial_savings + model.wages[t] * model.working_hours[t] - model.prices[t] * model.consumption[t]
+            return model.savings[t] == model.initial_savings + model.wages[t] * model.working_hours[t] - model.prices[t] * model.consumption[t] + model.profit_income[t]
         else:
-            return model.savings[t] == model.savings[t-1] + model.wages[t] * model.working_hours[t] - model.prices[t] * model.consumption[t]
+            return model.savings[t] == model.savings[t-1] + model.wages[t] * model.working_hours[t] - model.prices[t] * model.consumption[t] + model.profit_income[t]
+
 
     @model.Constraint(model.T)
-    def consumption_constraint(model, t):
-      return model.consumption[t] >= min_consumtion * decay_rate**t
-    @model.Constraint(model.T)
-
     def consumption_constraint2(model, t):
       return model.consumption[t] * model.prices[t] <= model.wages[t] * model.working_hours[t] + model.savings[t]
 

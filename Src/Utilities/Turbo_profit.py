@@ -74,8 +74,9 @@ def profit_maximization(params: Dict) -> Optional[Dict]:
             return None
 
         # Preprocess parameters - handle lists safely
-        labor_supply = float(params['labor_supply'][0]) /16
-        wage = float(params['wage'][0])/16
+        labor_supply = float(params['labor_supply'][0]) / 16 
+        wage = float(params['wage'][0]) * 16 # per unit wage per day of work 
+
         expected_demand = list(np.array(params['expected_demand'])/5)  # Create a copy
         
         return _profit_maximization(

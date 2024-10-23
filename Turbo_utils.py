@@ -95,10 +95,11 @@ def best_response_scenario_buyer(price_decision_data, debug=False):
     previous_price = price_decision_data['previous_price']
     demand = price_decision_data['demand']
     supply = price_decision_data['supply']
+    market_type = price_decision_data['market_type']
     
     def adjust_for_imbalance(base_price, upper_bound=None, lower_bound=None):
         imbalance_factor = (demand - supply) / (demand + supply)
-        adjustment = 0.1 * abs(imbalance_factor) #+ np.random.uniform(0, 0.01)  # Ensure some minimum adjustment
+        adjustment = 0.1 * abs(imbalance_factor) + np.random.uniform(0, 0.01)  # Ensure some minimum adjustment
         if imbalance_factor >= 0:
             return min(base_price * (1 + adjustment), upper_bound or float('inf'))
         else:
@@ -116,10 +117,10 @@ def best_response_scenario_buyer(price_decision_data, debug=False):
         case "Round1_Equilibrium_Trade" | "Round1_Equilibrium_NoTrade" | "Round2_BuyerAdv_Equilibrium_Trade" | "Round2_BuyerAdv_Equilibrium_NoTrade":
             target_price = (avg_seller_price + avg_buyer_price) / 2  # Meet in the middle
         case "Round1_ExcessSupply_Trade" | "Round1_ExcessSupply_NoTrade":
-            lower_bound = max(avg_seller_min_price, avg_buyer_price)
-            target_price = adjust_for_imbalance(avg_buyer_price, lower_bound=lower_bound)
+            lower_bound = avg_seller_min_price
+            target_price = adjust_for_imbalance(min(avg_buyer_price, avg_seller_price), lower_bound=lower_bound)
         case "Round2_BuyerAdv_ExcessSupply_Trade" | "Round2_BuyerAdv_ExcessSupply_NoTrade":
-            target_price = max(avg_seller_min_price, avg_buyer_price)
+            target_price = avg_seller_min_price
         case _:
             raise ValueError(f"Unknown scenario: {scenario}")
     
@@ -143,10 +144,11 @@ def best_response_scenario_seller(price_decision_data, debug=False):
     previous_price = price_decision_data['previous_price']
     demand = price_decision_data['demand']
     supply = price_decision_data['supply']
+    market_type = price_decision_data['market_type']
     
     def adjust_for_imbalance(base_price, lower_bound=None, upper_bound=None):
         imbalance_factor = (demand - supply) / (demand + supply)
-        adjustment = 0.1 * abs(imbalance_factor) #+ np.random.uniform(-0.01, 0.01)  # Ensure some minimum adjustment
+        adjustment = 0.1 * abs(imbalance_factor) + np.random.uniform(-0.01, 0.01)  # Ensure some minimum adjustment
         if imbalance_factor >= 0:
             return min(base_price * (1 + adjustment), upper_bound or float('inf'))
         else:
@@ -164,7 +166,7 @@ def best_response_scenario_seller(price_decision_data, debug=False):
         case "Round1_Equilibrium_Trade" | "Round1_Equilibrium_NoTrade" | "Round2_BuyerAdv_Equilibrium_Trade" | "Round2_BuyerAdv_Equilibrium_NoTrade":
             target_price = (avg_seller_price + avg_buyer_price) / 2  # Meet in the middle
         case "Round1_ExcessSupply_Trade" | "Round1_ExcessSupply_NoTrade":
-            lower_bound = max(pvt_res_price, avg_seller_price)
+            lower_bound = max(pvt_res_price, avg_buyer_price)
             target_price = adjust_for_imbalance(min(avg_seller_price, avg_buyer_price), lower_bound=lower_bound)
         case "Round2_BuyerAdv_ExcessSupply_Trade" | "Round2_BuyerAdv_ExcessSupply_NoTrade":
             target_price = max(avg_seller_min_price, pvt_res_price)
@@ -175,6 +177,5 @@ def best_response_scenario_seller(price_decision_data, debug=False):
     
     if debug:
         print(f"Scenario: {scenario}, Final Price: {final_price}")
-    
     return final_price
 

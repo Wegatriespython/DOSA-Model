@@ -57,7 +57,6 @@ def simulate_market():
                 utility_params = worker.get_utility_params()
                 results = maximize_utility(utility_params)
 
-
                 worker.desired_consumption, worker.working_hours, _, _ = [arr[0] for arr in results]
             except ValueError as e:
                 print(f"Error in worker utility maximization: {e}")
@@ -69,16 +68,15 @@ def simulate_market():
                 profit_params = firm.get_profit_params()
                 result = profit_maximization(profit_params)
                 print(f"result: {result}")
-
                 if result:
                     firm.labor_demand = result['optimal_labor'] * 16
                     firm.production = result['optimal_production']
                 else:
                     print("Profit maximization returned None")
-                    firm.labor_demand, firm.production = 1, 1  # Default values
+                    firm.labor_demand, firm.production = 16, 1  # Default values
             except ValueError as e:
                 print(f"Error in firm profit maximization: {e}")
-                firm.labor_demand, firm.production = 1, 1  # Default values
+                firm.labor_demand, firm.production = 16, 1  # Default values
 
 
         labor_price_params = {
@@ -156,19 +154,22 @@ def simulate_market():
         )
 
         # Update expectations
+        labor_quantity = sum(t[2] for t in labor_transactions) if labor_transactions else 0
+        consumption_quantity = sum(t[2] for t in consumption_transactions) if consumption_transactions else 0
         new_labor_price = np.mean([t[3] for t in labor_transactions]) if labor_transactions else labor_market_stats['price']
         new_consumption_price = np.mean([t[3] for t in consumption_transactions]) if consumption_transactions else consumption_market_stats['price']
-
+        profit = consumption_quantity * new_consumption_price - labor_quantity * new_labor_price
+        
         # Update the existing dictionaries instead of creating new ones
         labor_market_stats.update({
             'price': new_labor_price,
-            'quantity': sum(t[2] for t in labor_transactions) if labor_transactions else 0
-
+            'quantity': labor_quantity
         })
 
         consumption_market_stats.update({
             'price': new_consumption_price,
-            'quantity': sum(t[2] for t in consumption_transactions) if consumption_transactions else 0
+            'quantity': consumption_quantity,
+            'profit': profit
 
         })
 

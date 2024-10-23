@@ -19,12 +19,15 @@ class Worker:
                 'consumption': [30]
             },
             'price': {
-                'labor': [1],
+                'labor': [.0625],
                 'consumption': [1]
             },
             'supply': {
                 'labor': [300],
                 'consumption': [30]
+            },
+            'profit': {
+                'consumption': [0]
             }
         }
         self.demand_record = {'labor': [], 'consumption': []}
@@ -33,24 +36,13 @@ class Worker:
 
     def get_max_consumption_price(self):
         # set prices based on wage expectations
-        savings = self.savings
-        desired_consumption = self.desired_consumption
-        wage = self.worker_expectations['price']['labor'][0]
-
-        income = wage * self.working_hours
-
-        price = income / desired_consumption if desired_consumption != 0 else 0
-        # Apply a random reduction between 0-10% on the price
-        reduction_factor = 1 - np.random.uniform(0, 0.1)
-        price *= reduction_factor
+        price = self.worker_expectations['price']['consumption'][0] * 1.5
         return price
 
     def get_min_wage(self):
         # Set wages based on consumption price expectations
-        expenses = self.desired_consumption * self.worker_expectations['price']['consumption'][0]
-        wage = expenses / self.working_hours if self.working_hours != 0 else expenses
-        increment_factor = 1 + np.random.uniform(0, 0.1)
-        wage *= increment_factor
+        wage = self.worker_expectations['price']['labor'][0] * .5
+        wage = max(wage, 0.04)
         return wage
 
 
@@ -62,6 +54,7 @@ class Worker:
             'discount_rate': 0.05,
             'time_horizon': self.time_horizon,
             'alpha': 0.9,
+            'profit_income': self.worker_expectations['profit']['consumption'],
             'max_working_hours': self.max_working_hours,
             'working_hours': self.working_hours,
             'expected_labor_demand': self.worker_expectations['demand']['labor'],
@@ -94,6 +87,9 @@ class Worker:
         if is_valid_number(consumption_market_stats.get('supply')):
             new_consumption_supply = alpha * consumption_market_stats['supply'] + (1 - alpha) * self.worker_expectations['supply']['consumption'][0]
             self.worker_expectations['supply']['consumption'] = [new_consumption_supply]
+        if is_valid_number(consumption_market_stats.get('profit')):
+            new_consumption_profit = alpha * consumption_market_stats['profit']/30 + (1 - alpha) * self.worker_expectations['profit']['consumption'][0]
+            self.worker_expectations['profit']['consumption'] = [new_consumption_profit]
         
         # Update records
         self.price_record['labor'].append(self.worker_expectations['price']['labor'][0])

@@ -14,25 +14,19 @@ class Firm:
         self.labor_bid = 0.0625 
         self.consumption_ask = 1
         self.time_horizon = 1
-        self.labor_price_expectations = [1]
+        self.labor_price_expectations = [0.0625]
         self.labor_supply_expectations = [300]
         self.consumption_price_expectations = [1]
         self.consumption_demand_expectations = [30]
 
     def get_min_consumption_price(self):
         # Set consumption prices based on labor price expectations
-        costs = self.labor_demand * self.labor_price_expectations[0]
-        price = costs / self.production
-        increment_factor = 1 + np.random.uniform(0, 0.1)
-        price *= increment_factor
+        price = self.consumption_price_expectations[0] * .5
         return price
 
     def get_max_labor_price(self):
         # Set labor prices based on consumption price expectations
-        revenue = self.production * self.consumption_price_expectations[0]
-        price = revenue / self.labor_demand # Hourly wage maximum firm can pay
-        decrease_factor = 1 - np.random.uniform(0, 0.1)
-        price *= decrease_factor
+        price = self.labor_price_expectations[0] * 1.5
         return price
     
     def get_profit_params(self):
