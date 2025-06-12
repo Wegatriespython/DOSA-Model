@@ -156,8 +156,13 @@ def simulate_market():
         # Update expectations
         labor_quantity = sum(t[2] for t in labor_transactions) if labor_transactions else 0
         consumption_quantity = sum(t[2] for t in consumption_transactions) if consumption_transactions else 0
+
         new_labor_price = np.mean([t[3] for t in labor_transactions]) if labor_transactions else labor_market_stats['price']
         new_consumption_price = np.mean([t[3] for t in consumption_transactions]) if consumption_transactions else consumption_market_stats['price']
+
+        # Store previous prices before updating the market stats
+        prev_labor_price = labor_market_stats['price']
+        prev_consumption_price = consumption_market_stats['price']
         profit = consumption_quantity * new_consumption_price - labor_quantity * new_labor_price
         
         # Update the existing dictionaries instead of creating new ones
@@ -179,9 +184,9 @@ def simulate_market():
         for firm in firms:
             firm.update_expectations(labor_market_stats, consumption_market_stats)
 
-        # Check for convergence
-        labor_price_change = abs(new_labor_price - labor_market_stats['price']) / labor_market_stats['price']
-        consumption_price_change = abs(new_consumption_price - consumption_market_stats['price']) / consumption_market_stats['price']
+        # Check for convergence using the previous period's prices
+        labor_price_change = abs(new_labor_price - prev_labor_price) / prev_labor_price if prev_labor_price else 0
+        consumption_price_change = abs(new_consumption_price - prev_consumption_price) / prev_consumption_price if prev_consumption_price else 0
 
         print(f"Labor price change: {labor_price_change:.4f}")
         print(f"Consumption price change: {consumption_price_change:.4f}")
